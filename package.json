@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:rules": "pnpm --filter @mbh/rules-tests test:rules",
     "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {

@@ -31,13 +31,31 @@ Step 3 (Action Layer — the one mutation path):
   idempotent replay, cross-action requestId refusal, one-active-job.
 - `scripts/seed.ts` rewritten to authenticate + dispatch the real actions.
 
-Full suite: 40 tests green; typecheck, lint, seed all green.
+Step 4 (security rules — defence in depth):
+- firebase/firestore.rules: deny-by-default; tenants + members readable by
+  active members of the same tenant; loads readable only by the owning
+  shipper's members (raw loads are shipper-private; carriers will read a
+  public listing projection — a separate collection, not yet built); jobs +
+  their append-only events readable by active members of EITHER side; audit
+  and idempotency markers never client-readable; ALL client writes denied.
+- firebase/firestore.indexes.json: empty — current queries are single-field
+  equality (auto-indexed). A composite index goes here when the drain adds
+  an ordered+filtered query.
+- firebase/rules-tests: 14 tests via @firebase/rules-unit-testing against
+  the emulator, explicit allow AND deny per collection. Run with
+  `pnpm test:rules` (firebase emulators:exec wraps vitest). Wired into CI
+  (adds a JDK + the emulator to the validate job).
+
+Full unit suite: 40 tests green; rules: 14 green; typecheck, lint, seed
+all green.
 
 ## Next step
 
-docs/backlog/0002-security-rules.md — bootstrap step 4 (deny-by-default
-Firestore rules re-enforcing the model, indexes in the repo, rules tests
-per collection; introduces the Firebase emulator to CI). Startable cold.
+docs/backlog/0003-offline-queue-and-first-screen.md — bootstrap step 5
+(pure offline sync-queue engine, the Astro + React-island PWA shell, and
+the driver's offline "Mark Delivered" capture — the 30-second moment, with
+the new deliverJob action committing evidence + status in one batch). This
+is the first slice with a browser bundle. Startable cold.
 
 ## Known deferred items
 

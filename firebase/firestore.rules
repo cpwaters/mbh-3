@@ -1,0 +1,78 @@
+rules_version = '2';
+
+// Defence in depth: these rules re-enforce the Action Layer's model at the
+// database layer. Business data is client-READ-only and membership-gated;
+// ALL client writes to business collections are denied — every mutation goes
+// through the server-side dispatch function (which uses admin credentials
+// and bypasses rules). Absence of an allow denies. See docs/reference/
+// architecture.md §5.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // An actor is an active member of a tenant iff their member doc exists
+    // and is status 'active'. auth.uid is the actorId.
+    function isActiveMember(tenantId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function jobData(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId)).data;
+    }
+
+    // Tenants + members: readable by active members of the same tenant.
+    match /tenants/{tenantId} {
+      allow read: if isActiveMember(tenantId);
+      allow write: if false;
+
+      match /members/{actorId} {
+        allow read: if isActiveMember(tenantId);
+        allow write: if false;
+      }
+    }
+
+    // Loads are shipper-private (price, contacts). Only active members of the
+    // owning shipper tenant may read the raw load. Carriers browse a public
+    // listing projection — a separate collection, not yet built.
+    match /loads/{loadId} {
+      allow read: if isActiveMember(resource.data.tenantId);
+      allow write: if false;
+    }
+
+    // Jobs (+ their append-only events) are the shared cross-tenant record:
+    // readable by active members of EITHER side.
+    match /jobs/{jobId} {
+      allow read: if isActiveMember(resource.data.shipperTenantId)
+        || isActiveMember(resource.data.carrierTenantId);
+      allow write: if false;
+
+      match /events/{eventId} {
+        allow read: if isActiveMember(jobData(jobId).shipperTenantId)
+          || isActiveMember(jobData(jobId).carrierTenantId);
+        allow write: if false;
+      }
+    }
+
+    // Audit is the internal attribution log — server-reviewed only, never
+    // client-readable. (User-visible history is the job events above.)
+    match /audit/{auditId} {
+      allow read, write: if false;
+    }
+
+    // Idempotency markers: never client-readable or writable.
+    match /requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    // Deny everything not explicitly allowed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

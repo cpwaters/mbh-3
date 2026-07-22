@@ -4,3 +4,4 @@ packages:
   - 'packages/providers/*'
   - 'functions'
   - 'scripts'
+  - 'firebase/rules-tests'

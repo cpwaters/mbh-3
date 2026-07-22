@@ -21,10 +21,16 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      # Firestore emulator needs a JDK; ubuntu-latest ships one but pin it.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:rules
       - run: pnpm seed
   # The deploy job arrives at bootstrap step 6: needs validate, main only,
   # gated on PRODUCTION_DEPLOY == 'true', keyless auth via Workload Identity
