@@ -124,6 +124,22 @@ export function describeDataStoreContract(
       expect(await claim()).toBe(false);
     });
 
+    it('supports queries inside a transaction observing committed state', async () => {
+      const store = await makeStore();
+      await store.runBatch([
+        { kind: 'create', path: 'jobs/j1', data: { driverActorId: 'd1', status: 'accepted' } },
+        { kind: 'create', path: 'jobs/j2', data: { driverActorId: 'd2', status: 'closed' } },
+      ]);
+      const activeForD1 = await store.runTransaction(async (tx) => {
+        const rows = await tx.query({
+          collection: 'jobs',
+          filters: [{ field: 'driverActorId', op: '==', value: 'd1' }],
+        });
+        return rows.map((r) => r.path);
+      });
+      expect(activeForD1).toEqual(['jobs/j1']);
+    });
+
     it('discards transaction writes when the function throws', async () => {
       const store = await makeStore();
       await store.runBatch([{ kind: 'create', path: 'outbound/w1', data: { status: 'queued' } }]);

@@ -2,3 +2,4 @@
 // '@mbh/provider-interfaces/contract' subpath so that importing this
 // package at runtime never drags vitest in.
 export * from './datastore.js';
+export * from './auth-provider.js';

@@ -1,144 +1,82 @@
-// Walking-skeleton seed: proves the spine — domain entities + DataStore
-// contract + atomic claim — with zero cloud dependencies. Run: pnpm seed
-//
-// This intentionally composes writes by hand; once the Action Layer exists
-// (bootstrap step 3) the same flow becomes acceptLoad and this script
-// switches to dispatching actions instead.
+// Walking skeleton, now through the real Action Layer: authenticate an
+// actor from a token, then dispatch postLoad + acceptLoad. Proves the spine
+// end-to-end (auth → validate → authorize → effect + audit + marker) with
+// zero cloud dependencies. Run: pnpm seed
 
-import {
-  ACTIVE_JOB_STATUSES,
-  canTransitionLoad,
-  formatGbp,
-  isValidLoadPriceGbpPence,
-  type Job,
-  type Load,
-  type LoadStatus,
-  type Member,
-  type Tenant,
-} from '@mbh/domain';
-import { InMemoryDataStore } from '@mbh/provider-mocks';
+import { authenticateActor } from '@mbh/auth';
+import { buildRegistry, dispatch, type DispatchDeps } from '@mbh/actions';
+import { formatGbp } from '@mbh/domain';
+import { InMemoryDataStore, MockAuthProvider } from '@mbh/provider-mocks';
 
-const now = new Date().toISOString();
-
-const shipper: Tenant = {
-  tenantId: 'shipper-1',
-  name: 'Acme Distribution Ltd',
-  capabilities: ['shipper'],
-  createdAt: now,
-};
-
-const carrier: Tenant = {
-  tenantId: 'carrier-1',
-  name: 'Waters Haulage',
-  capabilities: ['carrier'],
-  createdAt: now,
-};
-
-const driver: Member = {
-  tenantId: carrier.tenantId,
-  actorId: 'driver-1',
-  displayName: 'Chris Waters',
-  role: 'driver',
-  status: 'active',
-  createdAt: now,
-};
-
-const load: Load = {
-  loadId: 'load-1',
-  tenantId: shipper.tenantId,
-  status: 'available',
-  origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
-  destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
-  consignment: { description: 'Mixed palletised goods', weightKg: 14200, palletCount: 16 },
-  priceGbpPence: 68_000,
-  pickupBy: '2026-08-01',
-  deliverBy: '2026-08-02',
-  createdAt: now,
-};
+function makeIdGen(): (prefix: string) => string {
+  const counters = new Map<string, number>();
+  return (prefix) => {
+    const n = (counters.get(prefix) ?? 0) + 1;
+    counters.set(prefix, n);
+    return `${prefix}-${n}`;
+  };
+}
 
 async function main(): Promise<void> {
-  if (!isValidLoadPriceGbpPence(load.priceGbpPence)) {
-    throw new Error('seed load violates the money invariant');
-  }
-
   const store = new InMemoryDataStore();
+  const auth = new MockAuthProvider();
+  const registry = buildRegistry();
+  const deps: DispatchDeps = { store, now: new Date().toISOString(), newId: makeIdGen() };
 
+  // Tenants + members (the composition root would provision these via an
+  // onboarding action; here we seed them directly to focus on the spine).
   await store.runBatch([
-    { kind: 'create', path: `tenants/${shipper.tenantId}`, data: { ...shipper } },
-    { kind: 'create', path: `tenants/${carrier.tenantId}`, data: { ...carrier } },
-    {
-      kind: 'create',
-      path: `tenants/${carrier.tenantId}/members/${driver.actorId}`,
-      data: { ...driver },
-    },
-    { kind: 'create', path: `loads/${load.loadId}`, data: { ...load } },
+    { kind: 'create', path: 'tenants/shipper-1', data: { tenantId: 'shipper-1', name: 'Acme Distribution Ltd', capabilities: ['shipper'] } },
+    { kind: 'create', path: 'tenants/carrier-1', data: { tenantId: 'carrier-1', name: 'Waters Haulage', capabilities: ['carrier'] } },
+    { kind: 'create', path: 'tenants/shipper-1/members/ship-owner', data: { tenantId: 'shipper-1', actorId: 'ship-owner', role: 'owner', status: 'active', displayName: 'Acme Owner' } },
+    { kind: 'create', path: 'tenants/carrier-1/members/driver-1', data: { tenantId: 'carrier-1', actorId: 'driver-1', role: 'driver', status: 'active', displayName: 'Chris Waters' } },
   ]);
+  auth.grant('ship-owner-token', 'ship-owner');
+  auth.grant('driver-token', 'driver-1');
 
-  // The acceptance: a transaction that CAS-claims the load and creates the
-  // cross-tenant Job + its first append-only event atomically — the same
-  // shape the real acceptLoad action will have.
-  const jobId = 'job-1';
-  const accepted = await store.runTransaction(async (tx) => {
-    const current = await tx.get(`loads/${load.loadId}`);
-    if (current === null) return false;
-    const status = current.status as LoadStatus;
-    if (status !== 'available' || !canTransitionLoad(status, 'matched')) return false;
+  // Shipper posts a load.
+  const shipper = await authenticateActor(auth, 'ship-owner-token');
+  const posted = (await dispatch(deps, registry, shipper, {
+    type: 'postLoad',
+    requestId: 'seed-post-1',
+    payload: {
+      shipperTenantId: 'shipper-1',
+      origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
+      destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
+      consignment: { description: 'Mixed palletised goods', weightKg: 14200, palletCount: 16 },
+      priceGbpPence: 68_000,
+      pickupBy: '2026-08-02',
+      deliverBy: '2026-08-03',
+    },
+  })) as { loadId: string };
 
-    // One-active-job-per-driver: refuse if the driver already has one.
-    const activeJobs = await store.query({
-      collection: 'jobs',
-      filters: [{ field: 'driverActorId', op: '==', value: driver.actorId }],
-    });
-    const hasActive = activeJobs.some((j) =>
-      (ACTIVE_JOB_STATUSES as readonly string[]).includes(j.data.status as string)
-    );
-    if (hasActive) return false;
+  // Driver accepts it.
+  const driver = await authenticateActor(auth, 'driver-token');
+  const accepted = (await dispatch(deps, registry, driver, {
+    type: 'acceptLoad',
+    requestId: 'seed-accept-1',
+    payload: { carrierTenantId: 'carrier-1', loadId: posted.loadId },
+  })) as { jobId: string };
 
-    const job: Job = {
-      jobId,
-      loadId: load.loadId,
-      shipperTenantId: shipper.tenantId,
-      carrierTenantId: carrier.tenantId,
-      driverActorId: driver.actorId,
-      status: 'accepted',
-      createdAt: new Date().toISOString(),
-    };
+  // Idempotent replay returns the original job, no second effect.
+  const replay = (await dispatch(deps, registry, driver, {
+    type: 'acceptLoad',
+    requestId: 'seed-accept-1',
+    payload: { carrierTenantId: 'carrier-1', loadId: posted.loadId },
+  })) as { jobId: string };
+  if (replay.jobId !== accepted.jobId) throw new Error('idempotent replay returned a different job');
 
-    tx.write({ kind: 'update', path: `loads/${load.loadId}`, data: { status: 'matched' } });
-    tx.write({ kind: 'create', path: `jobs/${jobId}`, data: { ...job } });
-    tx.write({
-      kind: 'create',
-      path: `jobs/${jobId}/events/evt-1`,
-      data: {
-        eventId: 'evt-1',
-        jobId,
-        type: 'job.accepted',
-        at: job.createdAt,
-        actorId: driver.actorId,
-        source: 'member',
-      },
-    });
-    return true;
-  });
+  const load = await store.getDoc(`loads/${posted.loadId}`);
+  const job = await store.getDoc(`jobs/${accepted.jobId}`);
+  const events = await store.query({ collection: `jobs/${accepted.jobId}/events` });
+  const audit = await store.query({ collection: 'audit' });
 
-  if (!accepted) throw new Error('walking skeleton failed: load was not claimable');
-
-  // A second acceptance attempt must observe the CAS and refuse.
-  const secondAttempt = await store.runTransaction(async (tx) => {
-    const current = await tx.get(`loads/${load.loadId}`);
-    return current !== null && current.status === 'available';
-  });
-  if (secondAttempt) throw new Error('walking skeleton failed: CAS did not hold');
-
-  const finalLoad = await store.getDoc(`loads/${load.loadId}`);
-  const finalJob = await store.getDoc(`jobs/${jobId}`);
-  const events = await store.query({ collection: `jobs/${jobId}/events` });
-
-  console.log('Walking skeleton: OK');
-  console.log(`  load ${load.loadId}: ${String(finalLoad?.status)} (${formatGbp(load.priceGbpPence)})`);
-  console.log(`  job ${jobId}: ${String(finalJob?.status)} — driver ${driver.displayName}`);
-  console.log(`  events: ${events.map((e) => String(e.data.type)).join(', ')}`);
-  console.log('  second claim correctly refused (CAS held)');
+  console.log('Walking skeleton (through the Action Layer): OK');
+  console.log(`  load ${posted.loadId}: ${String(load?.status)} (${formatGbp(68_000)})`);
+  console.log(`  job ${accepted.jobId}: ${String(job?.status)} — driver ${driver}`);
+  console.log(`  job events: ${events.map((e) => String(e.data.type)).join(', ')}`);
+  console.log(`  audit entries: ${audit.map((a) => String(a.data.action)).join(', ')}`);
+  console.log(`  idempotent replay returned the original job (${replay.jobId})`);
 }
 
 main().catch((err) => {

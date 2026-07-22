@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@mbh/actions": "workspace:*",
+    "@mbh/auth": "workspace:*",
     "@mbh/domain": "workspace:*",
+    "@mbh/paths": "workspace:*",
     "@mbh/provider-mocks": "workspace:*"
   }
 }

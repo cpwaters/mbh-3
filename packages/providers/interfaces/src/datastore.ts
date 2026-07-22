@@ -35,6 +35,9 @@ export interface QueryResult {
 
 export interface TransactionContext {
   get(path: string): Promise<DocData | null>;
+  // Queries inside a transaction observe committed state — needed for
+  // race-safe invariants like one-active-job-per-driver during a claim.
+  query(spec: QuerySpec): Promise<QueryResult[]>;
   write(op: WriteOp): void;
 }
 

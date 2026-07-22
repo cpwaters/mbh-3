@@ -8,6 +8,9 @@
   "include": ["*.ts"],
   "references": [
     { "path": "../packages/domain" },
+    { "path": "../packages/paths" },
+    { "path": "../packages/auth" },
+    { "path": "../packages/actions" },
     { "path": "../packages/providers/interfaces" },
     { "path": "../packages/providers/mocks" }
   ]

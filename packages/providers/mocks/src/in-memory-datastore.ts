@@ -38,6 +38,10 @@ export class InMemoryDataStore implements DataStore {
   }
 
   async query(spec: QuerySpec): Promise<QueryResult[]> {
+    return this.queryCommitted(spec);
+  }
+
+  private queryCommitted(spec: QuerySpec): QueryResult[] {
     if (!isCollectionPath(spec.collection)) {
       throw new DataStoreError('invalid-path', `Not a collection path: ${spec.collection}`);
     }
@@ -71,6 +75,7 @@ export class InMemoryDataStore implements DataStore {
           const doc = this.docs.get(path);
           return doc === undefined ? null : clone(doc);
         },
+        query: async (spec) => this.queryCommitted(spec),
         write: (op) => {
           buffered.push(op);
         },
