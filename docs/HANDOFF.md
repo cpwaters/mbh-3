@@ -105,33 +105,49 @@ Step 6a (real DataStore provider — proven equivalent to the mock):
   Firestore on the emulator — all 13 pass, identical to the mock. This is
   the proof that mock-first CI is faithful to production. Wired into CI.
 
-Full unit suite: 75 green; contract: 13 green (emulator); rules: 14 green;
+Step 6b (the HTTP dispatch boundary + the two functions):
+- @mbh/actions gains handleHttpRequest — the exact logic the dispatch
+  function runs, as a pure function of an HTTP-ish request (method, path,
+  Authorization header, body). Routes /health (no auth) and POST
+  /api/dispatch (authenticateActor from the bearer token → the action
+  registry). Maps AppError codes to HTTP status (401/403/404/400/409/500)
+  and returns the SAME { ok:true, result } | { ok:false, error } shape the
+  HttpDispatchTransport already parses — the loop is closed at the logic
+  level. Never leaks internal error detail. 9 tests against the mocks.
+- functions/: exactly two gen2 functions (europe-west2). dispatch — a thin
+  onRequest adapter over handleHttpRequest. drain — a 1-minute
+  onSchedule claim/backoff/record SKELETON (no-op until the first outbound
+  work type exists). composition.ts wires FirestoreDataStore +
+  FirebaseAuthProvider (getAuth().verifyIdToken) + the registry, cached
+  across warm invocations. Built + typechecked (in tsc -b); the boundary
+  logic they wrap is fully unit-tested.
+
+Full unit suite: 84 green; contract: 13 green (emulator); rules: 14 green;
 astro check 0 errors; build, typecheck, lint, seed green.
 
-## DEPLOY-TARGET DECISION PENDING (blocks the go-live parts of step 6)
+## DECISION MADE: fresh project
 
-Founder named project `mybackhaul-21112` — but that is the LIVE PROTOTYPE's
-project (cpwaters/mbh-2 is deployed there with real accounts + load data).
-Reusing it for mbh-3 is a hard conflict:
-- Firestore has ONE ruleset per project: deploying mbh-3's deny-by-default
-  rules replaces the prototype's permissive rules and breaks the prototype
-  (all its client-side writes denied).
-- The `loads` collection name collides with an incompatible schema.
-- One default hosting site: deploying mbh-3 replaces the prototype's site.
-Options: (a) a FRESH project for mbh-3 (original plan; prototype stays live
-until parity), or (b) reuse `mybackhaul-21112` and retire the prototype now.
-Nothing is deployed and no project id is baked into config yet — the
-FirestoreDataStore + contract are project-independent.
+Founder chose a FRESH Firebase/GCP project for mbh-3 (the mybackhaul-21112
+prototype stays live as the demo until parity; migrate real accounts by
+script at cutover). Nothing is deployed; no project id is baked into config.
 
-## Next step (after the decision)
+## FOUNDER ACTION NEEDED (unblocks go-live)
 
-Rest of step 6: the two gen2 functions (dispatch wiring FirestoreDataStore +
-real Firebase auth verification → the action registry; a 1-minute drain
-skeleton), firebase.json hosting rewrites (/api/** → dispatch), Terraform
-env (budget alert, uptime probe, WIF pinned to the repo), the keyless CI
-deploy job (gated on PRODUCTION_DEPLOY), and smoke:prod. Backlog slice 0004.
-The dispatch function makes /api/dispatch (which the offline queue already
-targets) real, closing the loop end to end.
+Create the new Firebase/GCP project + enable billing; give Claude the
+project id. Then the remaining step-6 slice can finish: functions deploy
+bundling (workspace deps → a self-contained bundle; pnpm workspaces don't
+deploy as-is), firebase.json hosting rewrites (/api/** and /health →
+dispatch, static apps/web/dist), the Firestore emulator wired to run the
+functions for a loop-closing integration test (POST /api/dispatch with a
+real token creates a job), Terraform env (budget alert, uptime probe on
+/health, WIF pinned to the repo), the keyless CI deploy job (gated on the
+PRODUCTION_DEPLOY repo variable), and smoke:prod. Backlog slice 0004.
+
+## Next step
+
+Await the fresh project id, then finish the go-live slice above. Everything
+buildable/testable without the cloud is done: the dispatch boundary and
+both functions exist and typecheck; only real deployment remains.
 
 ## Known deferred items
 

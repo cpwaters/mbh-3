@@ -6,6 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
+    "@mbh/auth": "workspace:*",
     "@mbh/domain": "workspace:*",
     "@mbh/paths": "workspace:*",
     "@mbh/provider-interfaces": "workspace:*",

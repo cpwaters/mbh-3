@@ -1,0 +1,17 @@
+{
+  "name": "@mbh/functions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "@mbh/actions": "workspace:*",
+    "@mbh/provider-firestore": "workspace:*",
+    "@mbh/provider-interfaces": "workspace:*",
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  }
+}

@@ -12,6 +12,7 @@
     { "path": "packages/providers/http" },
     { "path": "packages/providers/indexeddb" },
     { "path": "packages/providers/firestore" },
+    { "path": "functions" },
     { "path": "scripts" }
   ]
 }

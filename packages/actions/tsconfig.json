@@ -8,6 +8,7 @@
   "references": [
     { "path": "../domain" },
     { "path": "../paths" },
+    { "path": "../auth" },
     { "path": "../providers/interfaces" },
     { "path": "../providers/mocks" }
   ]
