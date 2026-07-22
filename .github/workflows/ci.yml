@@ -32,6 +32,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm test:rules
+      - run: pnpm test:contract
       - run: pnpm seed
       - run: pnpm build
   # The deploy job arrives at bootstrap step 6: needs validate, main only,

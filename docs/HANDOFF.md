@@ -94,19 +94,44 @@ Step 5d (the web layer — bootstrap step 5 complete):
 - CI gains `pnpm check:web` (astro check — 0 errors) and `pnpm build`
   (astro build). Root eslint ignores apps/web/.astro generated files.
 
-Full unit suite: 75 tests green; rules: 14 green; astro check 0 errors;
-build green; typecheck, lint, seed green. Bootstrap steps 1–5 complete.
+Step 6a (real DataStore provider — proven equivalent to the mock):
+- @mbh/provider-firestore: FirestoreDataStore (Admin SDK; the only package
+  importing firebase-admin). Transaction writes are buffered and flushed
+  after the callback so all reads precede all writes (Firestore's rule)
+  while the callback reads-then-writes naturally; the buffer is per-attempt
+  so retry-on-contention re-runs cleanly. gRPC errors mapped to the
+  contract's codes (ALREADY_EXISTS→already-exists, NOT_FOUND→not-found).
+- pnpm test:contract runs the SAME DataStore contract suite against real
+  Firestore on the emulator — all 13 pass, identical to the mock. This is
+  the proof that mock-first CI is faithful to production. Wired into CI.
 
-## Next step
+Full unit suite: 75 green; contract: 13 green (emulator); rules: 14 green;
+astro check 0 errors; build, typecheck, lint, seed green.
 
-Bootstrap step 6 — the real cloud: create the Firebase/GCP project +
-billing (FOUNDER action, out of chat), then the FirestoreDataStore behind
-the SAME contract suite (test:contract on the emulator), the two gen2
-functions (dispatch + 1-minute drain), Terraform env (budget alert, uptime
-probe), keyless WIF deploy job, and smoke:prod. This is the first slice
-that needs a cloud account and the first that can cost money — nothing
-before it does. The dispatch function makes the /api/dispatch the offline
-queue already posts to real, closing the loop end to end.
+## DEPLOY-TARGET DECISION PENDING (blocks the go-live parts of step 6)
+
+Founder named project `mybackhaul-21112` — but that is the LIVE PROTOTYPE's
+project (cpwaters/mbh-2 is deployed there with real accounts + load data).
+Reusing it for mbh-3 is a hard conflict:
+- Firestore has ONE ruleset per project: deploying mbh-3's deny-by-default
+  rules replaces the prototype's permissive rules and breaks the prototype
+  (all its client-side writes denied).
+- The `loads` collection name collides with an incompatible schema.
+- One default hosting site: deploying mbh-3 replaces the prototype's site.
+Options: (a) a FRESH project for mbh-3 (original plan; prototype stays live
+until parity), or (b) reuse `mybackhaul-21112` and retire the prototype now.
+Nothing is deployed and no project id is baked into config yet — the
+FirestoreDataStore + contract are project-independent.
+
+## Next step (after the decision)
+
+Rest of step 6: the two gen2 functions (dispatch wiring FirestoreDataStore +
+real Firebase auth verification → the action registry; a 1-minute drain
+skeleton), firebase.json hosting rewrites (/api/** → dispatch), Terraform
+env (budget alert, uptime probe, WIF pinned to the repo), the keyless CI
+deploy job (gated on PRODUCTION_DEPLOY), and smoke:prod. Backlog slice 0004.
+The dispatch function makes /api/dispatch (which the offline queue already
+targets) real, closing the loop end to end.
 
 ## Known deferred items
 

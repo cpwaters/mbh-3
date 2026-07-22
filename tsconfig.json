@@ -11,6 +11,7 @@
     { "path": "packages/providers/mocks" },
     { "path": "packages/providers/http" },
     { "path": "packages/providers/indexeddb" },
+    { "path": "packages/providers/firestore" },
     { "path": "scripts" }
   ]
 }
