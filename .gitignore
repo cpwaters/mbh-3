@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Env / secrets — secrets live in Secret Manager, never in the repo
+.env
+.env.*
+!.env.example
+*serviceAccount*.json
+*service-account*.json
+*.pem
+*.p12
+*.key
+
+# Firebase local state / logs
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pglite-debug.log
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json

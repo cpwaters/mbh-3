@@ -1,0 +1,10 @@
+{
+  "name": "@mbh/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mbh/domain": "workspace:*",
+    "@mbh/provider-mocks": "workspace:*"
+  }
+}

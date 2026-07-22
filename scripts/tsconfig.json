@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "noEmit": false
+  },
+  "include": ["*.ts"],
+  "references": [
+    { "path": "../packages/domain" },
+    { "path": "../packages/providers/interfaces" },
+    { "path": "../packages/providers/mocks" }
+  ]
+}
