@@ -3,15 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "engines": {
     "node": "22"
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.cjs --external:firebase-admin --external:firebase-functions"
+  },
   "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  },
+  "devDependencies": {
     "@mbh/actions": "workspace:*",
     "@mbh/provider-firestore": "workspace:*",
     "@mbh/provider-interfaces": "workspace:*",
-    "firebase-admin": "^13.0.2",
-    "firebase-functions": "^6.3.0"
+    "esbuild": "^0.25.0"
   }
 }

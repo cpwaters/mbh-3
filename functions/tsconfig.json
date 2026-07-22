@@ -2,15 +2,12 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist",
     "lib": ["ES2022"],
-    "types": ["node"]
+    "types": ["node"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true
   },
-  "include": ["src"],
-  "references": [
-    { "path": "../packages/domain" },
-    { "path": "../packages/actions" },
-    { "path": "../packages/providers/interfaces" },
-    { "path": "../packages/providers/firestore" }
-  ]
+  "include": ["src"]
 }

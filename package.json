@@ -12,10 +12,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rules": "pnpm --filter @mbh/rules-tests test:rules",
-    "test:contract": "firebase emulators:exec --only firestore --project demo-mbh --config firebase/firebase.json 'vitest run --config vitest.contract.config.ts'",
+    "test:contract": "firebase emulators:exec --only firestore --project demo-mbh 'vitest run --config vitest.contract.config.ts'",
+    "test:functions": "pnpm --filter @mbh/functions build && firebase emulators:exec --only functions,firestore,auth --project demo-mbh 'vitest run --config functions/vitest.integration.config.ts'",
     "check:web": "pnpm --filter @mbh/web check",
     "build": "pnpm --filter @mbh/web build",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "smoke:prod": "tsx scripts/smoke-prod.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

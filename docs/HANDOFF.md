@@ -125,29 +125,50 @@ Step 6b (the HTTP dispatch boundary + the two functions):
 Full unit suite: 84 green; contract: 13 green (emulator); rules: 14 green;
 astro check 0 errors; build, typecheck, lint, seed green.
 
-## DECISION MADE: fresh project
+Step 6c (go-live plumbing — all code/config done + emulator-proven):
+- Project: mybackhaul-app (fresh). .firebaserc targets it; firebase.json at
+  the repo root (firestore rules/indexes in firebase/, functions with an
+  esbuild-bundle predeploy, hosting apps/web/dist with /api/** + /health
+  rewrites to dispatch, emulators). Rules/contract scripts use the root
+  config now.
+- Functions deploy bundle: esbuild bundles src → dist/index.cjs (workspace
+  deps + zod inlined; firebase-admin/functions external) so pnpm-workspace
+  functions deploy cleanly; functions typechecked separately (noEmit, out of
+  the composite graph).
+- test:functions — the loop-closing integration test: builds functions, runs
+  them in the emulator (functions+firestore+auth), mints a REAL Firebase
+  token, POSTs to /api/dispatch through the real dispatch function, and
+  asserts a real Firestore job is created (+ /health, 401 fail-closed,
+  idempotent replay). 4 tests green. Wired into CI.
+- Terraform (infrastructure/environments/production): budget alert
+  (50/90/100%), uptime check on /health, keyless WIF pool/provider pinned to
+  cpwaters/mbh-3, deploy service account + roles. terraform fmt + validate
+  clean.
+- CI deploy job: needs validate; main + push only; gated on the
+  PRODUCTION_DEPLOY repo variable; keyless WIF auth; firebase deploy
+  functions+hosting+firestore; then smoke:prod (scripts/smoke-prod.ts:
+  /health 200, unauthenticated /api/dispatch 401 fail-closed, pages 200).
 
-Founder chose a FRESH Firebase/GCP project for mbh-3 (the mybackhaul-21112
-prototype stays live as the demo until parity; migrate real accounts by
-script at cutover). Nothing is deployed; no project id is baked into config.
+Full suite: 84 unit + 13 contract + 14 rules + 4 functions-integration green;
+typecheck (root + functions), lint, build, seed green; terraform validate
+clean.
 
-## FOUNDER ACTION NEEDED (unblocks go-live)
+## FOUNDER ACTION NEEDED — cloud provisioning + first deploy
 
-Create the new Firebase/GCP project + enable billing; give Claude the
-project id. Then the remaining step-6 slice can finish: functions deploy
-bundling (workspace deps → a self-contained bundle; pnpm workspaces don't
-deploy as-is), firebase.json hosting rewrites (/api/** and /health →
-dispatch, static apps/web/dist), the Firestore emulator wired to run the
-functions for a loop-closing integration test (POST /api/dispatch with a
-real token creates a job), Terraform env (budget alert, uptime probe on
-/health, WIF pinned to the repo), the keyless CI deploy job (gated on the
-PRODUCTION_DEPLOY repo variable), and smoke:prod. Backlog slice 0004.
+All code/config is done and emulator-proven; the remaining steps need the
+founder's cloud credentials (CLI auth was expired this session). Exact
+commands are in docs/runbooks/go-live.md: re-auth gcloud/firebase, enable
+APIs, create the Firestore db in europe-west2, `terraform apply` (WIF +
+budget + uptime), set three GitHub repo variables (WIF_PROVIDER,
+DEPLOY_SERVICE_ACCOUNT, PRODUCTION_DEPLOY=true), then push to main — CI
+deploys keylessly and runs smoke:prod. No secrets transit chat.
 
 ## Next step
 
-Await the fresh project id, then finish the go-live slice above. Everything
-buildable/testable without the cloud is done: the dispatch boundary and
-both functions exist and typecheck; only real deployment remains.
+After the go-live runbook + first green deploy: step 7 (external
+integrations — labs scripts against live APIs, adapters behind interfaces,
+the drain's first outbound leg) and/or step 8 (E2E browser journeys, docs).
+Migrate the prototype's real accounts by script at cutover.
 
 ## Known deferred items
 

@@ -23,6 +23,13 @@ firestore-debug.log
 ui-debug.log
 pglite-debug.log
 
+# Terraform state + real vars (never commit secrets/state)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.terraform.lock.hcl
+
 # Test artifacts
 coverage/
 playwright-report/

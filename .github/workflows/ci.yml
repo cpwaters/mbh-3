@@ -28,13 +28,43 @@ jobs:
           java-version: 21
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm --filter @mbh/functions typecheck
       - run: pnpm check:web
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm test:rules
       - run: pnpm test:contract
+      - run: pnpm test:functions
       - run: pnpm seed
       - run: pnpm build
-  # The deploy job arrives at bootstrap step 6: needs validate, main only,
-  # gated on PRODUCTION_DEPLOY == 'true', keyless auth via Workload Identity
-  # Federation. Hand-deploys are an emergency escape hatch, not a path.
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    # Only from main, and only when the repo variable is explicitly enabled.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY == 'true'
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # required for keyless Workload Identity Federation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build # apps/web/dist for hosting (functions build in predeploy)
+      # Keyless auth — no service-account keys. The WIF provider's attribute
+      # condition pins this repo; the repo variables come from terraform output.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+      - run: pnpm exec firebase deploy --only functions,hosting,firestore --project mybackhaul-app --non-interactive
+      - run: pnpm smoke:prod
+        env:
+          SMOKE_BASE_URL: https://mybackhaul-app.web.app
