@@ -63,18 +63,50 @@ Step 5b (offline sync-queue engine — @mbh/offline, a pure zero-dep layer):
   Honest states: queued / sending / failed. 11 tests. A real double-count
   bug in attempts was caught by the test and fixed.
 
-Full unit suite: 56 tests green; rules: 14 green; typecheck, lint, seed
-green. Steps 1–4 + 5a/5b CI all confirmed green on GitHub.
+Step 5c (browser providers): @mbh/provider-http (HttpDispatchTransport,
+Zod-parsed responses, retry-by-default so a capture is never lost) and
+@mbh/provider-indexeddb (IndexedDbQueueStorage via idb, durable across
+reloads). Tested with fake fetch + fake-indexeddb.
+
+Step 5d (the web layer — bootstrap step 5 complete):
+- @mbh/client (pure): buildDeliverRequest (same domain PoD validation at
+  capture time) + genRequestId (stable idempotency key). Tested.
+- apps/web: Astro static output + one React island. Landing is pure Astro
+  (zero JS); the driver app is the island at /app. PWA: hand-written
+  service worker (network-first navigations, versioned mbh-shell-v1 cache,
+  /api/* never cached), manifest.webmanifest, SVG icon, Barlow +
+  Barlow Condensed fonts.
+- The 30-second moment: MarkDelivered captures photos + signature (canvas
+  pad) + recipient, buildDeliverRequest validates inline (red-star required
+  fields), and onCommit enqueues via the real SyncQueue wired to the
+  IndexedDB + HTTP providers at the composition root (apps/web/src/lib/
+  queue.ts). Honest offline UX: a badge counts what's queued, rows show
+  "Waiting for signal…", drains on mount / online event / 15s interval.
+- Verified in a real browser (Playwright): filling the form and tapping
+  Record delivery persists a deliverJob to IndexedDB (status queued) and
+  shows the "saved to this device, sent automatically when you have signal"
+  confirmation; the only network error is the expected /api/dispatch 404
+  (no backend yet), which correctly keeps the item queued.
+- Since there is no auth/backend yet, the active job is read from URL
+  params purely for demo (?job=&carrier=); without them the app shows an
+  honest "No active job" empty state. The token is null so drains retry —
+  honest offline behaviour, not a bug.
+- CI gains `pnpm check:web` (astro check — 0 errors) and `pnpm build`
+  (astro build). Root eslint ignores apps/web/.astro generated files.
+
+Full unit suite: 75 tests green; rules: 14 green; astro check 0 errors;
+build green; typecheck, lint, seed green. Bootstrap steps 1–5 complete.
 
 ## Next step
 
-The remainder of docs/backlog/0003 — bootstrap step 5's web layer: the
-Astro static site + one React island (PWA: hand-written service worker,
-manifest, Barlow fonts), wiring the offline SyncQueue to a fetch transport
-and IndexedDB storage provider, and the driver's "Mark Delivered" capture
-screen (the 30-second moment) that enqueues offline and shows "waiting for
-signal…". First slice producing a browser bundle. The pure pieces it needs
-(deliverJob action, SyncQueue engine) are done and tested.
+Bootstrap step 6 — the real cloud: create the Firebase/GCP project +
+billing (FOUNDER action, out of chat), then the FirestoreDataStore behind
+the SAME contract suite (test:contract on the emulator), the two gen2
+functions (dispatch + 1-minute drain), Terraform env (budget alert, uptime
+probe), keyless WIF deploy job, and smoke:prod. This is the first slice
+that needs a cloud account and the first that can cost money — nothing
+before it does. The dispatch function makes the /api/dispatch the offline
+queue already posts to real, closing the loop end to end.
 
 ## Known deferred items
 

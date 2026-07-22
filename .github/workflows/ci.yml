@@ -28,10 +28,12 @@ jobs:
           java-version: 21
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      - run: pnpm check:web
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm test:rules
       - run: pnpm seed
+      - run: pnpm build
   # The deploy job arrives at bootstrap step 6: needs validate, main only,
   # gated on PRODUCTION_DEPLOY == 'true', keyless auth via Workload Identity
   # Federation. Hand-deploys are an emergency escape hatch, not a path.

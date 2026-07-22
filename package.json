@@ -12,6 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rules": "pnpm --filter @mbh/rules-tests test:rules",
+    "check:web": "pnpm --filter @mbh/web check",
+    "build": "pnpm --filter @mbh/web build",
     "seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {

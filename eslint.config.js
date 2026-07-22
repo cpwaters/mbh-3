@@ -28,7 +28,14 @@ const FORBIDDEN_IN_PURE_LAYERS = [
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/*.js', '!eslint.config.js'],
+    // Generated output and Astro's generated type files are not ours to lint.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/*.js',
+      '!eslint.config.js',
+      'apps/web/.astro/**',
+    ],
   },
   ...tseslint.configs.recommended,
   {

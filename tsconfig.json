@@ -6,6 +6,7 @@
     { "path": "packages/auth" },
     { "path": "packages/actions" },
     { "path": "packages/offline" },
+    { "path": "packages/client" },
     { "path": "packages/providers/interfaces" },
     { "path": "packages/providers/mocks" },
     { "path": "packages/providers/http" },

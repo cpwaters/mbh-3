@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+.astro/
 
 # Env / secrets — secrets live in Secret Manager, never in the repo
 .env

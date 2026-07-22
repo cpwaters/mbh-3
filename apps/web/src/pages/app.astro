@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import DriverApp from '../components/DriverApp.tsx';
+---
+
+<Base title="MyBackHaul — driver">
+  <DriverApp client:only="react" />
+  <script>
+    // Register the PWA service worker (network-first navigations, versioned
+    // shell cache). Guarded so a failed registration never breaks the app.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+          /* offline capture still works without the SW */
+        });
+      });
+    }
+  </script>
+</Base>
