@@ -7,3 +7,6 @@ export { postLoadHandler } from './actions/post-load.js';
 export type { PostLoadPayload, PostLoadResult } from './actions/post-load.js';
 export { acceptLoadHandler } from './actions/accept-load.js';
 export type { AcceptLoadPayload, AcceptLoadResult } from './actions/accept-load.js';
+export { collectJobHandler, startTransitHandler } from './actions/progress-job.js';
+export { deliverJobHandler } from './actions/deliver-job.js';
+export type { DeliverJobPayload, DeliverJobResult } from './actions/deliver-job.js';

@@ -66,15 +66,34 @@ async function main(): Promise<void> {
   })) as { jobId: string };
   if (replay.jobId !== accepted.jobId) throw new Error('idempotent replay returned a different job');
 
+  // Walk the job lifecycle: collect -> in transit -> deliver (the atomic
+  // legal event: PoD evidence + status + event in one batch).
+  const carrier = { carrierTenantId: 'carrier-1', jobId: accepted.jobId };
+  await dispatch(deps, registry, driver, { type: 'collectJob', requestId: 'seed-collect', payload: carrier });
+  await dispatch(deps, registry, driver, { type: 'startTransit', requestId: 'seed-transit', payload: carrier });
+  const delivered = (await dispatch(deps, registry, driver, {
+    type: 'deliverJob',
+    requestId: 'seed-deliver',
+    payload: {
+      ...carrier,
+      photoRefs: ['storage://pod/photo-1.jpg'],
+      signatureRef: 'storage://pod/signature-1.png',
+      recipientName: 'Warehouse Supervisor',
+      location: { lat: 55.98, lng: -3.17 },
+    },
+  })) as { jobId: string; evidenceId: string };
+
   const load = await store.getDoc(`loads/${posted.loadId}`);
   const job = await store.getDoc(`jobs/${accepted.jobId}`);
   const events = await store.query({ collection: `jobs/${accepted.jobId}/events` });
+  const evidence = await store.getDoc(`jobs/${accepted.jobId}/evidence/${delivered.evidenceId}`);
   const audit = await store.query({ collection: 'audit' });
 
   console.log('Walking skeleton (through the Action Layer): OK');
   console.log(`  load ${posted.loadId}: ${String(load?.status)} (${formatGbp(68_000)})`);
   console.log(`  job ${accepted.jobId}: ${String(job?.status)} — driver ${driver}`);
-  console.log(`  job events: ${events.map((e) => String(e.data.type)).join(', ')}`);
+  console.log(`  job events: ${events.map((e) => String(e.data.type)).join(' -> ')}`);
+  console.log(`  proof of delivery: ${String(evidence?.recipientName)} signed (${delivered.evidenceId})`);
   console.log(`  audit entries: ${audit.map((a) => String(a.data.action)).join(', ')}`);
   console.log(`  idempotent replay returned the original job (${replay.jobId})`);
 }

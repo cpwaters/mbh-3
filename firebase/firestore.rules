@@ -57,6 +57,14 @@ service cloud.firestore {
           || isActiveMember(jobData(jobId).carrierTenantId);
         allow write: if false;
       }
+
+      // Evidence (Proof of Delivery, collection photos) — the legal
+      // artifacts. Readable by both sides; never client-written.
+      match /evidence/{evidenceId} {
+        allow read: if isActiveMember(jobData(jobId).shipperTenantId)
+          || isActiveMember(jobData(jobId).carrierTenantId);
+        allow write: if false;
+      }
     }
 
     // Audit is the internal attribution log — server-reviewed only, never

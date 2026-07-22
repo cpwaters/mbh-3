@@ -48,6 +48,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'loads/load-1'), { loadId: 'load-1', tenantId: 'shipper-1', status: 'available', priceGbpPence: 68000 });
     await setDoc(doc(db, 'jobs/job-1'), { jobId: 'job-1', loadId: 'load-1', shipperTenantId: 'shipper-1', carrierTenantId: 'carrier-1', driverActorId: CAR_DRIVER, status: 'accepted' });
     await setDoc(doc(db, 'jobs/job-1/events/evt-1'), { eventId: 'evt-1', jobId: 'job-1', type: 'job.accepted', source: 'member', actorId: CAR_DRIVER });
+    await setDoc(doc(db, 'jobs/job-1/evidence/evd-1'), { evidenceId: 'evd-1', jobId: 'job-1', kind: 'delivery', recipientName: 'J. Smith', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'audit/audit-1'), { auditId: 'audit-1', action: 'acceptLoad', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
   });
@@ -95,21 +96,25 @@ describe('loads (shipper-private)', () => {
 });
 
 describe('jobs + events (shared cross-tenant record)', () => {
-  it('members of either side read the job and its events', async () => {
+  it('members of either side read the job, its events, and its evidence', async () => {
     await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'jobs/job-1')));
     await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'jobs/job-1')));
     await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'jobs/job-1/events/evt-1')));
     await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'jobs/job-1/events/evt-1')));
+    await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'jobs/job-1/evidence/evd-1')));
+    await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'jobs/job-1/evidence/evd-1')));
   });
 
-  it('an outsider cannot read the job or its events', async () => {
+  it('an outsider cannot read the job, its events, or its evidence', async () => {
     await assertFails(getDoc(doc(db(OUTSIDER), 'jobs/job-1')));
     await assertFails(getDoc(doc(db(OUTSIDER), 'jobs/job-1/events/evt-1')));
+    await assertFails(getDoc(doc(db(OUTSIDER), 'jobs/job-1/evidence/evd-1')));
   });
 
-  it('no client can write a job or event', async () => {
+  it('no client can write a job, event, or evidence (no forging a PoD)', async () => {
     await assertFails(setDoc(doc(db(CAR_DRIVER), 'jobs/job-1'), { status: 'delivered', shipperTenantId: 'shipper-1', carrierTenantId: 'carrier-1' }));
     await assertFails(setDoc(doc(db(CAR_DRIVER), 'jobs/job-1/events/evt-hack'), { type: 'job.delivered', source: 'member' }));
+    await assertFails(setDoc(doc(db(CAR_DRIVER), 'jobs/job-1/evidence/evd-hack'), { kind: 'delivery', recipientName: 'Forged' }));
   });
 });
 

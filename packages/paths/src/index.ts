@@ -55,6 +55,14 @@ export function jobEventDoc(jobId: string, eventId: string): string {
   return `${jobEventsCollection(jobId)}/${eventId}`;
 }
 
+export function jobEvidenceCollection(jobId: string): string {
+  return `${jobDoc(jobId)}/evidence`;
+}
+
+export function jobEvidenceDoc(jobId: string, evidenceId: string): string {
+  return `${jobEvidenceCollection(jobId)}/${evidenceId}`;
+}
+
 export function auditDoc(auditId: string): string {
   return `${COLLECTIONS.audit}/${auditId}`;
 }
