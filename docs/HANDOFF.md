@@ -46,16 +46,35 @@ Step 4 (security rules — defence in depth):
   `pnpm test:rules` (firebase emulators:exec wraps vitest). Wired into CI
   (adds a JDK + the emulator to the validate job).
 
-Full unit suite: 40 tests green; rules: 14 green; typecheck, lint, seed
-all green.
+Step 5a (job lifecycle + the atomic legal event):
+- domain: JobEvidence + validateDeliveryEvidence (PoD needs photo +
+  signature + recipient). paths: evidence docs. Actions: collectJob,
+  startTransit (plain status+event), deliverJob (PoD evidence + delivered
+  status + event in ONE batch). Rules cover jobs/*/evidence. Seed walks the
+  full lifecycle and prints the PoD.
+
+Step 5b (offline sync-queue engine — @mbh/offline, a pure zero-dep layer):
+- Ports: QueueStorage + DispatchTransport (interfaces; in-memory test
+  doubles in testing.ts). SyncQueue: enqueue (offline capture; idempotent
+  on requestId; refuses non-idempotent action types via an injected
+  allow-list), pendingCount (the "waiting for signal" badge), drain
+  (queued → deliver; retry keeps it queued, permanent 4xx → failed and
+  auto-retry stops; resends the SAME requestId so the server dedupes).
+  Honest states: queued / sending / failed. 11 tests. A real double-count
+  bug in attempts was caught by the test and fixed.
+
+Full unit suite: 56 tests green; rules: 14 green; typecheck, lint, seed
+green. Steps 1–4 + 5a/5b CI all confirmed green on GitHub.
 
 ## Next step
 
-docs/backlog/0003-offline-queue-and-first-screen.md — bootstrap step 5
-(pure offline sync-queue engine, the Astro + React-island PWA shell, and
-the driver's offline "Mark Delivered" capture — the 30-second moment, with
-the new deliverJob action committing evidence + status in one batch). This
-is the first slice with a browser bundle. Startable cold.
+The remainder of docs/backlog/0003 — bootstrap step 5's web layer: the
+Astro static site + one React island (PWA: hand-written service worker,
+manifest, Barlow fonts), wiring the offline SyncQueue to a fetch transport
+and IndexedDB storage provider, and the driver's "Mark Delivered" capture
+screen (the 30-second moment) that enqueues offline and shows "waiting for
+signal…". First slice producing a browser bundle. The pure pieces it needs
+(deliverJob action, SyncQueue engine) are done and tested.
 
 ## Known deferred items
 
