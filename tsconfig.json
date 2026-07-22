@@ -8,6 +8,8 @@
     { "path": "packages/offline" },
     { "path": "packages/providers/interfaces" },
     { "path": "packages/providers/mocks" },
+    { "path": "packages/providers/http" },
+    { "path": "packages/providers/indexeddb" },
     { "path": "scripts" }
   ]
 }
