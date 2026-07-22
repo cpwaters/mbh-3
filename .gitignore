@@ -43,3 +43,7 @@ test-results/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Terraform saved plan artifacts
+tfplan
+*.tfplan

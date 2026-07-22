@@ -2,6 +2,12 @@
 # budget emails at 50/90/100% of a small monthly cap so a runaway cost is
 # caught fast.
 
+# The budgets API stores/returns the project *number*, so filtering by the
+# project id produces a perpetual diff. Resolve the number once and use it.
+data "google_project" "this" {
+  project_id = var.project_id
+}
+
 resource "google_monitoring_notification_channel" "email" {
   display_name = "mbh alerts"
   type         = "email"
@@ -15,7 +21,7 @@ resource "google_billing_budget" "monthly" {
   display_name    = "mbh-3 monthly budget"
 
   budget_filter {
-    projects = ["projects/${var.project_id}"]
+    projects = ["projects/${data.google_project.this.number}"]
   }
 
   amount {
