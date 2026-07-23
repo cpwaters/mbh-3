@@ -52,6 +52,10 @@ locals {
     "roles/datastore.indexAdmin",
     "roles/iam.serviceAccountUser",
     "roles/serviceusage.serviceUsageConsumer",
+    # firebase deploy pre-flights the project's extension instances even for a
+    # functions/hosting/firestore deploy; this read-only role grants the
+    # required firebaseextensions.configs.list permission.
+    "roles/firebaseextensions.editor",
   ]
 }
 
