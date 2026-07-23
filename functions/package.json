@@ -16,9 +16,6 @@
     "firebase-functions": "^6.3.0"
   },
   "devDependencies": {
-    "@mbh/actions": "workspace:*",
-    "@mbh/provider-firestore": "workspace:*",
-    "@mbh/provider-interfaces": "workspace:*",
     "esbuild": "^0.25.0"
   }
 }

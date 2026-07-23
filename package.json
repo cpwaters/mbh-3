@@ -20,6 +20,9 @@
     "smoke:prod": "tsx scripts/smoke-prod.ts"
   },
   "devDependencies": {
+    "@mbh/actions": "workspace:*",
+    "@mbh/provider-firestore": "workspace:*",
+    "@mbh/provider-interfaces": "workspace:*",
     "@types/node": "^22.10.0",
     "eslint": "^9.17.0",
     "firebase-tools": "^13.29.0",

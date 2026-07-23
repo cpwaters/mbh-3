@@ -8,6 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@mbh/actions':
+        specifier: workspace:*
+        version: link:packages/actions
+      '@mbh/provider-firestore':
+        specifier: workspace:*
+        version: link:packages/providers/firestore
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:packages/providers/interfaces
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
@@ -106,15 +115,6 @@ importers:
         specifier: ^6.3.0
         version: 6.6.0(firebase-admin@13.10.0)
     devDependencies:
-      '@mbh/actions':
-        specifier: workspace:*
-        version: link:../packages/actions
-      '@mbh/provider-firestore':
-        specifier: workspace:*
-        version: link:../packages/providers/firestore
-      '@mbh/provider-interfaces':
-        specifier: workspace:*
-        version: link:../packages/providers/interfaces
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12

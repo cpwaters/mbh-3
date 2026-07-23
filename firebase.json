@@ -15,8 +15,8 @@
     "public": "apps/web/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/api/**", "function": "dispatch" },
-      { "source": "/health", "function": "dispatch" }
+      { "source": "/api/**", "function": { "functionId": "dispatch", "region": "europe-west2" } },
+      { "source": "/health", "function": { "functionId": "dispatch", "region": "europe-west2" } }
     ]
   },
   "emulators": {
