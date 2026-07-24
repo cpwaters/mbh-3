@@ -82,6 +82,13 @@ condition in the WIF provider.)
 - The deploy SA is least-privileged; it cannot enable APIs (hence enabling
   them all up front) and needs `roles/firebaseextensions.editor` for the CLI's
   extension-instances pre-flight (in Terraform).
+- A **scheduled (`onSchedule`) function** deploys a Cloud Scheduler job, so the
+  deploy SA needs `roles/cloudscheduler.admin` (in Terraform) — without it the
+  deploy 403s on `cloudscheduler.jobs.create/update`. Note firebase only
+  (re)writes the schedule when the function's deployed config changes, so if
+  you grant the role after a skipped deploy, force one redeploy of that
+  function (any config/source change) to actually create the job. No App
+  Engine app is required.
 
 ## Never
 
