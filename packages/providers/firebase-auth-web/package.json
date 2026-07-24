@@ -1,0 +1,12 @@
+{
+  "name": "@mbh/provider-firebase-auth-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@mbh/provider-interfaces": "workspace:*",
+    "firebase": "^11.3.0"
+  }
+}

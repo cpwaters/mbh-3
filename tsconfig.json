@@ -15,6 +15,7 @@
     { "path": "packages/providers/firestore" },
     { "path": "packages/providers/postcodes-io" },
     { "path": "packages/providers/osrm" },
+    { "path": "packages/providers/firebase-auth-web" },
     { "path": "labs" },
     { "path": "scripts" }
   ]

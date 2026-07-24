@@ -207,6 +207,15 @@ importers:
 
   packages/paths: {}
 
+  packages/providers/firebase-auth-web:
+    dependencies:
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
+      firebase:
+        specifier: ^11.3.0
+        version: 11.10.0
+
   packages/providers/firestore:
     dependencies:
       '@mbh/provider-interfaces':
