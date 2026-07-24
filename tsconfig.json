@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/domain" },
     { "path": "packages/paths" },
+    { "path": "packages/wire" },
     { "path": "packages/auth" },
     { "path": "packages/actions" },
     { "path": "packages/offline" },
@@ -12,6 +13,9 @@
     { "path": "packages/providers/http" },
     { "path": "packages/providers/indexeddb" },
     { "path": "packages/providers/firestore" },
+    { "path": "packages/providers/postcodes-io" },
+    { "path": "packages/providers/osrm" },
+    { "path": "labs" },
     { "path": "scripts" }
   ]
 }

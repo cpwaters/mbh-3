@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["*.ts"],
+  "references": [
+    { "path": "../packages/domain" },
+    { "path": "../packages/wire" },
+    { "path": "../packages/providers/postcodes-io" },
+    { "path": "../packages/providers/osrm" }
+  ]
+}

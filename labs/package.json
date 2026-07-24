@@ -1,0 +1,19 @@
+{
+  "name": "@mbh/labs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postcodes-io": "tsx postcodes-io.ts",
+    "osrm": "tsx osrm.ts"
+  },
+  "dependencies": {
+    "@mbh/domain": "workspace:*",
+    "@mbh/provider-osrm": "workspace:*",
+    "@mbh/provider-postcodes-io": "workspace:*",
+    "@mbh/wire": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

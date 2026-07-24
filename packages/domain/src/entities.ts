@@ -2,6 +2,8 @@
 // no browser APIs. Timestamps are ISO-8601 UTC strings; money is integer
 // GBP pence. Every tenant-scoped document carries a denormalized tenantId.
 
+import type { LoadRoute } from './geo.js';
+
 export type TenantCapability = 'shipper' | 'carrier';
 
 export interface Tenant {
@@ -51,6 +53,9 @@ export interface Load {
   pickupBy: string;
   deliverBy: string;
   createdAt: string;
+  // System-written enrichment (geocode + driving route), absent until the
+  // drain has processed this load. Never user-supplied.
+  route?: LoadRoute;
 }
 
 // A Job is the cross-tenant record created by acceptance — the shared,
