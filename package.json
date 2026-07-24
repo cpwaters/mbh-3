@@ -28,6 +28,7 @@
     "@mbh/provider-postcodes-io": "workspace:*",
     "@types/node": "^22.10.0",
     "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
     "firebase-tools": "^13.29.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

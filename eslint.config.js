@@ -1,4 +1,5 @@
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 // Vendor SDKs, framework code, and browser APIs are forbidden in the pure
 // layers (domain, offline, auth, actions, provider interfaces, mocks).
@@ -52,6 +53,19 @@ export default tseslint.config(
           })),
         },
       ],
+    },
+  },
+  {
+    // Footgun rule (a hard-won lesson): a React hook placed after a conditional
+    // early return silently blanks the whole screen AND still typechecks. Make
+    // it a hard error wherever React components live. A canary test
+    // (tooling/lint-canary.test.ts) proves this config actually catches the
+    // exact shape.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   }
 );

@@ -205,12 +205,35 @@ Step 7b (the drain's first outbound leg):
 Full suite: 113 unit + 13 contract + 16 rules + 4 functions-integration green;
 typecheck, lint, build, check:web, seed all green.
 
+## Step 8 (E2E regression net + the footgun lint rule)
+
+Step 8a (E2E browser journeys): @mbh/e2e — Playwright against the real
+production bundle (astro preview serves it), selectors user-visible text only.
+Four journeys: landing→app nav, the no-active-job empty state, the full
+30-second moment (photo + drawn signature + recipient → "Delivery recorded" +
+queued), and the required-proof guard. The core flow is offline-first so it
+needs no backend — the E2E covers the browser DOM/React behaviour the
+HTTP-level functions-integration test can't see. Wired into CI validate
+(installs chromium, runs after build); `pnpm test:e2e` runs it locally.
+
+Step 8b (footgun lint): react-hooks/rules-of-hooks is now an ERROR on
+apps/web (a hook after a conditional early return blanks the screen yet
+typechecks). A canary (tooling/lint-canary.test.ts) lints inline good/bad
+snippets through the real eslint config and asserts the rule actually
+fires — so a silent regression of the wiring fails the suite.
+
+Full suite: 115 unit + 13 contract + 16 rules + 4 functions-integration +
+4 E2E green; typecheck, lint, build, check:web, seed all green.
+
 ## Next step
 
-Step 8 (E2E browser journeys as the regression net; user docs + screenshots).
-Also: a hosted/self-run OSRM before real volume (see backlog), the carrier
-listing projection (ADR 0002), and migrating the prototype's real accounts at
-cutover.
+- User docs + screenshots: deferred until the flows stabilize (no sign-in yet;
+  the driver app reads its job from URL params for demo). Build when a real
+  sign-in + active-job flow lands.
+- A sign-in flow (Firebase Auth client in its own provider package) — unblocks
+  a full-loop E2E (browser → real dispatch → Firestore) against the emulator.
+- Hosted/self-run OSRM before real volume (see backlog); the carrier listing
+  projection (ADR 0002); migrating the prototype's real accounts at cutover.
 
 ## Known deferred items
 
