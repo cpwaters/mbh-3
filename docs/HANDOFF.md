@@ -153,15 +153,21 @@ Full suite: 84 unit + 13 contract + 14 rules + 4 functions-integration green;
 typecheck (root + functions), lint, build, seed green; terraform validate
 clean.
 
-## FOUNDER ACTION NEEDED — cloud provisioning + first deploy
+## GO-LIVE COMPLETE — LIVE in production
 
-All code/config is done and emulator-proven; the remaining steps need the
-founder's cloud credentials (CLI auth was expired this session). Exact
-commands are in docs/runbooks/go-live.md: re-auth gcloud/firebase, enable
-APIs, create the Firestore db in europe-west2, `terraform apply` (WIF +
-budget + uptime), set three GitHub repo variables (WIF_PROVIDER,
-DEPLOY_SERVICE_ACCOUNT, PRODUCTION_DEPLOY=true), then push to main — CI
-deploys keylessly and runs smoke:prod. No secrets transit chat.
+The first production deploy is green. https://mybackhaul-app.web.app is
+serving: landing 200, /app PWA 200, /health 200 via the hosting rewrite to
+the gen2 `dispatch` function (europe-west2) → Firestore, unauthenticated
+/api/dispatch 401 (fail-closed), firestore rules released, `drain` scheduled.
+CI deploys keylessly via WIF on green; `smoke:prod` passes in the deploy job.
+
+Infra provisioned via Terraform (WIF, deploy SA + least-priv roles incl.
+firebaseextensions.editor, budget, uptime). The go-live surfaced several
+cloud steps now captured in docs/runbooks/go-live.md: enable the full API set
+up front (the least-priv deploy SA can't), set ADC quota project for the
+budget apply, npm-clean functions manifest for the buildpack, region-pinned
+hosting rewrites, and a one-time `allUsers` run.invoker grant on `dispatch`
+(the last blocker — hosting 404s until the public function is invocable).
 
 ## Next step
 
