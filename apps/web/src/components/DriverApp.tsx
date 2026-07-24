@@ -1,28 +1,28 @@
-import { useMemo } from 'react';
 import type { DeliverCapture } from '@mbh/client';
+import type { DriverJobView } from '@mbh/provider-interfaces';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
+import { useActiveJob } from './useActiveJob';
 import { SignIn } from './SignIn';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
 // The driver app island (browser-only). Auth gates the app: signed out shows
 // the sign-in screen; signed in, the real ID token authenticates every
-// dispatch. The active job is still read from URL params (a driver "home" that
-// reads it from Firestore is a later slice); without them we show an honest
-// empty state. The offline queue is fully real — a capture persists to
-// IndexedDB and delivers to /api/dispatch when there is signal.
+// dispatch and the driver's current job is read from Firestore (rules-gated).
+// The offline queue is fully real — a capture persists to IndexedDB and
+// delivers to /api/dispatch when there is signal.
 
-function readDemoJob(): ActiveJob | null {
-  if (typeof window === 'undefined') return null;
-  const p = new URLSearchParams(window.location.search);
-  const jobId = p.get('job');
-  const carrierTenantId = p.get('carrier');
-  if (jobId === null || carrierTenantId === null) return null;
+// Present the address as a short "Town, POSTCODE" line for the capture header.
+function label(a: { town: string; postcode: string }): string {
+  return `${a.town}, ${a.postcode}`;
+}
+
+function toActiveJob(job: DriverJobView): ActiveJob {
   return {
-    jobId,
-    carrierTenantId,
-    origin: p.get('origin') ?? 'Manchester, M17 1WS',
-    destination: p.get('destination') ?? 'Edinburgh, EH6 6JJ',
+    jobId: job.jobId,
+    carrierTenantId: job.carrierTenantId,
+    origin: label(job.origin),
+    destination: label(job.destination),
   };
 }
 
@@ -31,7 +31,7 @@ export default function DriverApp() {
   // signed-in session, so drains are authenticated once signed in.
   const auth = useAuth();
   const queue = useSyncQueue(auth.getIdToken);
-  const job = useMemo(readDemoJob, []);
+  const { loading: jobLoading, job } = useActiveJob(auth.session?.actorId ?? null);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
@@ -79,13 +79,17 @@ export default function DriverApp() {
         </button>
       </p>
 
-      {job === null ? (
+      {jobLoading ? (
+        <div className="card">
+          <p className="muted">Loading your job…</p>
+        </div>
+      ) : job === null ? (
         <div className="card">
           <h2>No active job</h2>
           <p className="muted">When you accept a load, your current delivery will show here.</p>
         </div>
       ) : (
-        <MarkDelivered job={job} onCommit={commit} />
+        <MarkDelivered job={toActiveJob(job)} onCommit={commit} />
       )}
 
       {queue.items.length > 0 && (

@@ -74,6 +74,9 @@ importers:
       '@mbh/provider-firebase-auth-web':
         specifier: workspace:*
         version: link:../../packages/providers/firebase-auth-web
+      '@mbh/provider-firestore-web':
+        specifier: workspace:*
+        version: link:../../packages/providers/firestore-web
       '@mbh/provider-http':
         specifier: workspace:*
         version: link:../../packages/providers/http
@@ -237,6 +240,21 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
+
+  packages/providers/firestore-web:
+    dependencies:
+      '@mbh/domain':
+        specifier: workspace:*
+        version: link:../../domain
+      '@mbh/paths':
+        specifier: workspace:*
+        version: link:../../paths
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
+      firebase:
+        specifier: ^11.3.0
+        version: 11.10.0
 
   packages/providers/http:
     dependencies:

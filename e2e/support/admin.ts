@@ -16,23 +16,33 @@ export const E2E = {
   password: 'test-password-123',
   carrierTenantId: 'carrier-e2e',
   jobId: 'job-e2e',
+  // A driver with no active job (for the empty-state journey).
+  joblessUid: 'driver-nojob-e2e',
+  joblessEmail: 'nojob.e2e@haulier.test',
+  joblessPassword: 'test-password-456',
 } as const;
 
 function app() {
   if (getApps().length === 0) initializeApp({ projectId: PROJECT_ID });
 }
 
-// Seed an auth user + the state the UI cannot reach (an in-transit job the
-// signed-in driver owns), so the sign-in → capture → deliver loop can run.
-export async function seedDeliverableJob(): Promise<void> {
-  app();
+async function ensureUser(uid: string, email: string, password: string): Promise<void> {
   const auth = getAuth();
   try {
-    await auth.deleteUser(E2E.uid);
+    await auth.deleteUser(uid);
   } catch {
     // first run — no user to delete
   }
-  await auth.createUser({ uid: E2E.uid, email: E2E.email, password: E2E.password });
+  await auth.createUser({ uid, email, password });
+}
+
+// Seed the auth users + the state the UI cannot reach (an in-transit job the
+// signed-in driver owns, with its delivery details), so the sign-in → read the
+// job from Firestore → capture → deliver loop can run.
+export async function seedDeliverableJob(): Promise<void> {
+  app();
+  await ensureUser(E2E.uid, E2E.email, E2E.password);
+  await ensureUser(E2E.joblessUid, E2E.joblessEmail, E2E.joblessPassword);
 
   const db = getFirestore();
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({
@@ -40,13 +50,15 @@ export async function seedDeliverableJob(): Promise<void> {
     name: 'Waters Haulage',
     capabilities: ['carrier'],
   });
-  await db.doc(`tenants/${E2E.carrierTenantId}/members/${E2E.uid}`).set({
-    tenantId: E2E.carrierTenantId,
-    actorId: E2E.uid,
-    role: 'driver',
-    status: 'active',
-    displayName: 'Chris Waters',
-  });
+  for (const uid of [E2E.uid, E2E.joblessUid]) {
+    await db.doc(`tenants/${E2E.carrierTenantId}/members/${uid}`).set({
+      tenantId: E2E.carrierTenantId,
+      actorId: uid,
+      role: 'driver',
+      status: 'active',
+      displayName: 'Test Driver',
+    });
+  }
   await db.doc(`jobs/${E2E.jobId}`).set({
     jobId: E2E.jobId,
     loadId: 'load-e2e',
@@ -54,6 +66,8 @@ export async function seedDeliverableJob(): Promise<void> {
     carrierTenantId: E2E.carrierTenantId,
     driverActorId: E2E.uid,
     status: 'in_transit',
+    origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
+    destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
     createdAt: new Date().toISOString(),
   });
 }
