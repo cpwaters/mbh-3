@@ -27,8 +27,12 @@ export function tenantDoc(tenantId: string): string {
   return `${COLLECTIONS.tenants}/${tenantId}`;
 }
 
+// The leaf name of the members subcollection — also the id for a
+// collection-group query (a user reading their own member docs across tenants).
+export const MEMBERS_SUBCOLLECTION = 'members';
+
 export function membersCollection(tenantId: string): string {
-  return `${tenantDoc(tenantId)}/members`;
+  return `${tenantDoc(tenantId)}/${MEMBERS_SUBCOLLECTION}`;
 }
 
 export function memberDoc(tenantId: string, actorId: string): string {

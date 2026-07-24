@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DriverJobView } from '@mbh/provider-interfaces';
-import { getJobReader } from '../lib/jobs';
+import { getReader } from '../lib/reader';
 
 export interface ActiveJobState {
   loading: boolean;
@@ -10,7 +10,7 @@ export interface ActiveJobState {
 // Reads the signed-in driver's current job from Firestore. Re-reads when the
 // signed-in actor changes; a null actor (signed out) resolves to no job.
 export function useActiveJob(actorId: string | null): ActiveJobState {
-  const reader = useMemo(getJobReader, []);
+  const reader = useMemo(getReader, []);
   const [state, setState] = useState<ActiveJobState>({ loading: actorId !== null, job: null });
 
   useEffect(() => {

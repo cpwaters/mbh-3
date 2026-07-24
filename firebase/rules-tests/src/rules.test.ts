@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import { collection, collectionGroup, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 
 // Every collection gets explicit allow AND deny cases. A client is an actor
 // (auth.uid == actorId). All writes are server-only, so client writes must
@@ -94,6 +94,18 @@ describe('loads (shipper-private)', () => {
 
   it('no client can write a load', async () => {
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'loads/load-1'), { tenantId: 'shipper-1', status: 'cancelled' }));
+  });
+});
+
+describe('memberships (a user reads their own across tenants)', () => {
+  it('a user can collection-group query their own member docs', async () => {
+    const mine = query(collectionGroup(db(CAR_DRIVER), 'members'), where('actorId', '==', CAR_DRIVER));
+    await assertSucceeds(getDocs(mine));
+  });
+
+  it("a user cannot query someone else's memberships", async () => {
+    const notMine = query(collectionGroup(db(CAR_DRIVER), 'members'), where('actorId', '==', SHIP_OWNER));
+    await assertFails(getDocs(notMine));
   });
 });
 

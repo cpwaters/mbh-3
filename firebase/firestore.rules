@@ -96,6 +96,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // A user may read their OWN member docs across all tenants (to discover
+    // which tenants they act for — the carrier browse needs the carrier tenant
+    // id). Field-aligned with `actorId == uid` so the collection-group query is
+    // authorized; writes stay server-only (denied above under /tenants).
+    match /{path=**}/members/{memberId} {
+      allow read: if isSignedIn() && resource.data.actorId == request.auth.uid;
+    }
+
     // Deny everything not explicitly allowed above.
     match /{document=**} {
       allow read, write: if false;

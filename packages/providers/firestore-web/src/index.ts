@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
 import {
   collection,
+  collectionGroup,
   connectFirestoreEmulator,
   getDocs,
   getFirestore,
@@ -8,13 +9,27 @@ import {
   where,
   type Firestore,
 } from 'firebase/firestore';
-import { ACTIVE_JOB_STATUSES, type Address, type JobStatus, type LoadRoute } from '@mbh/domain';
-import { jobsCollection } from '@mbh/paths';
-import type { DriverJobView, JobReader } from '@mbh/provider-interfaces';
+import {
+  ACTIVE_JOB_STATUSES,
+  type Address,
+  type JobStatus,
+  type Listing,
+  type LoadRoute,
+  type Role,
+} from '@mbh/domain';
+import { jobsCollection, listingsCollection, MEMBERS_SUBCOLLECTION } from '@mbh/paths';
+import type {
+  DriverJobView,
+  JobReader,
+  ListingReader,
+  Membership,
+  MembershipReader,
+} from '@mbh/provider-interfaces';
 
 // The ONLY package that imports the Firestore web SDK. Business READS go
-// directly to the store (rules-gated); this adapts that read to the JobReader
-// interface. Shares the Firebase app with the auth provider (getApps()[0]).
+// directly to the store (rules-gated); this adapts them to the reader
+// interfaces the app depends on. One class + one Firestore instance so the
+// emulator connection is made exactly once.
 
 export interface FirestoreWebConfig {
   apiKey: string;
@@ -37,7 +52,7 @@ interface JobDoc {
   route?: LoadRoute;
 }
 
-export class FirestoreJobReader implements JobReader {
+export class FirestoreReader implements JobReader, ListingReader, MembershipReader {
   private readonly db: Firestore;
 
   constructor(options: FirestoreWebOptions) {
@@ -67,5 +82,24 @@ export class FirestoreJobReader implements JobReader {
       }
     }
     return null;
+  }
+
+  async availableListings(): Promise<Listing[]> {
+    const snap = await getDocs(collection(this.db, listingsCollection()));
+    const listings = snap.docs.map((d) => d.data() as Listing);
+    // Newest first — deterministic without needing a composite index.
+    return listings.sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
+  }
+
+  async membershipsFor(actorId: string): Promise<Membership[]> {
+    // Collection-group read of the user's OWN member docs (rules authorize via
+    // the field-aligned `actorId == uid` match).
+    const snap = await getDocs(
+      query(collectionGroup(this.db, MEMBERS_SUBCOLLECTION), where('actorId', '==', actorId))
+    );
+    return snap.docs.map((d) => {
+      const data = d.data() as { tenantId: string; role: Role };
+      return { tenantId: data.tenantId, role: data.role };
+    });
   }
 }
