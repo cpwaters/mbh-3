@@ -54,9 +54,13 @@ service cloud.firestore {
     }
 
     // Jobs (+ their append-only events) are the shared cross-tenant record:
-    // readable by active members of EITHER side.
+    // readable by active members of EITHER side. The driver-owns-this clause is
+    // FIRST and is a direct field match (no cross-doc get()), so it also
+    // authorizes the driver-home query `where driverActorId == uid` — a list
+    // rule must key off a field the query constrains.
     match /jobs/{jobId} {
-      allow read: if isActiveMember(resource.data.shipperTenantId)
+      allow read: if resource.data.driverActorId == request.auth.uid
+        || isActiveMember(resource.data.shipperTenantId)
         || isActiveMember(resource.data.carrierTenantId);
       allow write: if false;
 

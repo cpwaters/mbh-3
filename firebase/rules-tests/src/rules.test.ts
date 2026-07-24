@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
 
 // Every collection gets explicit allow AND deny cases. A client is an actor
 // (auth.uid == actorId). All writes are server-only, so client writes must
@@ -113,6 +113,16 @@ describe('listings (carrier-facing projection)', () => {
 });
 
 describe('jobs + events (shared cross-tenant record)', () => {
+  it('a driver can query their own jobs (the driver home)', async () => {
+    const mine = query(collection(db(CAR_DRIVER), 'jobs'), where('driverActorId', '==', CAR_DRIVER));
+    await assertSucceeds(getDocs(mine));
+  });
+
+  it('an outsider querying a real job is denied (a matched doc they cannot read)', async () => {
+    const q = query(collection(db(OUTSIDER), 'jobs'), where('driverActorId', '==', CAR_DRIVER));
+    await assertFails(getDocs(q));
+  });
+
   it('members of either side read the job, its events, and its evidence', async () => {
     await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'jobs/job-1')));
     await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'jobs/job-1')));

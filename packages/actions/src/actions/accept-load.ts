@@ -70,6 +70,11 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
       driverActorId: ctx.actorId,
       status: 'accepted',
       createdAt: ctx.now,
+      // Denormalize the delivery details so the driver's home renders without
+      // reading the shipper-private load.
+      origin: load.origin,
+      destination: load.destination,
+      ...(load.route !== undefined ? { route: load.route } : {}),
     };
     const eventId = ctx.newId('evt');
     const event: JobEvent = {

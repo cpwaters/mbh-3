@@ -41,4 +41,25 @@ describe('carrier listing projection', () => {
     // The raw load remains, now matched.
     expect(await harness.store.getDoc(`loads/${loadId}`).then((l) => l?.status)).toBe('matched');
   });
+
+  it('acceptLoad denormalizes the delivery details onto the job', async () => {
+    const harness = await makeHarness();
+    const { loadId } = (await harness.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload(),
+      requestId: 'r1',
+    })) as { loadId: string };
+    const { jobId } = (await harness.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId },
+      requestId: 'r2',
+    })) as { jobId: string };
+
+    // The driver's home reads these from the job (never the shipper-private load).
+    const job = await harness.store.getDoc(`jobs/${jobId}`);
+    expect(job).toMatchObject({
+      origin: { town: 'Trafford', postcode: 'M17 1WS' },
+      destination: { town: 'Leith', postcode: 'EH6 6JJ' },
+    });
+  });
 });

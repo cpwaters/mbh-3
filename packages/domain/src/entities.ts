@@ -70,6 +70,13 @@ export interface Job {
   driverActorId: string;
   status: JobStatus;
   createdAt: string;
+  // Delivery details denormalized from the load at acceptance — the carrier is
+  // entitled to them now (they must collect and deliver), and they let the
+  // driver's home render without reading the shipper-private load. `route` is
+  // present only if the drain had enriched the load by acceptance time.
+  origin: Address;
+  destination: Address;
+  route?: LoadRoute;
 }
 
 export type EventSource = 'member' | 'system';
