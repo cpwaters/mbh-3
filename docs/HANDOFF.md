@@ -272,11 +272,32 @@ Firebase console (Authentication → Sign-in method): **Email/Password** and
 domain. The code + E2E prove correctness against the emulator; providers are
 just not enabled on the live project yet.
 
+## Driver home — reads the active job from Firestore (built)
+
+The driver app reads the signed-in driver's current job directly from Firestore
+(rules-gated) instead of URL params.
+- domain: Job now carries origin/destination (+ optional route), denormalized
+  from the load by acceptLoad. provider-interfaces: JobReader; provider-mocks:
+  MockJobReader. rules: a driver may read jobs where they are the driver — a
+  direct field match placed FIRST so it also authorizes the driver-home list
+  query `where driverActorId == uid`.
+- provider-firestore-web: the ONLY Firestore web SDK importer, behind
+  JobReader. apps/web: shared firebase-config, getJobReader, useActiveJob,
+  DriverApp renders loading / no-active-job / capture from the read.
+- E2E exercises the real read: seeds the job WITH delivery details + a jobless
+  user; 5 journeys incl. the empty state, the job read from Firestore (shows
+  Trafford → Leith, no URL params), the required-proof guard, and the full loop
+  to `delivered`.
+
+Full suite: 126 unit + 13 contract + 21 rules + 4 functions-integration +
+5 full-loop E2E green; typecheck, lint, prod+emulator builds, check:web, seed.
+CI actions bumped to Node-24 majors (checkout@v7, setup-node@v7, setup-java@v5,
+pnpm/action-setup@v6, auth@v3).
+
 ## Next step
 
-- A carrier browse *screen* reading listings (now unblocked — sign-in landed).
-- A driver "home" that reads the active job from Firestore (replaces the URL
-  params); + user docs + screenshots now the flows are stabilizing.
+- A carrier browse *screen* reading listings (unblocked — sign-in landed).
+- User docs + screenshots now the flows are stabilizing.
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 
