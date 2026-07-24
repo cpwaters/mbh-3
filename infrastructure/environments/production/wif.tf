@@ -56,6 +56,9 @@ locals {
     # functions/hosting/firestore deploy; this read-only role grants the
     # required firebaseextensions.configs.list permission.
     "roles/firebaseextensions.editor",
+    # Scheduled (onSchedule) functions like the drain deploy a Cloud Scheduler
+    # job; the deployer must be able to create/update it.
+    "roles/cloudscheduler.admin",
   ]
 }
 
