@@ -17,6 +17,12 @@ importers:
       '@mbh/provider-interfaces':
         specifier: workspace:*
         version: link:packages/providers/interfaces
+      '@mbh/provider-osrm':
+        specifier: workspace:*
+        version: link:packages/providers/osrm
+      '@mbh/provider-postcodes-io':
+        specifier: workspace:*
+        version: link:packages/providers/postcodes-io
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1

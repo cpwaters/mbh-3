@@ -51,6 +51,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'jobs/job-1/evidence/evd-1'), { evidenceId: 'evd-1', jobId: 'job-1', kind: 'delivery', recipientName: 'J. Smith', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'audit/audit-1'), { auditId: 'audit-1', action: 'acceptLoad', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
+    await setDoc(doc(db, 'outbox/task-1'), { taskId: 'task-1', type: 'enrichLoadRoute', status: 'pending', tenantId: 'shipper-1', loadId: 'load-1' });
   });
 });
 
@@ -131,6 +132,17 @@ describe('audit + request markers (never client-readable)', () => {
   it('no client can forge an outcome by writing audit or a marker', async () => {
     await assertFails(setDoc(doc(db(CAR_DRIVER), 'audit/audit-x'), { action: 'forged' }));
     await assertFails(setDoc(doc(db(CAR_DRIVER), 'requests/req-x'), { actionType: 'forged' }));
+  });
+});
+
+describe('outbox (drain work — never client-accessible)', () => {
+  it('no one reads outbox tasks', async () => {
+    await assertFails(getDoc(doc(db(SHIP_OWNER), 'outbox/task-1')));
+    await assertFails(getDoc(doc(db(CAR_DRIVER), 'outbox/task-1')));
+  });
+
+  it('no client can enqueue or tamper with outbox work', async () => {
+    await assertFails(setDoc(doc(db(SHIP_OWNER), 'outbox/task-x'), { type: 'enrichLoadRoute', status: 'pending' }));
   });
 });
 

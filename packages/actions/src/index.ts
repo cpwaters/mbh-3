@@ -1,6 +1,7 @@
 export * from './context.js';
 export * from './pipeline.js';
 export * from './http-dispatch.js';
+export * from './drain.js';
 export * from './registry.js';
 export * from './require-member.js';
 export * from './parse.js';

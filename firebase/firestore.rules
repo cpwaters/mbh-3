@@ -78,6 +78,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Outbox: pending outbound work for the scheduled drain. Internal only —
+    // never client-readable or writable.
+    match /outbox/{taskId} {
+      allow read, write: if false;
+    }
+
     // Deny everything not explicitly allowed above.
     match /{document=**} {
       allow read, write: if false;

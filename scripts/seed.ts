@@ -4,9 +4,14 @@
 // zero cloud dependencies. Run: pnpm seed
 
 import { authenticateActor } from '@mbh/auth';
-import { buildRegistry, dispatch, type DispatchDeps } from '@mbh/actions';
+import { buildRegistry, dispatch, runDrainOnce, type DispatchDeps } from '@mbh/actions';
 import { formatGbp } from '@mbh/domain';
-import { InMemoryDataStore, MockAuthProvider } from '@mbh/provider-mocks';
+import {
+  InMemoryDataStore,
+  InMemoryGeocoder,
+  InMemoryRouteProvider,
+  MockAuthProvider,
+} from '@mbh/provider-mocks';
 
 function makeIdGen(): (prefix: string) => string {
   const counters = new Map<string, number>();
@@ -50,6 +55,20 @@ async function main(): Promise<void> {
     },
   })) as { loadId: string };
 
+  // postLoad enqueued an outbound enrichment task. The scheduled drain would
+  // process it in production; here we run one pass with in-memory providers to
+  // prove the outbound leg (geocode -> route -> recorded as a system action).
+  const drainSummary = await runDrainOnce({
+    store,
+    geocoder: new InMemoryGeocoder({
+      'M17 1WS': { lat: 53.4673, lng: -2.2915 },
+      'EH6 6JJ': { lat: 55.9758, lng: -3.1706 },
+    }),
+    routeProvider: new InMemoryRouteProvider(),
+    now: () => new Date().toISOString(),
+    newId: deps.newId, // shared counter -> no audit id collision
+  });
+
   // Driver accepts it.
   const driver = await authenticateActor(auth, 'driver-token');
   const accepted = (await dispatch(deps, registry, driver, {
@@ -89,8 +108,17 @@ async function main(): Promise<void> {
   const evidence = await store.getDoc(`jobs/${accepted.jobId}/evidence/${delivered.evidenceId}`);
   const audit = await store.query({ collection: 'audit' });
 
+  const route = load?.route as { distanceMeters: number; durationSeconds: number } | undefined;
+
   console.log('Walking skeleton (through the Action Layer): OK');
   console.log(`  load ${posted.loadId}: ${String(load?.status)} (${formatGbp(68_000)})`);
+  console.log(
+    `  drain enrichment: ${
+      route
+        ? `${Math.round(route.distanceMeters / 1000)} km, ~${Math.round(route.durationSeconds / 60)} min`
+        : 'none'
+    } [${drainSummary.enriched} enriched]`
+  );
   console.log(`  job ${accepted.jobId}: ${String(job?.status)} — driver ${driver}`);
   console.log(`  job events: ${events.map((e) => String(e.data.type)).join(' -> ')}`);
   console.log(`  proof of delivery: ${String(evidence?.recipientName)} signed (${delivered.evidenceId})`);

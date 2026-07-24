@@ -10,6 +10,7 @@
 //   jobs/{jobId}/events/{eventId}
 //   audit/{auditId}
 //   requests/{requestId}          (idempotency markers — never client-readable)
+//   outbox/{taskId}               (outbound work for the drain — never client-readable)
 
 export const COLLECTIONS = {
   tenants: 'tenants',
@@ -17,6 +18,7 @@ export const COLLECTIONS = {
   jobs: 'jobs',
   audit: 'audit',
   requests: 'requests',
+  outbox: 'outbox',
 } as const;
 
 export function tenantDoc(tenantId: string): string {
@@ -69,4 +71,12 @@ export function auditDoc(auditId: string): string {
 
 export function requestMarkerDoc(requestId: string): string {
   return `${COLLECTIONS.requests}/${requestId}`;
+}
+
+export function outboxCollection(): string {
+  return COLLECTIONS.outbox;
+}
+
+export function outboxTaskDoc(taskId: string): string {
+  return `${COLLECTIONS.outbox}/${taskId}`;
 }

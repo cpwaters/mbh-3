@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { MAX_LOAD_PRICE_GBP_PENCE, type Load, type Role } from '@mbh/domain';
-import { loadDoc } from '@mbh/paths';
+import { MAX_LOAD_PRICE_GBP_PENCE, type Load, type OutboxTask, type Role } from '@mbh/domain';
+import { loadDoc, outboxTaskDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
@@ -57,6 +57,21 @@ export const postLoadHandler: ActionHandler<PostLoadPayload, PostLoadResult> = {
     };
 
     tx.write({ kind: 'create', path: loadDoc(loadId), data: { ...load } });
+
+    // Enqueue outbound enrichment (geocode + route) for the drain to process,
+    // atomically with the load itself — the work can never be lost or run in
+    // the request path. Third-party calls happen only in the scheduled drain.
+    const taskId = ctx.newId('task');
+    const task: OutboxTask = {
+      taskId,
+      type: 'enrichLoadRoute',
+      status: 'pending',
+      tenantId: payload.shipperTenantId,
+      loadId,
+      attempts: 0,
+      createdAt: ctx.now,
+    };
+    tx.write({ kind: 'create', path: outboxTaskDoc(taskId), data: { ...task } });
 
     return { result: { loadId }, auditDetail: { loadId, tenantId: payload.shipperTenantId } };
   },

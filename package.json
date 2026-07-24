@@ -23,6 +23,8 @@
     "@mbh/actions": "workspace:*",
     "@mbh/provider-firestore": "workspace:*",
     "@mbh/provider-interfaces": "workspace:*",
+    "@mbh/provider-osrm": "workspace:*",
+    "@mbh/provider-postcodes-io": "workspace:*",
     "@types/node": "^22.10.0",
     "eslint": "^9.17.0",
     "firebase-tools": "^13.29.0",

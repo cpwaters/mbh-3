@@ -169,12 +169,48 @@ budget apply, npm-clean functions manifest for the buildpack, region-pinned
 hosting rewrites, and a one-time `allUsers` run.invoker grant on `dispatch`
 (the last blocker — hosting 404s until the public function is invocable).
 
+## Step 7 (external integrations — first outbound leg: load enrichment)
+
+Built the architecture's way — labs → adapter-behind-interface → drain leg,
+mock-first in CI, no third-party call anywhere in the request path.
+
+Step 7a (geocoding + routing behind interfaces):
+- domain: GeoPoint, RouteInfo, LoadRoute; Load gains optional `route` (integer
+  metres/seconds). provider-interfaces: Geocoder + RouteProvider, each with a
+  recoverable-flagged structured error.
+- @mbh/wire: external wire schemas + the ONE mapper each (postcodes.io lookup,
+  OSRM route); a well-formed not-found/no-route maps to null, only an
+  unparseable body errors.
+- provider-mocks: InMemoryGeocoder (scriptable) + InMemoryRouteProvider
+  (deterministic haversine, scripted overrides), both with failOnce().
+- provider-postcodes-io + provider-osrm: thin fetch adapters (transport + error
+  classification; mapping lives in wire). Tested with a fake fetch.
+- labs/: by-hand live-API drift-check scripts; a workspace package so tsc -b
+  typechecks them, never run in CI.
+
+Step 7b (the drain's first outbound leg):
+- domain: OutboxTask (pending/claimed/done/failed, attempts, MAX 5). paths:
+  outbox collection. postLoad now enqueues an enrichLoadRoute task atomically
+  with the load.
+- @mbh/actions runDrainOnce: reclaim stale claims → query pending → CAS-claim +
+  read load → geocode both postcodes + route → record (load.route + task done +
+  source:'system' audit) in ONE transaction. Unknown postcode / no route =
+  permanent fail; recoverable provider error retries (attempt-capped, the
+  1-minute schedule is the backoff). Pure — runs on mocks in CI, Firestore +
+  real adapters in prod.
+- functions/drain.ts wires runDrainOnce with FirestoreDataStore +
+  PostcodesIoGeocoder + OsrmRouteProvider. Rules: outbox never client-readable/
+  writable (+ deny tests). seed shows the enrichment end to end.
+
+Full suite: 113 unit + 13 contract + 16 rules + 4 functions-integration green;
+typecheck, lint, build, check:web, seed all green.
+
 ## Next step
 
-After the go-live runbook + first green deploy: step 7 (external
-integrations — labs scripts against live APIs, adapters behind interfaces,
-the drain's first outbound leg) and/or step 8 (E2E browser journeys, docs).
-Migrate the prototype's real accounts by script at cutover.
+Step 8 (E2E browser journeys as the regression net; user docs + screenshots).
+Also: a hosted/self-run OSRM before real volume (see backlog), the carrier
+listing projection (ADR 0002), and migrating the prototype's real accounts at
+cutover.
 
 ## Known deferred items
 
@@ -187,5 +223,12 @@ Migrate the prototype's real accounts by script at cutover.
   mechanism — re-verify when the real provider lands (step 6).
 - What3Words API plan is broken on the prototype (QuotaExceeded on
   convert-to-3wa) — resolve before the W3W provider is built here.
+- OSRM: the drain currently points at the public demo server
+  (router.project-osrm.org), which is rate-limited and not for production
+  traffic. Fine at pre-launch volume; swap OsrmRouteProvider's baseUrl for a
+  hosted/self-run OSRM before real load. postcodes.io is keyless and fine.
+- The drain skips a task stuck 'claimed' by a crashed run for up to 5 minutes
+  (STALE_CLAIM_MS) before reclaiming — acceptable; there is no time-range
+  query in the DataStore contract to make it tighter without an index.
 - Prototype (cpwaters/mbh-2) stays live as demo; account migration script
   happens at cutover.
