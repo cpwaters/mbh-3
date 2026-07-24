@@ -37,9 +37,11 @@ jobs:
       - run: pnpm test:functions
       - run: pnpm seed
       - run: pnpm build
-      # E2E browser journeys against the built bundle (astro preview serves it).
+      # E2E browser journeys against the FULL emulator stack (auth + firestore +
+      # functions + hosting). run-e2e.sh builds the emulator bundle, runs the
+      # journeys, and restores the prod bundle. Needs chromium + the JDK above.
       - run: pnpm --filter @mbh/e2e exec playwright install --with-deps chromium
-      - run: pnpm --filter @mbh/e2e test
+      - run: pnpm test:e2e
 
   deploy:
     needs: validate

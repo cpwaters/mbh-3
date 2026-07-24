@@ -1,13 +1,16 @@
 import { useMemo } from 'react';
 import type { DeliverCapture } from '@mbh/client';
 import { useSyncQueue } from './useSyncQueue';
+import { useAuth } from './useAuth';
+import { SignIn } from './SignIn';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
-// The driver app island. Until sign-in + the dispatch backend land (step 6),
-// there is no real "current job" over the wire, so the active job is read
-// from URL params purely to demonstrate the capture flow; without them the
-// app shows an honest empty state. The offline queue is fully real — a
-// capture persists to IndexedDB and retries against /api/dispatch.
+// The driver app island (browser-only). Auth gates the app: signed out shows
+// the sign-in screen; signed in, the real ID token authenticates every
+// dispatch. The active job is still read from URL params (a driver "home" that
+// reads it from Firestore is a later slice); without them we show an honest
+// empty state. The offline queue is fully real — a capture persists to
+// IndexedDB and delivers to /api/dispatch when there is signal.
 
 function readDemoJob(): ActiveJob | null {
   if (typeof window === 'undefined') return null;
@@ -24,14 +27,38 @@ function readDemoJob(): ActiveJob | null {
 }
 
 export default function DriverApp() {
-  // No auth yet: token is always null, so drains will retry (no signal to a
-  // real backend). This is honest offline behaviour, not a bug.
-  const getIdToken = useMemo(() => async () => null, []);
-  const queue = useSyncQueue(getIdToken);
+  // All hooks run unconditionally (rules-of-hooks): the token comes from the
+  // signed-in session, so drains are authenticated once signed in.
+  const auth = useAuth();
+  const queue = useSyncQueue(auth.getIdToken);
   const job = useMemo(readDemoJob, []);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
+  }
+
+  if (!auth.ready) {
+    return (
+      <div className="app">
+        <header className="topbar">
+          <strong>MyBackHaul</strong>
+        </header>
+        <div className="card">
+          <p className="muted">Loading…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (auth.session === null) {
+    return (
+      <div className="app">
+        <header className="topbar">
+          <strong>MyBackHaul</strong>
+        </header>
+        <SignIn auth={auth} />
+      </div>
+    );
   }
 
   return (
@@ -40,6 +67,17 @@ export default function DriverApp() {
         <strong>MyBackHaul</strong>
         <QueueBadge pending={queue.pending} online={queue.online} />
       </header>
+
+      <p className="muted small">
+        Signed in as {auth.session.email ?? auth.session.displayName ?? 'you'} ·{' '}
+        <button
+          type="button"
+          onClick={() => void auth.signOut()}
+          style={{ color: '#dc2626', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+        >
+          Sign out
+        </button>
+      </p>
 
       {job === null ? (
         <div className="card">

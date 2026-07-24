@@ -240,14 +240,43 @@ headline price — never line1 or commercial internals).
 Full suite: 119 unit + 13 contract + 19 rules + 4 functions-integration +
 4 E2E green; typecheck, lint, build, check:web, seed all green.
 
+## Sign-in (email/password + Google — built, mock-first)
+
+The keystone slice: the app now authenticates, and every dispatch carries a
+real ID token.
+- provider-interfaces: AuthClient (signInWithPassword, signInWithGoogle,
+  signOut, getIdToken, currentSession, subscribe) + AuthSession +
+  AuthClientError. provider-mocks: MockAuthClient (scriptable, CI default).
+- provider-firebase-auth-web: the ONLY firebase-auth-SDK importer, behind the
+  interface (email/password + GoogleAuthProvider popup + onIdTokenChanged +
+  connectAuthEmulator). A Firebase web app is registered; its PUBLIC config is
+  baked into the bundle (apps/web/src/lib/auth.ts), projectId env-overridable.
+- apps/web: useAuth hook, SignIn screen (email/password + Continue with
+  Google), DriverApp gated on the session; useSyncQueue now gets the real
+  getIdToken so drains are authenticated.
+- E2E is now the FULL emulator stack (auth+firestore+functions+hosting):
+  scripts/run-e2e.sh builds the emulator bundle (PUBLIC_USE_EMULATORS=true,
+  PUBLIC_FIREBASE_PROJECT_ID=demo-mbh), seeds an auth user + in-transit job via
+  admin, signs in through the UI, captures a PoD, and asserts the job reaches
+  `delivered` in Firestore through the real dispatch function — then ALWAYS
+  restores the prod bundle so a deploy can't ship the emulator flavour.
+
+Full suite: 123 unit + 13 contract + 19 rules + 4 functions-integration +
+4 full-loop E2E green; typecheck, lint, build (prod + emulator), check:web,
+seed all green.
+
+**FOUNDER STEP for production sign-in:** enable the sign-in providers in the
+Firebase console (Authentication → Sign-in method): **Email/Password** and
+**Google**. For Google, configure the OAuth consent screen and add
+`mybackhaul-app.web.app` (+ `mybackhaul-app.firebaseapp.com`) as an authorized
+domain. The code + E2E prove correctness against the emulator; providers are
+just not enabled on the live project yet.
+
 ## Next step
 
-- A carrier browse *screen* reading listings (needs the read path + sign-in).
-- Sign-in flow (Firebase Auth client in its own provider package) — NEEDS
-  founder input: the auth method (email/password vs phone vs magic link) and
-  authorization to register a Firebase web app + use its public config. It
-  unblocks a full-loop E2E (browser → real dispatch → Firestore) and the
-  deferred user docs + screenshots.
+- A carrier browse *screen* reading listings (now unblocked — sign-in landed).
+- A driver "home" that reads the active job from Firestore (replaces the URL
+  params); + user docs + screenshots now the flows are stabilizing.
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 
