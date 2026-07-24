@@ -23,9 +23,16 @@ test('landing invites the driver into the app', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });
 
-test('a signed-in driver with no active job sees an honest empty state', async ({ page }) => {
+test('a carrier browses available loads and accepts one', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
-  await expect(page.getByRole('heading', { name: 'No active job' })).toBeVisible();
+  // No active job -> the carrier sees the browse (loads read from Firestore).
+  await expect(page.getByRole('heading', { name: 'Available loads' })).toBeVisible();
+  await expect(page.getByText('Avonmouth → Cardiff')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Accept load' }).click();
+
+  // Accepted -> the home switches to the delivery capture for the new job.
+  await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {

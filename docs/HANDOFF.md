@@ -294,10 +294,34 @@ Full suite: 126 unit + 13 contract + 21 rules + 4 functions-integration +
 CI actions bumped to Node-24 majors (checkout@v7, setup-node@v7, setup-java@v5,
 pnpm/action-setup@v6, auth@v3).
 
+## Carrier browse screen (built)
+
+The marketplace's other side: a signed-in carrier browses available loads and
+accepts one, which becomes their active job.
+- provider-interfaces: ListingReader + MembershipReader; provider-mocks +
+  a consolidated FirestoreReader (JobReader + ListingReader + MembershipReader,
+  one emulator connection). rules: a user reads their OWN member docs across
+  tenants (field-aligned collection-group query) so the app can resolve the
+  carrier tenant id.
+- app: useCarrierBrowse (resolves the carrier tenant + reads listings),
+  AvailableLoads (each load with an Accept button), lib/dispatch (a one-shot
+  ONLINE dispatch for accept — needs an immediate got-it/taken answer, distinct
+  from the offline queue). DriverApp: no active job -> the browse; accept ->
+  re-read the active job -> the delivery capture.
+- E2E: a carrier signs in, browses (Avonmouth -> Cardiff read from Firestore),
+  accepts, and the home switches to Mark delivered. 5 journeys green.
+
+Full suite: 128 unit + 13 contract + 23 rules + 4 functions-integration +
+5 full-loop E2E green; typecheck, lint, prod+emulator builds, check:web, seed.
+
+Simplification to revisit: the browse uses the FIRST membership as the carrier
+tenant (single-tenant assumption); multi-tenant selection + capability
+filtering is a later refinement.
+
 ## Next step
 
-- A carrier browse *screen* reading listings (unblocked — sign-in landed).
 - User docs + screenshots now the flows are stabilizing.
+- A shipper side (post a load from the UI); multi-tenant carrier selection.
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 

@@ -3,6 +3,8 @@ import type { DriverJobView } from '@mbh/provider-interfaces';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
 import { useActiveJob } from './useActiveJob';
+import { useCarrierBrowse } from './useCarrierBrowse';
+import { AvailableLoads } from './AvailableLoads';
 import { SignIn } from './SignIn';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
@@ -30,11 +32,18 @@ export default function DriverApp() {
   // All hooks run unconditionally (rules-of-hooks): the token comes from the
   // signed-in session, so drains are authenticated once signed in.
   const auth = useAuth();
+  const actorId = auth.session?.actorId ?? null;
   const queue = useSyncQueue(auth.getIdToken);
-  const { loading: jobLoading, job } = useActiveJob(auth.session?.actorId ?? null);
+  const { loading: jobLoading, job, reload: reloadJob } = useActiveJob(actorId);
+  const browse = useCarrierBrowse(actorId);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
+  }
+
+  function onAccepted() {
+    reloadJob();
+    browse.reload();
   }
 
   if (!auth.ready) {
@@ -79,17 +88,20 @@ export default function DriverApp() {
         </button>
       </p>
 
-      {jobLoading ? (
+      {jobLoading || browse.loading ? (
         <div className="card">
-          <p className="muted">Loading your job…</p>
+          <p className="muted">Loading…</p>
         </div>
-      ) : job === null ? (
-        <div className="card">
-          <h2>No active job</h2>
-          <p className="muted">When you accept a load, your current delivery will show here.</p>
-        </div>
-      ) : (
+      ) : job !== null ? (
         <MarkDelivered job={toActiveJob(job)} onCommit={commit} />
+      ) : (
+        <AvailableLoads
+          carrierTenantId={browse.carrierTenantId}
+          listings={browse.listings}
+          getIdToken={auth.getIdToken}
+          onAccepted={onAccepted}
+          onChanged={browse.reload}
+        />
       )}
 
       {queue.items.length > 0 && (

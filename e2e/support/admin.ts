@@ -16,10 +16,11 @@ export const E2E = {
   password: 'test-password-123',
   carrierTenantId: 'carrier-e2e',
   jobId: 'job-e2e',
-  // A driver with no active job (for the empty-state journey).
+  // A driver with no active job — browses and accepts the available load below.
   joblessUid: 'driver-nojob-e2e',
   joblessEmail: 'nojob.e2e@haulier.test',
   joblessPassword: 'test-password-456',
+  browseLoadId: 'load-browse-e2e',
 } as const;
 
 function app() {
@@ -69,6 +70,34 @@ export async function seedDeliverableJob(): Promise<void> {
     origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
     destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
     createdAt: new Date().toISOString(),
+  });
+
+  // An available load + its listing for the browse-and-accept journey (a
+  // distinct route so the browse is unambiguous). acceptLoad reads the raw load.
+  await db.doc(`loads/${E2E.browseLoadId}`).set({
+    loadId: E2E.browseLoadId,
+    tenantId: 'shipper-e2e',
+    status: 'available',
+    origin: { line1: '1 Dock Road', town: 'Avonmouth', postcode: 'BS11 8DL' },
+    destination: { line1: '2 Bay St', town: 'Cardiff', postcode: 'CF10 4UW' },
+    consignment: { description: 'Steel coils', weightKg: 20000, palletCount: 8 },
+    priceGbpPence: 42000,
+    pickupBy: '2026-08-04',
+    deliverBy: '2026-08-05',
+    createdAt: new Date().toISOString(),
+  });
+  await db.doc(`listings/${E2E.browseLoadId}`).set({
+    loadId: E2E.browseLoadId,
+    shipperTenantId: 'shipper-e2e',
+    origin: { town: 'Avonmouth', postcode: 'BS11 8DL' },
+    destination: { town: 'Cardiff', postcode: 'CF10 4UW' },
+    description: 'Steel coils',
+    weightKg: 20000,
+    palletCount: 8,
+    priceGbpPence: 42000,
+    pickupBy: '2026-08-04',
+    deliverBy: '2026-08-05',
+    postedAt: new Date().toISOString(),
   });
 }
 
