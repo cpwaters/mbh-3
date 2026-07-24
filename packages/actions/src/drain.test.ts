@@ -54,6 +54,10 @@ describe('runDrainOnce — enrichLoadRoute', () => {
     const task = await harness.store.getDoc('outbox/task-1');
     expect(task?.status).toBe('done');
 
+    // The carrier listing mirrors the computed route.
+    const listing = await harness.store.getDoc('listings/load-1');
+    expect((listing?.route as { distanceMeters: number }).distanceMeters).toBeGreaterThan(0);
+
     const audits = await harness.store.query({
       collection: 'audit',
       filters: [{ field: 'source', op: '==', value: 'system' }],

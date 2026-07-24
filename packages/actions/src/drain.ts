@@ -1,5 +1,5 @@
 import { type Address, type LoadRoute, MAX_OUTBOX_ATTEMPTS, type OutboxTask } from '@mbh/domain';
-import { auditDoc, loadDoc, outboxCollection } from '@mbh/paths';
+import { auditDoc, listingDoc, loadDoc, outboxCollection } from '@mbh/paths';
 import type { DataStore, Geocoder, RouteProvider } from '@mbh/provider-interfaces';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
@@ -152,6 +152,16 @@ async function recordEnrichment(
     const task = await tx.get(taskPath);
     if (task === null || task.status !== 'claimed') return; // already settled elsewhere
     tx.write({ kind: 'update', path: loadDoc(loadId), data: { route: { ...route } } });
+    // Mirror the route onto the carrier listing if the load is still available
+    // (the listing is gone once accepted — don't resurrect it).
+    const listing = await tx.get(listingDoc(loadId));
+    if (listing !== null) {
+      tx.write({
+        kind: 'update',
+        path: listingDoc(loadId),
+        data: { route: { distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds } },
+      });
+    }
     tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
     tx.write(
       systemAuditOp(deps, 'enrichLoadRoute', {

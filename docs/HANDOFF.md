@@ -225,15 +225,31 @@ fires — so a silent regression of the wiring fails the suite.
 Full suite: 115 unit + 13 contract + 16 rules + 4 functions-integration +
 4 E2E green; typecheck, lint, build, check:web, seed all green.
 
+## Carrier listing projection (ADR-0002 — built)
+
+Raw loads stay shipper-private; carriers browse a deliberately-narrow, safe
+`listings/{loadId}` projection (route as town+postcode, goods summary, window,
+headline price — never line1 or commercial internals).
+- domain: Listing + listingFromLoad (the ONE projection mapper). paths:
+  listings collection. postLoad writes the listing atomically with the load;
+  acceptLoad deletes it (taken loads leave the browse); the drain mirrors the
+  computed route onto the listing when it still exists.
+- rules: any signed-in user may read listings, server-only writes (+ allow/deny
+  tests). seed prints the live listing and its removal on accept.
+
+Full suite: 119 unit + 13 contract + 19 rules + 4 functions-integration +
+4 E2E green; typecheck, lint, build, check:web, seed all green.
+
 ## Next step
 
-- User docs + screenshots: deferred until the flows stabilize (no sign-in yet;
-  the driver app reads its job from URL params for demo). Build when a real
-  sign-in + active-job flow lands.
-- A sign-in flow (Firebase Auth client in its own provider package) — unblocks
-  a full-loop E2E (browser → real dispatch → Firestore) against the emulator.
-- Hosted/self-run OSRM before real volume (see backlog); the carrier listing
-  projection (ADR 0002); migrating the prototype's real accounts at cutover.
+- A carrier browse *screen* reading listings (needs the read path + sign-in).
+- Sign-in flow (Firebase Auth client in its own provider package) — NEEDS
+  founder input: the auth method (email/password vs phone vs magic link) and
+  authorization to register a Firebase web app + use its public config. It
+  unblocks a full-loop E2E (browser → real dispatch → Firestore) and the
+  deferred user docs + screenshots.
+- Hosted/self-run OSRM before real volume (see backlog); migrating the
+  prototype's real accounts at cutover.
 
 ## Known deferred items
 

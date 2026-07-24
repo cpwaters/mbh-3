@@ -52,6 +52,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'audit/audit-1'), { auditId: 'audit-1', action: 'acceptLoad', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
     await setDoc(doc(db, 'outbox/task-1'), { taskId: 'task-1', type: 'enrichLoadRoute', status: 'pending', tenantId: 'shipper-1', loadId: 'load-1' });
+    await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
   });
 });
 
@@ -93,6 +94,21 @@ describe('loads (shipper-private)', () => {
 
   it('no client can write a load', async () => {
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'loads/load-1'), { tenantId: 'shipper-1', status: 'cancelled' }));
+  });
+});
+
+describe('listings (carrier-facing projection)', () => {
+  it('any signed-in user (carrier included) can browse a listing', async () => {
+    await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'listings/load-1')));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), 'listings/load-1')));
+  });
+
+  it('an anonymous visitor cannot browse listings', async () => {
+    await assertFails(getDoc(doc(db(null), 'listings/load-1')));
+  });
+
+  it('no client can write a listing', async () => {
+    await assertFails(setDoc(doc(db(CAR_DRIVER), 'listings/load-x'), { loadId: 'load-x' }));
   });
 });
 

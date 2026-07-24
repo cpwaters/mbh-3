@@ -10,7 +10,7 @@ import {
   type LoadStatus,
   type Role,
 } from '@mbh/domain';
-import { jobDoc, jobEventDoc, jobsCollection, loadDoc } from '@mbh/paths';
+import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
@@ -82,6 +82,8 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
     };
 
     tx.write({ kind: 'update', path: loadDoc(load.loadId), data: { status: 'matched' } });
+    // The load is taken — remove it from the carrier browse projection.
+    tx.write({ kind: 'delete', path: listingDoc(load.loadId) });
     tx.write({ kind: 'create', path: jobDoc(jobId), data: { ...job } });
     tx.write({ kind: 'create', path: jobEventDoc(jobId, eventId), data: { ...event } });
 

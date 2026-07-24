@@ -1,6 +1,12 @@
 import { z } from 'zod';
-import { MAX_LOAD_PRICE_GBP_PENCE, type Load, type OutboxTask, type Role } from '@mbh/domain';
-import { loadDoc, outboxTaskDoc } from '@mbh/paths';
+import {
+  listingFromLoad,
+  MAX_LOAD_PRICE_GBP_PENCE,
+  type Load,
+  type OutboxTask,
+  type Role,
+} from '@mbh/domain';
+import { listingDoc, loadDoc, outboxTaskDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
@@ -57,6 +63,10 @@ export const postLoadHandler: ActionHandler<PostLoadPayload, PostLoadResult> = {
     };
 
     tx.write({ kind: 'create', path: loadDoc(loadId), data: { ...load } });
+
+    // The carrier-facing projection (ADR-0002): raw loads stay shipper-private;
+    // carriers browse this safe view. Written atomically with the load.
+    tx.write({ kind: 'create', path: listingDoc(loadId), data: { ...listingFromLoad(load) } });
 
     // Enqueue outbound enrichment (geocode + route) for the drain to process,
     // atomically with the load itself — the work can never be lost or run in

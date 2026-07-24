@@ -69,6 +69,10 @@ async function main(): Promise<void> {
     newId: deps.newId, // shared counter -> no audit id collision
   });
 
+  // The carrier-facing listing (ADR-0002) is live and route-enriched while the
+  // load is available — this is what a carrier browse screen reads.
+  const listing = await store.getDoc(`listings/${posted.loadId}`);
+
   // Driver accepts it.
   const driver = await authenticateActor(auth, 'driver-token');
   const accepted = (await dispatch(deps, registry, driver, {
@@ -118,6 +122,11 @@ async function main(): Promise<void> {
         ? `${Math.round(route.distanceMeters / 1000)} km, ~${Math.round(route.durationSeconds / 60)} min`
         : 'none'
     } [${drainSummary.enriched} enriched]`
+  );
+  console.log(
+    `  carrier listing: ${String((listing?.origin as { town: string })?.town)} → ${String(
+      (listing?.destination as { town: string })?.town
+    )} @ ${formatGbp(68_000)} (removed on accept: ${(await store.getDoc(`listings/${posted.loadId}`)) === null})`
   );
   console.log(`  job ${accepted.jobId}: ${String(job?.status)} — driver ${driver}`);
   console.log(`  job events: ${events.map((e) => String(e.data.type)).join(' -> ')}`);

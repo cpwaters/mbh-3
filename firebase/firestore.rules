@@ -38,10 +38,18 @@ service cloud.firestore {
     }
 
     // Loads are shipper-private (price, contacts). Only active members of the
-    // owning shipper tenant may read the raw load. Carriers browse a public
-    // listing projection — a separate collection, not yet built.
+    // owning shipper tenant may read the raw load. Carriers browse the listing
+    // projection below instead.
     match /loads/{loadId} {
       allow read: if isActiveMember(resource.data.tenantId);
+      allow write: if false;
+    }
+
+    // Listings: the deliberately-projected, safe-to-expose view of an available
+    // load (ADR-0002). Any signed-in user may browse; only the server writes
+    // them (via postLoad / acceptLoad / the drain).
+    match /listings/{loadId} {
+      allow read: if isSignedIn();
       allow write: if false;
     }
 

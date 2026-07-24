@@ -11,6 +11,7 @@
 //   audit/{auditId}
 //   requests/{requestId}          (idempotency markers — never client-readable)
 //   outbox/{taskId}               (outbound work for the drain — never client-readable)
+//   listings/{loadId}             (carrier-facing projection of an available load)
 
 export const COLLECTIONS = {
   tenants: 'tenants',
@@ -19,6 +20,7 @@ export const COLLECTIONS = {
   audit: 'audit',
   requests: 'requests',
   outbox: 'outbox',
+  listings: 'listings',
 } as const;
 
 export function tenantDoc(tenantId: string): string {
@@ -79,4 +81,14 @@ export function outboxCollection(): string {
 
 export function outboxTaskDoc(taskId: string): string {
   return `${COLLECTIONS.outbox}/${taskId}`;
+}
+
+export function listingsCollection(): string {
+  return COLLECTIONS.listings;
+}
+
+// One listing per load — same id, so the projection is trivially found and
+// removed when the load is taken.
+export function listingDoc(loadId: string): string {
+  return `${COLLECTIONS.listings}/${loadId}`;
 }

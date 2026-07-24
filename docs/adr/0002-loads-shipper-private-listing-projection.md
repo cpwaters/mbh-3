@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted (projection collection not yet built).
+Accepted and built. `listings/{loadId}` is written by postLoad, removed by
+acceptLoad, and route-enriched by the drain; rules allow any signed-in user to
+browse, server-only writes. A carrier browse *screen* is still to come.
 
 ## Context
 
