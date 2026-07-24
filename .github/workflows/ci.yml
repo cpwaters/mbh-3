@@ -37,6 +37,9 @@ jobs:
       - run: pnpm test:functions
       - run: pnpm seed
       - run: pnpm build
+      # E2E browser journeys against the built bundle (astro preview serves it).
+      - run: pnpm --filter @mbh/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @mbh/e2e test
 
   deploy:
     needs: validate

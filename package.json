@@ -16,6 +16,7 @@
     "test:functions": "pnpm --filter @mbh/functions build && firebase emulators:exec --only functions,firestore,auth --project demo-mbh 'vitest run --config functions/vitest.integration.config.ts'",
     "check:web": "pnpm --filter @mbh/web check",
     "build": "pnpm --filter @mbh/web build",
+    "test:e2e": "pnpm --filter @mbh/web build && pnpm --filter @mbh/e2e test",
     "seed": "tsx scripts/seed.ts",
     "smoke:prod": "tsx scripts/smoke-prod.ts"
   },

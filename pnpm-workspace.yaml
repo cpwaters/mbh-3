@@ -5,4 +5,5 @@ packages:
   - 'functions'
   - 'scripts'
   - 'labs'
+  - 'e2e'
   - 'firebase/rules-tests'
