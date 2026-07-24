@@ -318,10 +318,27 @@ Simplification to revisit: the browse uses the FIRST membership as the carrier
 tenant (single-tenant assumption); multi-tenant selection + capability
 filtering is a later refinement.
 
+## Shipper post-a-load UI (built) — the whole loop is now UI-driven
+
+- Memberships now carry tenant capabilities (FirestoreReader reads each
+  tenant), so the app knows which tenant is a shipper vs carrier.
+- app: useMemberships (derives shipperTenantId + carrierTenantId), useListings
+  (carrier browse), PostLoad form (dispatches postLoad online). DriverApp is
+  capability-aware: a shipper sees "Post a load"; a carrier sees their active
+  delivery or the browse; a user with both sees both.
+- E2E: a shipper signs in, fills the form, posts a load, sees "Load posted"
+  (the load then appears in the carrier browse). 6 journeys green — the full
+  marketplace loop is UI-driven: shipper posts -> carrier browses + accepts ->
+  driver captures PoD offline -> delivered.
+
+Full suite: 128 unit + 13 contract + 23 rules + 4 functions-integration +
+6 full-loop E2E green; typecheck, lint, prod+emulator builds, check:web, seed.
+
 ## Next step
 
-- User docs + screenshots now the flows are stabilizing.
-- A shipper side (post a load from the UI); multi-tenant carrier selection.
+- User docs + screenshots (the flows are stable now).
+- Multi-tenant per-role selection (retire the first-of-each simplification);
+  server-side capability enforcement on postLoad/acceptLoad.
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 

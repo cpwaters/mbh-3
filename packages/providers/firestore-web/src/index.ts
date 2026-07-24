@@ -3,6 +3,8 @@ import {
   collection,
   collectionGroup,
   connectFirestoreEmulator,
+  doc,
+  getDoc,
   getDocs,
   getFirestore,
   query,
@@ -16,8 +18,9 @@ import {
   type Listing,
   type LoadRoute,
   type Role,
+  type TenantCapability,
 } from '@mbh/domain';
-import { jobsCollection, listingsCollection, MEMBERS_SUBCOLLECTION } from '@mbh/paths';
+import { jobsCollection, listingsCollection, MEMBERS_SUBCOLLECTION, tenantDoc } from '@mbh/paths';
 import type {
   DriverJobView,
   JobReader,
@@ -97,9 +100,14 @@ export class FirestoreReader implements JobReader, ListingReader, MembershipRead
     const snap = await getDocs(
       query(collectionGroup(this.db, MEMBERS_SUBCOLLECTION), where('actorId', '==', actorId))
     );
-    return snap.docs.map((d) => {
-      const data = d.data() as { tenantId: string; role: Role };
-      return { tenantId: data.tenantId, role: data.role };
-    });
+    // Read each tenant for its capabilities (readable by active members).
+    return Promise.all(
+      snap.docs.map(async (d) => {
+        const data = d.data() as { tenantId: string; role: Role };
+        const tenant = await getDoc(doc(this.db, tenantDoc(data.tenantId)));
+        const capabilities = (tenant.data()?.capabilities ?? []) as TenantCapability[];
+        return { tenantId: data.tenantId, role: data.role, capabilities };
+      })
+    );
   }
 }

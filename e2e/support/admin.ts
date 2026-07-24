@@ -21,6 +21,11 @@ export const E2E = {
   joblessEmail: 'nojob.e2e@haulier.test',
   joblessPassword: 'test-password-456',
   browseLoadId: 'load-browse-e2e',
+  // A shipper who posts loads through the UI.
+  shipperUid: 'shipper-e2e-user',
+  shipperEmail: 'shipper.e2e@acme.test',
+  shipperPassword: 'test-password-789',
+  shipperTenantId: 'shipper-e2e',
 } as const;
 
 function app() {
@@ -44,12 +49,26 @@ export async function seedDeliverableJob(): Promise<void> {
   app();
   await ensureUser(E2E.uid, E2E.email, E2E.password);
   await ensureUser(E2E.joblessUid, E2E.joblessEmail, E2E.joblessPassword);
+  await ensureUser(E2E.shipperUid, E2E.shipperEmail, E2E.shipperPassword);
 
   const db = getFirestore();
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({
     tenantId: E2E.carrierTenantId,
     name: 'Waters Haulage',
     capabilities: ['carrier'],
+  });
+  // The shipper tenant + an owner member who posts loads.
+  await db.doc(`tenants/${E2E.shipperTenantId}`).set({
+    tenantId: E2E.shipperTenantId,
+    name: 'Acme Distribution',
+    capabilities: ['shipper'],
+  });
+  await db.doc(`tenants/${E2E.shipperTenantId}/members/${E2E.shipperUid}`).set({
+    tenantId: E2E.shipperTenantId,
+    actorId: E2E.shipperUid,
+    role: 'owner',
+    status: 'active',
+    displayName: 'Acme Owner',
   });
   for (const uid of [E2E.uid, E2E.joblessUid]) {
     await db.doc(`tenants/${E2E.carrierTenantId}/members/${uid}`).set({

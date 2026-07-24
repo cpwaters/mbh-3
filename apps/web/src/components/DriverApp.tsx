@@ -2,17 +2,19 @@ import type { DeliverCapture } from '@mbh/client';
 import type { DriverJobView } from '@mbh/provider-interfaces';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
+import { useMemberships } from './useMemberships';
 import { useActiveJob } from './useActiveJob';
-import { useCarrierBrowse } from './useCarrierBrowse';
+import { useListings } from './useListings';
 import { AvailableLoads } from './AvailableLoads';
+import { PostLoad } from './PostLoad';
 import { SignIn } from './SignIn';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
-// The driver app island (browser-only). Auth gates the app: signed out shows
-// the sign-in screen; signed in, the real ID token authenticates every
-// dispatch and the driver's current job is read from Firestore (rules-gated).
-// The offline queue is fully real — a capture persists to IndexedDB and
-// delivers to /api/dispatch when there is signal.
+// The app island (browser-only). Auth gates the app; signed in, the ID token
+// authenticates every dispatch and the UI adapts to the user's tenants: a
+// shipper sees "Post a load", a carrier sees their active delivery or the
+// browse. The offline queue is fully real — a capture persists to IndexedDB
+// and delivers to /api/dispatch when there is signal.
 
 // Present the address as a short "Town, POSTCODE" line for the capture header.
 function label(a: { town: string; postcode: string }): string {
@@ -34,8 +36,9 @@ export default function DriverApp() {
   const auth = useAuth();
   const actorId = auth.session?.actorId ?? null;
   const queue = useSyncQueue(auth.getIdToken);
+  const { loading: memLoading, shipperTenantId, carrierTenantId } = useMemberships(actorId);
   const { loading: jobLoading, job, reload: reloadJob } = useActiveJob(actorId);
-  const browse = useCarrierBrowse(actorId);
+  const listings = useListings(carrierTenantId !== null);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
@@ -43,7 +46,7 @@ export default function DriverApp() {
 
   function onAccepted() {
     reloadJob();
-    browse.reload();
+    listings.reload();
   }
 
   if (!auth.ready) {
@@ -88,20 +91,36 @@ export default function DriverApp() {
         </button>
       </p>
 
-      {jobLoading || browse.loading ? (
+      {memLoading || jobLoading || listings.loading ? (
         <div className="card">
           <p className="muted">Loading…</p>
         </div>
-      ) : job !== null ? (
-        <MarkDelivered job={toActiveJob(job)} onCommit={commit} />
       ) : (
-        <AvailableLoads
-          carrierTenantId={browse.carrierTenantId}
-          listings={browse.listings}
-          getIdToken={auth.getIdToken}
-          onAccepted={onAccepted}
-          onChanged={browse.reload}
-        />
+        <>
+          {shipperTenantId !== null && (
+            <PostLoad shipperTenantId={shipperTenantId} getIdToken={auth.getIdToken} />
+          )}
+
+          {carrierTenantId !== null &&
+            (job !== null ? (
+              <MarkDelivered job={toActiveJob(job)} onCommit={commit} />
+            ) : (
+              <AvailableLoads
+                carrierTenantId={carrierTenantId}
+                listings={listings.listings}
+                getIdToken={auth.getIdToken}
+                onAccepted={onAccepted}
+                onChanged={listings.reload}
+              />
+            ))}
+
+          {shipperTenantId === null && carrierTenantId === null && (
+            <div className="card">
+              <h2>No company yet</h2>
+              <p className="muted">Your account isn't linked to a shipper or carrier yet.</p>
+            </div>
+          )}
+        </>
       )}
 
       {queue.items.length > 0 && (

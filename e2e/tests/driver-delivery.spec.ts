@@ -23,13 +23,35 @@ test('landing invites the driver into the app', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
 });
 
+test('a shipper posts a load through the UI', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+
+  await page.getByLabel('Collection address').fill('10 Distribution Way');
+  await page.getByLabel('Collection town').fill('Trafford');
+  await page.getByLabel('Collection postcode').fill('M17 1WS');
+  await page.getByLabel('Delivery address').fill('5 Harbour Road');
+  await page.getByLabel('Delivery town').fill('Leith');
+  await page.getByLabel('Delivery postcode').fill('EH6 6JJ');
+  await page.getByLabel('Description').fill('Mixed pallets');
+  await page.getByLabel('Weight (kg)').fill('14200');
+  await page.getByLabel('Pallets').fill('16');
+  await page.getByLabel('Price (£)').fill('680');
+  await page.getByLabel('Collect by').fill('2026-08-02');
+  await page.getByLabel('Deliver by').fill('2026-08-03');
+
+  await page.getByRole('button', { name: 'Post load' }).click();
+  await expect(page.getByRole('heading', { name: 'Load posted' })).toBeVisible();
+});
+
 test('a carrier browses available loads and accepts one', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   // No active job -> the carrier sees the browse (loads read from Firestore).
   await expect(page.getByRole('heading', { name: 'Available loads' })).toBeVisible();
-  await expect(page.getByText('Avonmouth → Cardiff')).toBeVisible();
+  const row = page.getByRole('listitem').filter({ hasText: 'Avonmouth → Cardiff' });
+  await expect(row).toBeVisible();
 
-  await page.getByRole('button', { name: 'Accept load' }).click();
+  await row.getByRole('button', { name: 'Accept load' }).click();
 
   // Accepted -> the home switches to the delivery capture for the new job.
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
