@@ -409,6 +409,11 @@ validate clean.
   infrastructure/osrm/ + docs/runbooks/osrm.md). The drain still defaults to the
   public demo server until the founder runs the OSRM runbook and sets the
   OSRM_BASE_URL repo variable. postcodes.io is keyless and fine.
+- Firestore indexes: the emulator does NOT enforce them, so a missing
+  production index passes every test. The membership collection-group
+  query (members.actorId) needs a COLLECTION_GROUP index — now in
+  firebase/firestore.indexes.json. Any new collectionGroup/ordered query
+  must add its index here or it fails ONLY in prod.
 - The drain skips a task stuck 'claimed' by a crashed run for up to 5 minutes
   (STALE_CLAIM_MS) before reclaiming — acceptable; there is no time-range
   query in the DataStore contract to make it tighter without an index.
