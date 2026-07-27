@@ -151,3 +151,59 @@ input[type='text'] {
   background: #fee2e2;
   color: var(--red);
 }
+
+/* Guide / user docs (pure Astro, no JS). */
+.guide {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  line-height: 1.55;
+}
+.guide h1 {
+  font-size: 2.25rem;
+  line-height: 1.1;
+  margin: 0.5rem 0 0.75rem;
+}
+.guide h2 {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 1.5rem;
+  margin: 2.25rem 0 0.5rem;
+}
+.guide .lede {
+  font-size: 1.15rem;
+  color: var(--muted);
+}
+.guide .back {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+.guide figure {
+  margin: 1rem 0;
+}
+.guide figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.guide figcaption {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.4rem;
+}
+.guide .pair {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 40rem) {
+  .guide .pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.guide .cta-row {
+  margin-top: 2.5rem;
+}

@@ -363,9 +363,21 @@ tenant's capabilities drive the view.
 Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
 7 full-loop E2E green.
 
+## User docs + screenshots (built)
+
+Public /guide pages (pure Astro, zero JS, part of the deployed site, linked
+from the landing) explaining sign-in + the shipper/carrier/driver flows and the
+offline story. Screenshots are captured from the REAL app against the emulator
+stack: `pnpm docs:screenshots` (scripts/capture-screenshots.sh + a Playwright
+screenshots.config) writes PNGs into apps/web/public/guide/ (committed); the
+guide embeds them. NOT part of CI (no binary churn) — regenerate when the UI
+changes. An E2E journey asserts the guide page + link work.
+
+Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
+8 full-loop E2E green; typecheck, lint, check:web, prod+emulator builds pass.
+
 ## Next step
 
-- User docs + screenshots (the flows are stable now).
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 

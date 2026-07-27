@@ -44,6 +44,13 @@ test('a shipper posts a load through the UI', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Load posted' })).toBeVisible();
 });
 
+test('the guide explains how it works', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'How it works' }).click();
+  await expect(page.getByRole('heading', { name: 'How MyBackHaul works' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'For drivers — the 30-second moment' })).toBeVisible();
+});
+
 test('a user in multiple tenants switches which they act as', async ({ page }) => {
   await signIn(page, E2E.multiEmail, E2E.multiPassword);
   const switcher = page.getByLabel('Acting as');
