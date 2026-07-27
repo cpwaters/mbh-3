@@ -64,7 +64,7 @@ export function PostLoad({
 
   if (posted) {
     return (
-      <div className="card">
+      <div className="card success">
         <h2>Load posted</h2>
         <p className="muted">Carriers can see it now. It will be routed automatically.</p>
         <button type="button" className="primary" onClick={() => setPosted(false)}>
@@ -84,7 +84,7 @@ export function PostLoad({
   return (
     <section className="card">
       <h2>Post a load</h2>
-      {error !== null && <p style={{ color: '#dc2626' }}>{error}</p>}
+      {error !== null && <p className="formerror">{error}</p>}
 
       {field('Collection address', 'originLine1', 'text', '10 Distribution Way')}
       {field('Collection town', 'originTown', 'text', 'Trafford')}

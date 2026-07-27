@@ -59,16 +59,18 @@ export function AvailableLoads({
   return (
     <section className="card">
       <h2>Available loads</h2>
-      {error !== null && <p style={{ color: '#dc2626' }}>{error}</p>}
-      <ul className="queue">
+      {error !== null && <p className="formerror">{error}</p>}
+      <ul className="loads">
         {listings.map((l) => (
-          <li key={l.loadId} style={{ display: 'block' }}>
-            <strong>
-              {l.origin.town} → {l.destination.town}
-            </strong>
-            <div className="muted small">
-              {l.origin.postcode} → {l.destination.postcode} · {l.palletCount} pallets ·{' '}
-              {formatGbp(l.priceGbpPence)}
+          <li key={l.loadId}>
+            <div className="load-route">
+              <strong>
+                {l.origin.town} → {l.destination.town}
+              </strong>
+              <span className="price">{formatGbp(l.priceGbpPence)}</span>
+            </div>
+            <div className="meta">
+              {l.origin.postcode} → {l.destination.postcode} · {l.palletCount} pallets
               {l.route !== undefined ? ` · ${Math.round(l.route.distanceMeters / 1000)} km` : ''}
             </div>
             <button
@@ -76,7 +78,6 @@ export function AvailableLoads({
               className="primary"
               disabled={busyLoadId !== null}
               onClick={() => void accept(l.loadId)}
-              style={{ marginTop: 6 }}
             >
               {busyLoadId === l.loadId ? 'Accepting…' : 'Accept load'}
             </button>

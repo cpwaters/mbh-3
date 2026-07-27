@@ -47,7 +47,7 @@ export function SignIn({ auth }: { auth: AuthView }) {
         />
       </label>
 
-      {error !== null && <p style={{ color: '#dc2626' }}>{error}</p>}
+      {error !== null && <p className="formerror">{error}</p>}
 
       <button
         type="button"
@@ -58,11 +58,15 @@ export function SignIn({ auth }: { auth: AuthView }) {
         {busy ? 'Signing in…' : 'Sign in'}
       </button>
 
+      <div className="or">
+        <span>or</span>
+      </div>
+
       <button
         type="button"
+        className="secondary"
         disabled={busy}
         onClick={() => void run(() => auth.signInWithGoogle())}
-        style={{ marginTop: 8 }}
       >
         Continue with Google
       </button>

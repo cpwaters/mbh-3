@@ -59,7 +59,7 @@ export function MarkDelivered({
 
   if (committed) {
     return (
-      <div className="card">
+      <div className="card success">
         <h2>Delivery recorded</h2>
         <p className="muted">
           Saved to this device. It will be sent to {job.destination.split(',')[0]} automatically when you have

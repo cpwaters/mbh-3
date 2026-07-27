@@ -57,7 +57,7 @@ export default function DriverApp() {
     return (
       <div className="app">
         <header className="topbar">
-          <strong>MyBackHaul</strong>
+          <span className="brand"><span className="mark" aria-hidden="true" />MyBackHaul</span>
         </header>
         <div className="card">
           <p className="muted">Loading…</p>
@@ -70,7 +70,7 @@ export default function DriverApp() {
     return (
       <div className="app">
         <header className="topbar">
-          <strong>MyBackHaul</strong>
+          <span className="brand"><span className="mark" aria-hidden="true" />MyBackHaul</span>
         </header>
         <SignIn auth={auth} />
       </div>
@@ -80,17 +80,14 @@ export default function DriverApp() {
   return (
     <div className="app">
       <header className="topbar">
-        <strong>MyBackHaul</strong>
+        <span className="brand"><span className="mark" aria-hidden="true" />MyBackHaul</span>
         <QueueBadge pending={queue.pending} online={queue.online} />
       </header>
 
-      <p className="muted small">
-        Signed in as {auth.session.email ?? auth.session.displayName ?? 'you'} ·{' '}
-        <button
-          type="button"
-          onClick={() => void auth.signOut()}
-          style={{ color: '#dc2626', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-        >
+      <p className="signedin">
+        <span>Signed in as {auth.session.email ?? auth.session.displayName ?? 'you'}</span>
+        <span aria-hidden="true">·</span>
+        <button type="button" className="linkbtn" onClick={() => void auth.signOut()}>
           Sign out
         </button>
       </p>
