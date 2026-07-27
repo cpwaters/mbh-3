@@ -26,6 +26,10 @@ export const E2E = {
   shipperEmail: 'shipper.e2e@acme.test',
   shipperPassword: 'test-password-789',
   shipperTenantId: 'shipper-e2e',
+  // A user who belongs to BOTH the shipper and carrier tenants (switcher).
+  multiUid: 'multi-e2e-user',
+  multiEmail: 'multi.e2e@both.test',
+  multiPassword: 'test-password-abc',
 } as const;
 
 function app() {
@@ -50,6 +54,7 @@ export async function seedDeliverableJob(): Promise<void> {
   await ensureUser(E2E.uid, E2E.email, E2E.password);
   await ensureUser(E2E.joblessUid, E2E.joblessEmail, E2E.joblessPassword);
   await ensureUser(E2E.shipperUid, E2E.shipperEmail, E2E.shipperPassword);
+  await ensureUser(E2E.multiUid, E2E.multiEmail, E2E.multiPassword);
 
   const db = getFirestore();
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({
@@ -69,6 +74,21 @@ export async function seedDeliverableJob(): Promise<void> {
     role: 'owner',
     status: 'active',
     displayName: 'Acme Owner',
+  });
+  // The multi-tenant user: owner of the shipper AND driver of the carrier.
+  await db.doc(`tenants/${E2E.shipperTenantId}/members/${E2E.multiUid}`).set({
+    tenantId: E2E.shipperTenantId,
+    actorId: E2E.multiUid,
+    role: 'owner',
+    status: 'active',
+    displayName: 'Multi User',
+  });
+  await db.doc(`tenants/${E2E.carrierTenantId}/members/${E2E.multiUid}`).set({
+    tenantId: E2E.carrierTenantId,
+    actorId: E2E.multiUid,
+    role: 'driver',
+    status: 'active',
+    displayName: 'Multi User',
   });
   for (const uid of [E2E.uid, E2E.joblessUid]) {
     await db.doc(`tenants/${E2E.carrierTenantId}/members/${uid}`).set({

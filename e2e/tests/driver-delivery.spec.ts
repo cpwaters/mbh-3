@@ -44,6 +44,19 @@ test('a shipper posts a load through the UI', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Load posted' })).toBeVisible();
 });
 
+test('a user in multiple tenants switches which they act as', async ({ page }) => {
+  await signIn(page, E2E.multiEmail, E2E.multiPassword);
+  const switcher = page.getByLabel('Acting as');
+  await expect(switcher).toBeVisible();
+
+  await switcher.selectOption(E2E.shipperTenantId);
+  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+
+  await switcher.selectOption(E2E.carrierTenantId);
+  await expect(page.getByRole('heading', { name: 'Post a load' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: /Available loads|No loads available/ })).toBeVisible();
+});
+
 test('a carrier browses available loads and accepts one', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   // No active job -> the carrier sees the browse (loads read from Firestore).

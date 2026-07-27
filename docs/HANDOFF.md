@@ -346,11 +346,26 @@ is the invariant. Tests cover both refusals + the still-allowed happy paths.
 Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
 6 full-loop E2E green.
 
+## Multi-tenant UI selection (built)
+
+A user who belongs to several tenants picks which to "act as"; the selected
+tenant's capabilities drive the view.
+- Membership now carries the tenant name (FirestoreReader reads it). useTenants
+  resolves all memberships + a localStorage-persisted selection (falls back to
+  the first tenant if the stored one isn't a membership). TenantSwitcher renders
+  a picker only when there is more than one tenant.
+- DriverApp: the selected tenant decides the sections — shipper -> Post a load;
+  carrier -> active delivery or browse; a both-capability tenant shows both.
+  Accept/post are scoped to the selected tenant id.
+- E2E: a user in a shipper + a carrier tenant switches and the view changes
+  (Post a load <-> the carrier browse). 7 journeys green.
+
+Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
+7 full-loop E2E green.
+
 ## Next step
 
 - User docs + screenshots (the flows are stable now).
-- Multi-tenant per-role selection in the UI (retire the first-of-each
-  simplification).
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 

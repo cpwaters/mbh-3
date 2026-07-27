@@ -2,11 +2,12 @@ import type { DeliverCapture } from '@mbh/client';
 import type { DriverJobView } from '@mbh/provider-interfaces';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
-import { useMemberships } from './useMemberships';
+import { useTenants } from './useTenants';
 import { useActiveJob } from './useActiveJob';
 import { useListings } from './useListings';
 import { AvailableLoads } from './AvailableLoads';
 import { PostLoad } from './PostLoad';
+import { TenantSwitcher } from './TenantSwitcher';
 import { SignIn } from './SignIn';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
@@ -36,9 +37,12 @@ export default function DriverApp() {
   const auth = useAuth();
   const actorId = auth.session?.actorId ?? null;
   const queue = useSyncQueue(auth.getIdToken);
-  const { loading: memLoading, shipperTenantId, carrierTenantId } = useMemberships(actorId);
+  const tenants = useTenants(actorId);
   const { loading: jobLoading, job, reload: reloadJob } = useActiveJob(actorId);
-  const listings = useListings(carrierTenantId !== null);
+  const selected = tenants.selected;
+  const isShipper = selected?.capabilities.includes('shipper') ?? false;
+  const isCarrier = selected?.capabilities.includes('carrier') ?? false;
+  const listings = useListings(isCarrier);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
@@ -91,35 +95,33 @@ export default function DriverApp() {
         </button>
       </p>
 
-      {memLoading || jobLoading || listings.loading ? (
+      {tenants.loading || jobLoading || listings.loading ? (
         <div className="card">
           <p className="muted">Loading…</p>
         </div>
+      ) : selected === null ? (
+        <div className="card">
+          <h2>No company yet</h2>
+          <p className="muted">Your account isn't linked to a shipper or carrier yet.</p>
+        </div>
       ) : (
         <>
-          {shipperTenantId !== null && (
-            <PostLoad shipperTenantId={shipperTenantId} getIdToken={auth.getIdToken} />
-          )}
+          <TenantSwitcher tenants={tenants.tenants} selected={selected} onSelect={tenants.select} />
 
-          {carrierTenantId !== null &&
+          {isShipper && <PostLoad shipperTenantId={selected.tenantId} getIdToken={auth.getIdToken} />}
+
+          {isCarrier &&
             (job !== null ? (
               <MarkDelivered job={toActiveJob(job)} onCommit={commit} />
             ) : (
               <AvailableLoads
-                carrierTenantId={carrierTenantId}
+                carrierTenantId={selected.tenantId}
                 listings={listings.listings}
                 getIdToken={auth.getIdToken}
                 onAccepted={onAccepted}
                 onChanged={listings.reload}
               />
             ))}
-
-          {shipperTenantId === null && carrierTenantId === null && (
-            <div className="card">
-              <h2>No company yet</h2>
-              <p className="muted">Your account isn't linked to a shipper or carrier yet.</p>
-            </div>
-          )}
         </>
       )}
 

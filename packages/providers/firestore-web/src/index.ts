@@ -106,7 +106,8 @@ export class FirestoreReader implements JobReader, ListingReader, MembershipRead
         const data = d.data() as { tenantId: string; role: Role };
         const tenant = await getDoc(doc(this.db, tenantDoc(data.tenantId)));
         const capabilities = (tenant.data()?.capabilities ?? []) as TenantCapability[];
-        return { tenantId: data.tenantId, role: data.role, capabilities };
+        const name = (tenant.data()?.name ?? data.tenantId) as string;
+        return { tenantId: data.tenantId, name, role: data.role, capabilities };
       })
     );
   }

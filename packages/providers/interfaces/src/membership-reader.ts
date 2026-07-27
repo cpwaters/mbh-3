@@ -6,6 +6,7 @@ import type { Role, TenantCapability } from '@mbh/domain';
 // user's own member docs (a collection-group read), never from user input.
 export interface Membership {
   tenantId: string;
+  name: string;
   role: Role;
   capabilities: TenantCapability[];
 }

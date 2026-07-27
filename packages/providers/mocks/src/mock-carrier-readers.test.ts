@@ -25,7 +25,7 @@ describe('MockListingReader', () => {
 
 describe('MockMembershipReader', () => {
   it("returns the actor's memberships, empty for an unknown actor", async () => {
-    const membership = { tenantId: 'carrier-1', role: 'driver' as const, capabilities: ['carrier' as const] };
+    const membership = { tenantId: 'carrier-1', name: 'Waters', role: 'driver' as const, capabilities: ['carrier' as const] };
     const reader = new MockMembershipReader({ 'driver-1': [membership] });
     expect(await reader.membershipsFor('driver-1')).toEqual([membership]);
     expect(await reader.membershipsFor('nobody')).toEqual([]);
