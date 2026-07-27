@@ -69,6 +69,13 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+      # Point the drain at a self-hosted OSRM when configured (else the code
+      # default — the public demo server — applies). Not a secret; a plain URL.
+      - run: |
+          if [ -n "${{ vars.OSRM_BASE_URL }}" ]; then
+            echo "OSRM_BASE_URL=${{ vars.OSRM_BASE_URL }}" > functions/.env
+            echo "drain -> OSRM ${{ vars.OSRM_BASE_URL }}"
+          fi
       - run: pnpm exec firebase deploy --only functions,hosting,firestore --project mybackhaul-app --non-interactive
       - run: pnpm smoke:prod
         env:

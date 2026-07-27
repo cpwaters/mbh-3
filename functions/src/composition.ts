@@ -47,16 +47,21 @@ export function getDeps(): HttpDispatchDeps {
 
 let cachedDrain: DrainDeps | null = null;
 
-// The drain's providers: the real HTTP adapters. postcodes.io is keyless and
-// fine for production; the public OSRM demo server is rate-limited — swap it
-// for a hosted/self-run OSRM before real volume (see docs/backlog).
+// The OSRM routing endpoint. Defaults to the public demo server (rate-limited,
+// fine at pre-launch volume); set the OSRM_BASE_URL env var (functions/.env,
+// applied at deploy) to a self-hosted OSRM before real volume — see
+// infrastructure/osrm/ + docs/runbooks/osrm.md. No code change needed to swap.
+// A plain env read (not a defineString param) so the emulator never prompts.
+const osrmBaseUrl = process.env.OSRM_BASE_URL ?? 'https://router.project-osrm.org';
+
+// The drain's providers: the real HTTP adapters. postcodes.io is keyless.
 export function getDrainDeps(): DrainDeps {
   if (cachedDrain !== null) return cachedDrain;
   ensureApp();
   cachedDrain = {
     store: new FirestoreDataStore(getFirestore()),
     geocoder: new PostcodesIoGeocoder(),
-    routeProvider: new OsrmRouteProvider(),
+    routeProvider: new OsrmRouteProvider({ baseUrl: osrmBaseUrl }),
     now: isoNow,
     newId: prefixedId,
   };

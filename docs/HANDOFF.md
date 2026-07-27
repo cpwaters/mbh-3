@@ -376,10 +376,23 @@ changes. An E2E journey asserts the guide page + link work.
 Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
 8 full-loop E2E green; typecheck, lint, check:web, prod+emulator builds pass.
 
+## Self-hosted OSRM (config + infra-as-code; founder runs the deploy)
+
+The drain's OSRM endpoint is now configurable: functions/src/composition.ts
+reads OSRM_BASE_URL (env), defaulting to the public demo server. CI writes
+functions/.env from a GitHub `OSRM_BASE_URL` variable at deploy, so swapping to
+a self-hosted OSRM is config, not code. infrastructure/osrm/ has a Dockerfile
+(GB graph baked in), cloudbuild.yaml (heavy build on a 32-vCPU machine), and
+Terraform for a scale-to-zero Cloud Run service (public + max_instances-bounded
+for now; private-with-token is a documented follow-up). docs/runbooks/osrm.md
+walks the founder through the build + deploy (heavy/costly, so founder-run).
+Verified: composition change loads cleanly (test:functions 4/4), terraform
+validate clean.
+
 ## Next step
 
-- Hosted/self-run OSRM before real volume (see backlog); migrating the
-  prototype's real accounts at cutover.
+- Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
+  OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
 
 ## Known deferred items
 
@@ -392,10 +405,10 @@ Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
   mechanism — re-verify when the real provider lands (step 6).
 - What3Words API plan is broken on the prototype (QuotaExceeded on
   convert-to-3wa) — resolve before the W3W provider is built here.
-- OSRM: the drain currently points at the public demo server
-  (router.project-osrm.org), which is rate-limited and not for production
-  traffic. Fine at pre-launch volume; swap OsrmRouteProvider's baseUrl for a
-  hosted/self-run OSRM before real load. postcodes.io is keyless and fine.
+- OSRM: config + self-hosting infra are in place (OSRM_BASE_URL env +
+  infrastructure/osrm/ + docs/runbooks/osrm.md). The drain still defaults to the
+  public demo server until the founder runs the OSRM runbook and sets the
+  OSRM_BASE_URL repo variable. postcodes.io is keyless and fine.
 - The drain skips a task stuck 'claimed' by a crashed run for up to 5 minutes
   (STALE_CLAIM_MS) before reclaiming — acceptable; there is no time-range
   query in the DataStore contract to make it tighter without an index.
