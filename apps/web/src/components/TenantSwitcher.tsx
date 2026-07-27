@@ -13,9 +13,13 @@ export function TenantSwitcher({
 }) {
   if (tenants.length <= 1) return null;
   return (
-    <label className="field">
-      <span>Acting as</span>
-      <select value={selected.tenantId} onChange={(e) => onSelect(e.target.value)}>
+    <label className="flex items-center gap-2 text-sm">
+      <span className="text-gray-500 font-medium">Acting as</span>
+      <select
+        value={selected.tenantId}
+        onChange={(e) => onSelect(e.target.value)}
+        className="border border-gray-300 rounded-lg py-1.5 pl-2.5 pr-8 bg-white text-gray-900 font-medium outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
         {tenants.map((t) => (
           <option key={t.tenantId} value={t.tenantId}>
             {t.name} ({t.capabilities.join('/')})

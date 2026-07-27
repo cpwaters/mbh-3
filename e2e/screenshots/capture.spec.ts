@@ -49,10 +49,13 @@ test('driver — mark delivered and confirmation', async ({ page }) => {
   if (box !== null) {
     await page.mouse.move(box.x + 30, box.y + 30);
     await page.mouse.down();
-    await page.mouse.move(box.x + 150, box.y + 90, { steps: 10 });
-    await page.mouse.move(box.x + 260, box.y + 40, { steps: 10 });
+    await page.mouse.move(box.x + 120, box.y + 80, { steps: 15 });
+    await page.mouse.move(box.x + 220, box.y + 50, { steps: 15 });
+    await page.mouse.move(box.x + 280, box.y + 100, { steps: 15 });
     await page.mouse.up();
   }
+  // Let React commit the captured signature ref before submitting.
+  await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Record delivery' }).click();
   await expect(page.getByRole('heading', { name: 'Delivery recorded' })).toBeVisible();
   await page.screenshot({ path: `${DIR}/delivery-recorded.png` });

@@ -64,10 +64,14 @@ export function SignaturePad({ onChange }: { onChange: (ref: string | null) => v
         onPointerMove={move}
         onPointerUp={end}
         onPointerLeave={end}
-        style={{ border: '1px solid #d1d5db', borderRadius: 8, touchAction: 'none', width: '100%', maxWidth: 320 }}
+        className="w-full max-w-[320px] h-[140px] border border-gray-300 rounded-lg bg-white touch-none"
       />
       <div>
-        <button type="button" onClick={clear} style={{ color: '#dc2626', background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer' }}>
+        <button
+          type="button"
+          onClick={clear}
+          className="text-sm text-gray-500 hover:text-gray-700 py-1"
+        >
           Clear signature
         </button>
       </div>

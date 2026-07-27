@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CheckCircle2, MapPin } from 'lucide-react';
 import { buildDeliverRequest, genRequestId, type DeliverCapture } from '@mbh/client';
 import { SignaturePad } from './SignaturePad';
 
@@ -10,8 +11,7 @@ export interface ActiveJob {
 }
 
 // The 30-second moment. Capture photo(s) + signature + recipient, then commit
-// to the offline queue — succeeds instantly with no signal. onCommit enqueues
-// the deliverJob request and returns; delivery is the queue's job.
+// to the offline queue — succeeds instantly with no signal.
 export function MarkDelivered({
   job,
   onCommit,
@@ -28,8 +28,6 @@ export function MarkDelivered({
 
   function addPhotos(files: FileList | null) {
     if (!files) return;
-    // A real upload to object storage is a later slice; capture the file
-    // identity as the ref for now.
     const refs = Array.from(files).map((f) => `capture://${f.name}:${f.size}`);
     setPhotoRefs((prev) => [...prev, ...refs]);
   }
@@ -59,59 +57,83 @@ export function MarkDelivered({
 
   if (committed) {
     return (
-      <div className="card success">
-        <h2>Delivery recorded</h2>
-        <p className="muted">
-          Saved to this device. It will be sent to {job.destination.split(',')[0]} automatically when you have
-          signal — you don't need to stay on this screen.
+      <div className="bg-white rounded-xl shadow-md border border-green-200 p-6 text-center">
+        <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" />
+        <h2 className="text-xl font-bold text-gray-900 mb-1">Delivery recorded</h2>
+        <p className="text-gray-600">
+          Saved to this device. It will be sent to {job.destination.split(',')[0]} automatically when
+          you have signal — you don't need to stay on this screen.
         </p>
       </div>
     );
   }
 
   const req = (field: string) =>
-    error?.field === field ? <span style={{ color: '#dc2626' }}> — {error.message}</span> : null;
+    error?.field === field ? <span className="text-red-600 font-normal"> — {error.message}</span> : null;
+  const star = <span className="text-red-500">*</span>;
+  const labelCls = 'block text-sm font-semibold text-gray-800 mb-1.5';
+  const input =
+    'w-full px-3 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
 
   return (
-    <div className="card">
-      <h2>Mark delivered</h2>
-      <p className="muted">
+    <section className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-1">Mark delivered</h2>
+      <p className="flex items-center gap-1.5 text-sm text-gray-500 mb-5">
+        <MapPin className="w-4 h-4 text-gray-400" />
         {job.origin} → {job.destination}
       </p>
 
-      <label className="field">
-        <span>
-          Photos of the delivered goods <span style={{ color: '#dc2626' }}>*</span>
-          {req('photoRefs')}
-        </span>
-        <input type="file" accept="image/*" capture="environment" multiple onChange={(e) => addPhotos(e.target.files)} />
-        {photoRefs.length > 0 && <span className="muted">{photoRefs.length} photo(s) captured</span>}
-      </label>
+      <div className="space-y-5">
+        <div>
+          <span className={labelCls}>
+            Photos of the delivered goods {star}
+            {req('photoRefs')}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            onChange={(e) => addPhotos(e.target.files)}
+            className="w-full text-sm text-gray-600 border border-dashed border-gray-300 rounded-lg p-2.5 bg-gray-50 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-blue-600 file:text-white file:font-semibold file:text-sm"
+          />
+          {photoRefs.length > 0 && (
+            <p className="text-sm text-green-600 mt-1.5">{photoRefs.length} photo(s) captured</p>
+          )}
+        </div>
 
-      <label className="field">
-        <span>
-          Recipient name <span style={{ color: '#dc2626' }}>*</span>
-          {req('recipientName')}
-        </span>
-        <input
-          type="text"
-          value={recipientName}
-          onChange={(e) => setRecipientName(e.target.value)}
-          placeholder="Who took delivery?"
-        />
-      </label>
+        <div>
+          <label htmlFor="recipient" className={labelCls}>
+            Recipient name {star}
+            {req('recipientName')}
+          </label>
+          <input
+            id="recipient"
+            type="text"
+            value={recipientName}
+            onChange={(e) => setRecipientName(e.target.value)}
+            placeholder="Who took delivery?"
+            className={input}
+          />
+        </div>
 
-      <div className="field">
-        <span>
-          Recipient signature <span style={{ color: '#dc2626' }}>*</span>
-          {req('signatureRef')}
-        </span>
-        <SignaturePad onChange={setSignatureRef} />
+        <div>
+          <span className={labelCls}>
+            Recipient signature {star}
+            {req('signatureRef')}
+          </span>
+          <SignaturePad onChange={setSignatureRef} />
+        </div>
+
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors"
+        >
+          {busy ? 'Saving…' : 'Record delivery'}
+        </button>
       </div>
-
-      <button type="button" className="primary" onClick={submit} disabled={busy}>
-        {busy ? 'Saving…' : 'Record delivery'}
-      </button>
-    </div>
+    </section>
   );
 }

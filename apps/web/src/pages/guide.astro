@@ -1,70 +1,81 @@
 ---
 import Base from '../layouts/Base.astro';
+
+const img = 'w-full rounded-xl border border-gray-200 shadow-md';
+const h2 = 'text-2xl font-bold text-gray-900 mt-12 mb-3 pt-6 border-t border-gray-100';
+const p = 'text-gray-600 leading-relaxed mb-4';
 ---
 
 <Base title="MyBackHaul — how it works">
-  <main class="guide">
-    <p><a class="back" href="/">← MyBackHaul</a></p>
-    <h1>How MyBackHaul works</h1>
-    <p class="lede">
-      MyBackHaul matches distributors' loads with hauliers who have spare capacity on the way back — with a
-      proof of delivery you can rely on, captured even where there's no signal.
-    </p>
+  <main class="min-h-screen bg-white">
+    <div class="max-w-3xl mx-auto px-4 py-10 sm:py-16">
+      <a href="/" class="inline-flex items-center gap-1.5 text-blue-600 font-semibold text-sm mb-6 hover:text-blue-700">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+        MyBackHaul
+      </a>
 
-    <h2>Signing in</h2>
-    <p>
-      Open the <a href="/app">driver app</a> and sign in with your email and password, or with Google. If your
-      account belongs to more than one company, an <strong>Acting as</strong> switcher lets you choose which
-      one you're working as — the screen changes to match.
-    </p>
-    <figure>
-      <img src="/guide/sign-in.png" alt="The MyBackHaul sign-in screen with email, password, and Continue with Google" />
-    </figure>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-4">How MyBackHaul works</h1>
+      <p class="text-lg text-gray-600 mb-2">
+        MyBackHaul matches distributors' loads with hauliers who have spare capacity on the way
+        back — with a proof of delivery you can rely on, captured even where there's no signal.
+      </p>
 
-    <h2>For shippers — post a load</h2>
-    <p>
-      Fill in where the goods are collected and delivered, the consignment (description, weight, pallets), the
-      price, and the collection and delivery dates. Post it, and hauliers can see it straight away. MyBackHaul
-      geocodes the route automatically within a minute.
-    </p>
-    <figure>
-      <img src="/guide/post-a-load.png" alt="The Post a load form with collection, delivery, consignment, and price fields" />
-    </figure>
+      <h2 class={h2}>Signing in</h2>
+      <p class={p}>
+        Open the <a href="/app" class="text-blue-600 font-medium">driver app</a> and sign in with your
+        email and password, or with Google. If your account belongs to more than one company, an
+        <strong>Acting as</strong> switcher lets you choose which one you're working as — the screen
+        changes to match.
+      </p>
+      <img src="/guide/sign-in.png" alt="The MyBackHaul sign-in screen" class={img} />
 
-    <h2>For carriers — find a backhaul</h2>
-    <p>
-      Browse the available loads — each shows the route, pallets, headline price, and distance. Accepting one
-      makes it your current job. You never see a shipper's private details until you've accepted.
-    </p>
-    <figure>
-      <img src="/guide/available-loads.png" alt="The Available loads browse showing loads with route, pallets, price, and an Accept button" />
-    </figure>
+      <h2 class={h2}>For shippers — post a load</h2>
+      <p class={p}>
+        Fill in where the goods are collected and delivered, the consignment, the price, and the
+        collection and delivery dates. Post it, and hauliers can see it straight away. MyBackHaul
+        geocodes the route automatically within a minute.
+      </p>
+      <img src="/guide/post-a-load.png" alt="The Post a load form" class={img} />
 
-    <h2>For drivers — the 30-second moment</h2>
-    <p>
-      When you've delivered, tap <strong>Mark delivered</strong>: take a photo of the goods, capture the
-      recipient's name and signature, and record it. It saves to your phone instantly — <strong>even with no
-      signal</strong> — and sends itself automatically the moment you're back online. You don't need to wait on
-      the screen.
-    </p>
-    <div class="pair">
-      <figure>
-        <img src="/guide/mark-delivered.png" alt="The Mark delivered screen with photo, recipient name, and signature fields" />
-        <figcaption>Capture the proof of delivery.</figcaption>
-      </figure>
-      <figure>
-        <img src="/guide/delivery-recorded.png" alt="The Delivery recorded confirmation — saved to this device, sent when you have signal" />
-        <figcaption>Saved on your device, sent when you have signal.</figcaption>
-      </figure>
+      <h2 class={h2}>For carriers — find a backhaul</h2>
+      <p class={p}>
+        Browse the available loads — each shows the route, pallets, headline price, and distance.
+        Accepting one makes it your current job. You never see a shipper's private details until
+        you've accepted.
+      </p>
+      <img src="/guide/available-loads.png" alt="The Available loads browse" class={img} />
+
+      <h2 class={h2}>For drivers — the 30-second moment</h2>
+      <p class={p}>
+        When you've delivered, tap <strong>Mark delivered</strong>: take a photo of the goods,
+        capture the recipient's name and signature, and record it. It saves to your phone
+        instantly — <strong>even with no signal</strong> — and sends itself automatically the moment
+        you're back online.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <figure class="m-0">
+          <img src="/guide/mark-delivered.png" alt="The Mark delivered screen" class={img} />
+          <figcaption class="text-sm text-gray-500 mt-2">Capture the proof of delivery.</figcaption>
+        </figure>
+        <figure class="m-0">
+          <img src="/guide/delivery-recorded.png" alt="The Delivery recorded confirmation" class={img} />
+          <figcaption class="text-sm text-gray-500 mt-2">Saved on your device, sent when you have signal.</figcaption>
+        </figure>
+      </div>
+
+      <h2 class={h2}>Works with no signal</h2>
+      <p class={p}>
+        Deliveries happen in loading bays and rural lay-bys where signal is patchy. MyBackHaul is
+        built for that: a proof of delivery is recorded on your device the moment it happens, and
+        delivered to the shipper when signal returns — nothing is ever lost.
+      </p>
+
+      <div class="mt-12">
+        <a href="/app" class="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-colors">
+          Open the driver app
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+        </a>
+      </div>
     </div>
-
-    <h2>Works with no signal</h2>
-    <p>
-      Deliveries happen in loading bays and rural lay-bys where signal is patchy. MyBackHaul is built for that:
-      a proof of delivery is recorded on your device the moment it happens, and delivered to the shipper when
-      signal returns — nothing is ever lost.
-    </p>
-
-    <p class="cta-row"><a class="cta" href="/app">Open the driver app</a></p>
   </main>
 </Base>

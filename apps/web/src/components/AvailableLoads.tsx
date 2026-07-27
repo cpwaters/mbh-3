@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import { MapPin } from 'lucide-react';
 import { formatGbp, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { dispatchAction } from '../lib/dispatch';
 
-// The carrier browse: available loads with an Accept action. Accepting is an
-// online request/response (the carrier needs to know if they got it), not an
-// offline capture. On success the parent re-reads the active job.
+// The carrier browse: available loads as cards (prototype JobCard style —
+// route with a pin, green payment, an Accept action). Accepting is an online
+// request/response; on success the parent re-reads the active job.
 export function AvailableLoads({
   carrierTenantId,
   listings,
@@ -40,7 +41,7 @@ export function AvailableLoads({
         onAccepted();
       } else {
         setError(res.error.message);
-        onChanged(); // the load may be gone — refresh the list
+        onChanged();
       }
     } finally {
       setBusyLoadId(null);
@@ -49,35 +50,50 @@ export function AvailableLoads({
 
   if (listings.length === 0) {
     return (
-      <div className="card">
-        <h2>No loads available</h2>
-        <p className="muted">New backhauls will appear here as shippers post them.</p>
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-3">
+          <MapPin className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">No loads available</h2>
+        <p className="text-gray-500">New backhauls will appear here as shippers post them.</p>
       </div>
     );
   }
 
   return (
-    <section className="card">
-      <h2>Available loads</h2>
-      {error !== null && <p className="formerror">{error}</p>}
-      <ul className="loads">
+    <section>
+      <h2 className="text-xl font-bold text-gray-900 mb-3">Available loads</h2>
+      {error !== null && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+          {error}
+        </div>
+      )}
+      <ul className="grid gap-3 sm:grid-cols-2">
         {listings.map((l) => (
-          <li key={l.loadId}>
-            <div className="load-route">
-              <strong>
-                {l.origin.town} → {l.destination.town}
-              </strong>
-              <span className="price">{formatGbp(l.priceGbpPence)}</span>
+          <li
+            key={l.loadId}
+            className="bg-white rounded-xl shadow-md border border-gray-200 p-5 flex flex-col"
+          >
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span className="font-semibold text-gray-900">
+                  {l.origin.town} → {l.destination.town}
+                </span>
+              </div>
+              <span className="flex-none text-lg font-bold text-green-600">
+                {formatGbp(l.priceGbpPence)}
+              </span>
             </div>
-            <div className="meta">
+            <p className="text-sm text-gray-500 mb-4">
               {l.origin.postcode} → {l.destination.postcode} · {l.palletCount} pallets
               {l.route !== undefined ? ` · ${Math.round(l.route.distanceMeters / 1000)} km` : ''}
-            </div>
+            </p>
             <button
               type="button"
-              className="primary"
               disabled={busyLoadId !== null}
               onClick={() => void accept(l.loadId)}
+              className="mt-auto w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-60 transition-colors"
             >
               {busyLoadId === l.loadId ? 'Accepting…' : 'Accept load'}
             </button>
