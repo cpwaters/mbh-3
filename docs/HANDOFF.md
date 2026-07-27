@@ -334,11 +334,23 @@ filtering is a later refinement.
 Full suite: 128 unit + 13 contract + 23 rules + 4 functions-integration +
 6 full-loop E2E green; typecheck, lint, prod+emulator builds, check:web, seed.
 
+## Server-side capability enforcement (built)
+
+requireTenantCapability(tx, tenantId, capability) reads the tenant and refuses
+the action if the capability is absent — enforced in the SAME transaction as
+the role check. postLoad requires 'shipper'; acceptLoad requires 'carrier'. So
+role alone (a carrier tenant's owner) can never post loads, and a shipper's
+driver can never accept — the client's capability-aware UI is convenience, this
+is the invariant. Tests cover both refusals + the still-allowed happy paths.
+
+Full suite: 131 unit + 13 contract + 23 rules + 4 functions-integration +
+6 full-loop E2E green.
+
 ## Next step
 
 - User docs + screenshots (the flows are stable now).
-- Multi-tenant per-role selection (retire the first-of-each simplification);
-  server-side capability enforcement on postLoad/acceptLoad.
+- Multi-tenant per-role selection in the UI (retire the first-of-each
+  simplification).
 - Hosted/self-run OSRM before real volume (see backlog); migrating the
   prototype's real accounts at cutover.
 

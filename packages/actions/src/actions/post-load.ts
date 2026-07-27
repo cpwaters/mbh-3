@@ -10,6 +10,7 @@ import { listingDoc, loadDoc, outboxTaskDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
+import { requireTenantCapability } from '../require-capability.js';
 import { zodParse } from '../parse.js';
 
 // Shippers post loads. Roles allowed to list.
@@ -47,6 +48,7 @@ export const postLoadHandler: ActionHandler<PostLoadPayload, PostLoadResult> = {
   parse: zodParse(postLoadSchema),
   async execute(tx, ctx, payload) {
     await requireMember(tx, payload.shipperTenantId, ctx.actorId, LISTING_ROLES);
+    await requireTenantCapability(tx, payload.shipperTenantId, 'shipper');
 
     const loadId = ctx.newId('load');
     const load: Load = {

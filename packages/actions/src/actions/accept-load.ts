@@ -14,6 +14,7 @@ import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc } from '@mbh/p
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
+import { requireTenantCapability } from '../require-capability.js';
 import { zodParse } from '../parse.js';
 
 // Carriers accept loads. Roles allowed to accept.
@@ -39,6 +40,7 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
   parse: zodParse(acceptLoadSchema),
   async execute(tx, ctx, payload) {
     await requireMember(tx, payload.carrierTenantId, ctx.actorId, ACCEPT_ROLES);
+    await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
 
     const loadData = await tx.get(loadDoc(payload.loadId));
     if (loadData === null) {

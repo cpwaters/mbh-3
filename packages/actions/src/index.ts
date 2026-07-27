@@ -4,6 +4,7 @@ export * from './http-dispatch.js';
 export * from './drain.js';
 export * from './registry.js';
 export * from './require-member.js';
+export * from './require-capability.js';
 export * from './parse.js';
 export { postLoadHandler } from './actions/post-load.js';
 export type { PostLoadPayload, PostLoadResult } from './actions/post-load.js';
