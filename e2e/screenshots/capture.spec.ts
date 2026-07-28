@@ -37,8 +37,17 @@ test('carrier — available loads', async ({ page }) => {
   await page.screenshot({ path: `${DIR}/available-loads.png`, fullPage: true });
 });
 
+test('driver — map', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await page.getByRole('link', { name: 'Map' }).click();
+  await expect(page.getByRole('heading', { name: 'Map' })).toBeVisible();
+  await page.waitForTimeout(1200); // let the tiles paint
+  await page.screenshot({ path: `${DIR}/map.png` });
+});
+
 test('driver — mark delivered and confirmation', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
+  await page.getByRole('link', { name: 'Active Jobs' }).click();
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
   await page.screenshot({ path: `${DIR}/mark-delivered.png`, fullPage: true });
 
@@ -54,7 +63,6 @@ test('driver — mark delivered and confirmation', async ({ page }) => {
     await page.mouse.move(box.x + 280, box.y + 100, { steps: 15 });
     await page.mouse.up();
   }
-  // Let React commit the captured signature ref before submitting.
   await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Record delivery' }).click();
   await expect(page.getByRole('heading', { name: 'Delivery recorded' })).toBeVisible();

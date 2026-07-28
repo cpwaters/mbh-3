@@ -16,6 +16,12 @@ async function signIn(page: Page, email: string, password: string): Promise<void
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
+// The app is a multi-page SPA now; delivery lives on the Active Jobs page.
+async function goToActiveJobs(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Active Jobs' }).click();
+  await expect(page.getByRole('heading', { name: 'Active Jobs' })).toBeVisible();
+}
+
 test('landing invites the driver into the app', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Fill your empty return legs.' })).toBeVisible();
@@ -73,19 +79,21 @@ test('a carrier browses available loads and accepts one', async ({ page }) => {
 
   await row.getByRole('button', { name: 'Accept load' }).click();
 
-  // Accepted -> the home switches to the delivery capture for the new job.
+  // Accepted -> the driver now has an active delivery on the Active Jobs page.
+  await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
-  // No URL params — the home read the job by the signed-in driver's id.
+  await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
   await expect(page.getByText(/Trafford.*Leith/)).toBeVisible();
 });
 
 test('capture refuses to submit without the required proof', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
   await page.getByRole('button', { name: 'Record delivery' }).click();
   await expect(page.getByRole('heading', { name: 'Delivery recorded' })).toHaveCount(0);
@@ -96,6 +104,7 @@ test('capture refuses to submit without the required proof', async ({ page }) =>
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 
   await page.setInputFiles('input[type="file"]', { name: 'pod.png', mimeType: 'image/png', buffer: PNG });
