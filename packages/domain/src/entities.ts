@@ -76,7 +76,14 @@ export interface Job {
   // present only if the drain had enriched the load by acceptance time.
   origin: Address;
   destination: Address;
+  // The carrier's pay for the job, denormalized from the load at acceptance so
+  // it is fixed at the price agreed and the driver's earnings read never needs
+  // the shipper-private load.
+  priceGbpPence: number;
   route?: LoadRoute;
+  // Set when the job transitions to `delivered` — the timestamp earnings are
+  // bucketed by. Absent until then.
+  deliveredAt?: string;
 }
 
 export type EventSource = 'member' | 'system';

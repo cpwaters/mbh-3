@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import {
   ACTIVE_JOB_STATUSES,
+  isCompletedJobStatus,
   type Address,
   type JobStatus,
   type Listing,
@@ -22,6 +23,7 @@ import {
 } from '@mbh/domain';
 import { jobsCollection, listingsCollection, MEMBERS_SUBCOLLECTION, tenantDoc } from '@mbh/paths';
 import type {
+  CompletedJobView,
   DriverJobView,
   JobReader,
   ListingReader,
@@ -52,7 +54,9 @@ interface JobDoc {
   status: JobStatus;
   origin: Address;
   destination: Address;
+  priceGbpPence: number;
   route?: LoadRoute;
+  deliveredAt?: string;
 }
 
 export class FirestoreReader implements JobReader, ListingReader, MembershipReader {
@@ -80,11 +84,31 @@ export class FirestoreReader implements JobReader, ListingReader, MembershipRead
           status: data.status,
           origin: data.origin,
           destination: data.destination,
+          priceGbpPence: data.priceGbpPence,
           ...(data.route !== undefined ? { route: data.route } : {}),
         };
       }
     }
     return null;
+  }
+
+  async completedJobsForDriver(actorId: string): Promise<CompletedJobView[]> {
+    // Same authorized list as the active read (`driverActorId == uid`); we
+    // filter to finished jobs client-side to avoid a composite index.
+    const snap = await getDocs(
+      query(collection(this.db, jobsCollection()), where('driverActorId', '==', actorId))
+    );
+    return snap.docs
+      .map((d) => d.data() as JobDoc)
+      .filter((data) => isCompletedJobStatus(data.status))
+      .map((data) => ({
+        jobId: data.jobId,
+        origin: data.origin,
+        destination: data.destination,
+        priceGbpPence: data.priceGbpPence,
+        deliveredAt: data.deliveredAt ?? '',
+      }))
+      .sort((a, b) => (a.deliveredAt < b.deliveredAt ? 1 : -1));
   }
 
   async availableListings(): Promise<Listing[]> {

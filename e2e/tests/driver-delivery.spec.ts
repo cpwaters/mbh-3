@@ -100,6 +100,17 @@ test('capture refuses to submit without the required proof', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 });
 
+test('a driver sees earnings from delivered jobs', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await page.getByRole('link', { name: 'Earnings' }).click();
+  await expect(page.getByRole('heading', { name: /Earnings/ })).toBeVisible();
+
+  // The seeded delivered job (Hull → Newport, £915) appears with its pay.
+  const row = page.getByRole('listitem').filter({ hasText: 'Hull → Newport' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('£915.00');
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

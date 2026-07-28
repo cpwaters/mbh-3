@@ -34,3 +34,10 @@ export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ['accepted', 'collected
 export function isActiveJobStatus(status: JobStatus): boolean {
   return ACTIVE_JOB_STATUSES.includes(status);
 }
+
+// A job the driver has finished and earned on — the statuses earnings count.
+export const COMPLETED_JOB_STATUSES: readonly JobStatus[] = ['delivered', 'closed'];
+
+export function isCompletedJobStatus(status: JobStatus): boolean {
+  return COMPLETED_JOB_STATUSES.includes(status);
+}

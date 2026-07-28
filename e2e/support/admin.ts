@@ -16,6 +16,9 @@ export const E2E = {
   password: 'test-password-123',
   carrierTenantId: 'carrier-e2e',
   jobId: 'job-e2e',
+  // A finished delivery the driver has already earned on — drives the Earnings
+  // page (a distinct route + price so the assertion is unambiguous).
+  doneJobId: 'job-done-e2e',
   // A driver with no active job — browses and accepts the available load below.
   joblessUid: 'driver-nojob-e2e',
   joblessEmail: 'nojob.e2e@haulier.test',
@@ -106,6 +109,7 @@ export async function seedDeliverableJob(): Promise<void> {
     carrierTenantId: E2E.carrierTenantId,
     driverActorId: E2E.uid,
     status: 'in_transit',
+    priceGbpPence: 68000,
     origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
     destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
     route: {
@@ -116,6 +120,21 @@ export async function seedDeliverableJob(): Promise<void> {
       enrichedAt: new Date().toISOString(),
     },
     createdAt: new Date().toISOString(),
+  });
+
+  // A delivered job the same driver already completed — the Earnings history.
+  await db.doc(`jobs/${E2E.doneJobId}`).set({
+    jobId: E2E.doneJobId,
+    loadId: 'load-done-e2e',
+    shipperTenantId: 'shipper-e2e',
+    carrierTenantId: E2E.carrierTenantId,
+    driverActorId: E2E.uid,
+    status: 'delivered',
+    priceGbpPence: 91500,
+    origin: { line1: '3 Dock St', town: 'Hull', postcode: 'HU1 1UU' },
+    destination: { line1: '9 Usk Way', town: 'Newport', postcode: 'NP20 2BA' },
+    createdAt: new Date().toISOString(),
+    deliveredAt: new Date().toISOString(),
   });
 
   // An available load + its listing for the browse-and-accept journey (a

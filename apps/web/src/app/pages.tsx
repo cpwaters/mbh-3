@@ -4,6 +4,7 @@ import { formatGbp } from '@mbh/domain';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
+import { useEarnings } from '../components/useEarnings';
 import LiveLocationMap from './LiveLocationMap';
 import { useApp } from './context';
 
@@ -11,6 +12,12 @@ const PAGE = 'max-w-4xl mx-auto px-4 py-6';
 
 function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
+}
+
+function fmtDate(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return '';
+  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { town: string; postcode: string }; destination: { town: string; postcode: string } }): ActiveJob {
   return {
@@ -178,18 +185,75 @@ function StatCard({
 }
 
 export function EarningsPage() {
+  const app = useApp();
+  const actorId = app.auth.session?.actorId ?? null;
+  const { loading, jobs } = useEarnings(actorId);
+
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const startWeek = new Date(startToday);
+  startWeek.setDate(startToday.getDate() - ((startToday.getDay() + 6) % 7)); // Monday
+  const startMonth = new Date(startToday);
+  startMonth.setDate(1);
+
+  const sumSince = (since: number): number =>
+    jobs.reduce((total, j) => {
+      const at = Date.parse(j.deliveredAt);
+      return !Number.isNaN(at) && at >= since ? total + j.priceGbpPence : total;
+    }, 0);
+
+  const today = sumSince(startToday.getTime());
+  const week = sumSince(startWeek.getTime());
+  const month = sumSince(startMonth.getTime());
+  const allTime = jobs.reduce((total, j) => total + j.priceGbpPence, 0);
+
   return (
     <div className={PAGE}>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Earnings &amp; Performance</h1>
       <p className="text-gray-600 mb-6">Track your income and performance metrics</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard icon={<PoundSterling className="w-5 h-5 text-green-600" />} tint="bg-green-100" label="Today" value={formatGbp(0)} />
-        <StatCard icon={<TrendingUp className="w-5 h-5 text-blue-600" />} tint="bg-blue-100" label="This week" value={formatGbp(0)} />
-        <StatCard icon={<PoundSterling className="w-5 h-5 text-purple-600" />} tint="bg-purple-100" label="This month" value={formatGbp(0)} />
-      </div>
-      <div className="mt-6 bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">
-        Earnings appear here as you complete deliveries.
-      </div>
+
+      {loading ? (
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">
+          Loading…
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatCard icon={<PoundSterling className="w-5 h-5 text-green-600" />} tint="bg-green-100" label="Today" value={formatGbp(today)} />
+            <StatCard icon={<TrendingUp className="w-5 h-5 text-blue-600" />} tint="bg-blue-100" label="This week" value={formatGbp(week)} />
+            <StatCard icon={<PoundSterling className="w-5 h-5 text-purple-600" />} tint="bg-purple-100" label="This month" value={formatGbp(month)} />
+          </div>
+
+          <section className="mt-6 bg-white rounded-lg shadow-md border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-gray-900">Recent deliveries</h2>
+              <span className="text-sm text-gray-500">
+                {jobs.length} total · {formatGbp(allTime)}
+              </span>
+            </div>
+            {jobs.length === 0 ? (
+              <p className="text-gray-500">Earnings appear here as you complete deliveries.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {jobs.slice(0, 10).map((j) => (
+                  <li key={j.jobId} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-800 flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                        <span className="truncate">
+                          {j.origin.town} → {j.destination.town}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-500">{fmtDate(j.deliveredAt)}</p>
+                    </div>
+                    <span className="font-semibold text-green-600 shrink-0">{formatGbp(j.priceGbpPence)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

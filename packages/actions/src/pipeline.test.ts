@@ -141,6 +141,7 @@ describe('acceptLoad', () => {
       shipperTenantId: 'shipper-1',
       carrierTenantId: 'carrier-1',
       loadId,
+      priceGbpPence: 68_000, // denormalized from the load at acceptance
     });
     expect(await h.store.getDoc('jobs/job-1/events/evt-1')).toMatchObject({
       type: 'job.accepted',
