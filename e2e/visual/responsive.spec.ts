@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { E2E } from '../support/admin.js';
 
-// Absolute scratchpad dir so the screenshots can be inspected outside the repo.
-const SHOTS =
-  '/private/tmp/claude-501/-Users-Chriswaters-Projects-MyHaul-mbh/e557046e-277a-41e1-8738-13c5401162cf/scratchpad/shots';
+// Screenshot output dir. Defaults to a gitignored repo dir (CI-safe); set
+// VISUAL_SHOTS_DIR to redirect (e.g. a scratchpad for local inspection).
+const SHOTS = process.env.VISUAL_SHOTS_DIR ?? new URL('../.visual-shots', import.meta.url).pathname;
 
 // The lg breakpoint (1024px) switches nav from the mobile bottom bar to the
 // desktop top pills, which use different link labels.

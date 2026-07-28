@@ -5,10 +5,9 @@ import { E2E } from '../support/admin.js';
 // profiles set isMobile, touch, the mobile UA, and the true mobile viewport —
 // the closest Playwright gets to a real phone, and what catches a viewport-meta
 // or mobile-only rendering bug that a plain viewport resize would miss.
-const SHOTS =
-  '/private/tmp/claude-501/-Users-Chriswaters-Projects-MyHaul-mbh/e557046e-277a-41e1-8738-13c5401162cf/scratchpad/shots';
+const SHOTS = process.env.VISUAL_SHOTS_DIR ?? new URL('../.visual-shots', import.meta.url).pathname;
 
-for (const name of ['iPhone 13', 'Pixel 7'] as const) {
+for (const name of ['iPhone 13', 'Pixel 7', 'iPad (gen 7)'] as const) {
   // Keep the viewport/isMobile/UA emulation but drop defaultBrowserType, which
   // Playwright forbids inside a describe (it would force a new worker); the
   // config's chromium project runs it.

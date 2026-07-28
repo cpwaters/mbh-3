@@ -50,3 +50,6 @@ tfplan
 
 # Storybook build output
 storybook-static/
+
+# Playwright visual review screenshots
+e2e/.visual-shots/

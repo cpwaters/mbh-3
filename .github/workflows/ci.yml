@@ -37,11 +37,16 @@ jobs:
       - run: pnpm test:functions
       - run: pnpm seed
       - run: pnpm build
+      # Storybook must build (catches broken component stories). No emulator.
+      - run: pnpm build-storybook
       # E2E browser journeys against the FULL emulator stack (auth + firestore +
       # functions + hosting). run-e2e.sh builds the emulator bundle, runs the
       # journeys, and restores the prod bundle. Needs chromium + the JDK above.
       - run: pnpm --filter @mbh/e2e exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      # Responsive / device visual review (widths + iPhone/Pixel/iPad),
+      # asserting no horizontal overflow across the whole page set.
+      - run: pnpm test:visual
 
   deploy:
     needs: validate
