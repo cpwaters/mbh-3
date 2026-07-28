@@ -325,3 +325,50 @@ describe('updateProfile', () => {
     expect(phoneErr.field).toBe('phone');
   });
 });
+
+describe('createTenant', () => {
+  it('a signed-in user creates a company and becomes its active owner', async () => {
+    const h = await makeHarness();
+    const result = await h.run('newcomer', {
+      type: 'createTenant',
+      payload: { name: '  Solo Haulage Ltd ', capabilities: ['carrier'] },
+      requestId: 'r-ct-1',
+    });
+    expect(result).toEqual({ tenantId: 'tenant-1' });
+    expect(await h.store.getDoc('tenants/tenant-1')).toMatchObject({
+      tenantId: 'tenant-1',
+      name: 'Solo Haulage Ltd', // trimmed
+      capabilities: ['carrier'],
+    });
+    expect(await h.store.getDoc('tenants/tenant-1/members/newcomer')).toMatchObject({
+      actorId: 'newcomer',
+      role: 'owner',
+      status: 'active',
+      displayName: 'Owner', // no profile saved yet
+    });
+  });
+
+  it("uses the creator's profile name for their membership when set", async () => {
+    const h = await makeHarness();
+    await h.run('newcomer', { type: 'updateProfile', payload: { displayName: 'Nadia', phone: '' }, requestId: 'r-p' });
+    await h.run('newcomer', {
+      type: 'createTenant',
+      payload: { name: 'Nadia Transport', capabilities: ['shipper', 'carrier'] },
+      requestId: 'r-ct',
+    });
+    expect(await h.store.getDoc('tenants/tenant-1/members/newcomer')).toMatchObject({ displayName: 'Nadia' });
+  });
+
+  it('rejects a too-short name and empty capabilities', async () => {
+    const h = await makeHarness();
+    const nameErr = await expectAppError(
+      h.run('newcomer', { type: 'createTenant', payload: { name: 'a', capabilities: ['carrier'] }, requestId: 'r-n' }),
+      'invalid-payload'
+    );
+    expect(nameErr.field).toBe('name');
+    await expectAppError(
+      h.run('newcomer', { type: 'createTenant', payload: { name: 'Valid Co', capabilities: [] }, requestId: 'r-c' }),
+      'invalid-payload'
+    );
+  });
+});

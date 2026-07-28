@@ -12,6 +12,7 @@ export interface TenantsState {
   tenants: Membership[];
   selected: Membership | null;
   select: (tenantId: string) => void;
+  reload: () => void;
 }
 
 export function useTenants(actorId: string | null): TenantsState {
@@ -19,6 +20,8 @@ export function useTenants(actorId: string | null): TenantsState {
   const [loading, setLoading] = useState(actorId !== null);
   const [tenants, setTenants] = useState<Membership[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   const select = useCallback((tenantId: string) => {
     setSelectedId(tenantId);
@@ -62,8 +65,8 @@ export function useTenants(actorId: string | null): TenantsState {
     return () => {
       cancelled = true;
     };
-  }, [reader, actorId]);
+  }, [reader, actorId, nonce]);
 
   const selected = tenants.find((t) => t.tenantId === selectedId) ?? null;
-  return { loading, tenants, selected, select };
+  return { loading, tenants, selected, select, reload };
 }

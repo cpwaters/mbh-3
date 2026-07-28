@@ -5,6 +5,7 @@ import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
 import { Vehicles } from '../components/Vehicles';
+import { CreateCompany } from '../components/CreateCompany';
 import { EditProfile } from '../components/EditProfile';
 import { useEarnings } from '../components/useEarnings';
 import { useProfile } from '../components/useProfile';
@@ -31,22 +32,21 @@ function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { to
   };
 }
 
-function NoCompany() {
-  return (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-1">No company yet</h2>
-      <p className="text-gray-600">Your account isn't linked to a shipper or carrier yet.</p>
-    </div>
-  );
-}
-
 export function Dashboard() {
   const app = useApp();
   return (
     <div className={`${PAGE} space-y-4`}>
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
-      {app.selected === null && <NoCompany />}
+      {app.selected === null && (
+        <CreateCompany
+          getIdToken={app.auth.getIdToken}
+          onCreated={(tenantId) => {
+            app.reloadTenants();
+            app.selectTenant(tenantId);
+          }}
+        />
+      )}
 
       {app.selected !== null && app.isShipper && (
         <PostLoad shipperTenantId={app.selected.tenantId} getIdToken={app.auth.getIdToken} />

@@ -33,6 +33,10 @@ export const E2E = {
   multiUid: 'multi-e2e-user',
   multiEmail: 'multi.e2e@both.test',
   multiPassword: 'test-password-abc',
+  // A brand-new user with NO company — exercises the onboarding flow.
+  newbieUid: 'newbie-e2e-user',
+  newbieEmail: 'newbie.e2e@nobody.test',
+  newbiePassword: 'test-password-def',
 } as const;
 
 function app() {
@@ -58,6 +62,8 @@ export async function seedDeliverableJob(): Promise<void> {
   await ensureUser(E2E.joblessUid, E2E.joblessEmail, E2E.joblessPassword);
   await ensureUser(E2E.shipperUid, E2E.shipperEmail, E2E.shipperPassword);
   await ensureUser(E2E.multiUid, E2E.multiEmail, E2E.multiPassword);
+  // No membership for the newbie — they create their company through the UI.
+  await ensureUser(E2E.newbieUid, E2E.newbieEmail, E2E.newbiePassword);
 
   const db = getFirestore();
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({

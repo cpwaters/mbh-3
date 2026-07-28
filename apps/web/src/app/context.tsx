@@ -12,6 +12,7 @@ export interface AppData {
   tenants: Membership[];
   selected: Membership | null;
   selectTenant: (tenantId: string) => void;
+  reloadTenants: () => void;
   isShipper: boolean;
   isCarrier: boolean;
   job: DriverJobView | null;

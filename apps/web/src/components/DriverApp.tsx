@@ -56,6 +56,7 @@ export default function DriverApp() {
     tenants: tenants.tenants,
     selected,
     selectTenant: tenants.select,
+    reloadTenants: tenants.reload,
     isShipper,
     isCarrier,
     job,

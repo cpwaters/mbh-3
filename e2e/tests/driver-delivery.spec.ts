@@ -143,6 +143,19 @@ test('a user edits their account profile', async ({ page }) => {
   await expect(page.getByText('Nadia Driver')).toBeVisible();
 });
 
+test('a new user creates their company and lands on the dashboard', async ({ page }) => {
+  await signIn(page, E2E.newbieEmail, E2E.newbiePassword);
+  await expect(page.getByRole('heading', { name: 'Create your company' })).toBeVisible();
+
+  await page.getByLabel('Company name').fill('Solo Haulage Ltd');
+  await page.getByLabel('Post loads (shipper)').check();
+  await page.getByRole('button', { name: 'Create company' }).click();
+
+  // Onboarded: the app refreshes memberships, selects the new tenant, and the
+  // shipper dashboard (post a load) renders.
+  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

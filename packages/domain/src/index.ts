@@ -6,5 +6,6 @@ export * from './transitions.js';
 export * from './money.js';
 export * from './vehicle.js';
 export * from './user-profile.js';
+export * from './tenant.js';
 export * from './errors.js';
 export * from './evidence.js';
