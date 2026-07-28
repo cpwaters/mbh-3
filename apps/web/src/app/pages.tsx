@@ -5,7 +5,9 @@ import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
 import { Vehicles } from '../components/Vehicles';
+import { EditProfile } from '../components/EditProfile';
 import { useEarnings } from '../components/useEarnings';
+import { useProfile } from '../components/useProfile';
 import LiveLocationMap from './LiveLocationMap';
 import { useApp } from './context';
 
@@ -279,6 +281,9 @@ export function DrivingTimePage() {
 export function ProfilePage() {
   const app = useApp();
   const s = app.auth.session;
+  const actorId = s?.actorId ?? null;
+  const { loading: profileLoading, profile, reload: reloadProfile } = useProfile(actorId);
+  const name = profile?.displayName ?? s?.displayName ?? s?.email ?? 'Driver';
   return (
     <div className={`${PAGE} space-y-4`}>
       <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
@@ -288,11 +293,23 @@ export function ProfilePage() {
             <User className="w-7 h-7" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{s?.displayName ?? s?.email ?? 'Driver'}</p>
+            <p className="font-semibold text-gray-900 truncate">{name}</p>
             <p className="text-sm text-gray-500 truncate">{s?.email}</p>
+            {profile?.phone !== undefined && profile.phone !== '' && (
+              <p className="text-sm text-gray-500 truncate">{profile.phone}</p>
+            )}
           </div>
         </div>
       </div>
+
+      {!profileLoading && (
+        <EditProfile
+          getIdToken={app.auth.getIdToken}
+          initialName={profile?.displayName ?? s?.displayName ?? ''}
+          initialPhone={profile?.phone ?? ''}
+          onSaved={reloadProfile}
+        />
+      )}
 
       {app.selected !== null && app.isCarrier && (
         <Vehicles carrierTenantId={app.selected.tenantId} getIdToken={app.auth.getIdToken} />

@@ -294,3 +294,34 @@ describe('addVehicle / retireVehicle', () => {
     );
   });
 });
+
+describe('updateProfile', () => {
+  it('a user upserts their own profile, keyed by their actor id, trimmed', async () => {
+    const h = await makeHarness();
+    const result = await h.run('driver-1', {
+      type: 'updateProfile',
+      payload: { displayName: '  Chris Waters  ', phone: ' 07700 900123 ' },
+      requestId: 'r-prof-1',
+    });
+    expect(result).toEqual({ actorId: 'driver-1' });
+    expect(await h.store.getDoc('userProfiles/driver-1')).toMatchObject({
+      actorId: 'driver-1',
+      displayName: 'Chris Waters',
+      phone: '07700 900123',
+    });
+  });
+
+  it('rejects a blank name and a malformed phone with a field error', async () => {
+    const h = await makeHarness();
+    const nameErr = await expectAppError(
+      h.run('driver-1', { type: 'updateProfile', payload: { displayName: '  ', phone: '' }, requestId: 'r-n' }),
+      'invalid-payload'
+    );
+    expect(nameErr.field).toBe('displayName');
+    const phoneErr = await expectAppError(
+      h.run('driver-1', { type: 'updateProfile', payload: { displayName: 'Chris', phone: 'nope' }, requestId: 'r-p' }),
+      'invalid-payload'
+    );
+    expect(phoneErr.field).toBe('phone');
+  });
+});

@@ -6,6 +6,7 @@ export * from './auth-provider.js';
 export * from './auth-client.js';
 export * from './job-reader.js';
 export * from './vehicle-reader.js';
+export * from './profile-reader.js';
 export * from './listing-reader.js';
 export * from './membership-reader.js';
 export * from './geocoder.js';

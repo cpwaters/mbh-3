@@ -54,6 +54,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
     await setDoc(doc(db, 'outbox/task-1'), { taskId: 'task-1', type: 'enrichLoadRoute', status: 'pending', tenantId: 'shipper-1', loadId: 'load-1' });
     await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
+    await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
   });
 });
 
@@ -79,6 +80,27 @@ describe('tenants + members', () => {
   it('no client can write a tenant or member', async () => {
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1'), { name: 'Hacked' }));
     await assertFails(setDoc(doc(db(SHIP_OWNER), `tenants/shipper-1/members/${SHIP_OWNER}`), { role: 'owner', status: 'active', tenantId: 'shipper-1', hacked: true }));
+  });
+});
+
+describe('userProfiles (a user reads their own)', () => {
+  it('a user reads their own profile', async () => {
+    await assertSucceeds(getDoc(doc(db(CAR_DRIVER), `userProfiles/${CAR_DRIVER}`)));
+  });
+
+  it("a user cannot read someone else's profile, nor can an anonymous visitor", async () => {
+    await assertFails(getDoc(doc(db(SHIP_OWNER), `userProfiles/${CAR_DRIVER}`)));
+    await assertFails(getDoc(doc(db(null), `userProfiles/${CAR_DRIVER}`)));
+  });
+
+  it('no client can write a profile', async () => {
+    await assertFails(
+      setDoc(doc(db(CAR_DRIVER), `userProfiles/${CAR_DRIVER}`), {
+        actorId: CAR_DRIVER,
+        displayName: 'Hacked',
+        phone: '',
+      })
+    );
   });
 });
 

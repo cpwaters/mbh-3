@@ -86,6 +86,13 @@ service cloud.firestore {
       }
     }
 
+    // A user's own account profile: they read their own (doc id == their uid);
+    // only the server writes it (via updateProfile).
+    match /userProfiles/{actorId} {
+      allow read: if isSignedIn() && request.auth.uid == actorId;
+      allow write: if false;
+    }
+
     // Audit is the internal attribution log — server-reviewed only, never
     // client-readable. (User-visible history is the job events above.)
     match /audit/{auditId} {

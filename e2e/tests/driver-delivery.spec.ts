@@ -128,6 +128,21 @@ test('a carrier adds a vehicle to their fleet', async ({ page }) => {
   await expect(row).toContainText('Rigid');
 });
 
+test('a user edits their account profile', async ({ page }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Profile' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit profile' })).toBeVisible();
+
+  await page.getByLabel('Name').fill('Nadia Driver');
+  await page.getByLabel('Phone').fill('07700 900123');
+  await page.getByRole('button', { name: 'Save profile' }).click();
+
+  // The dispatch reaches Firestore through the functions emulator; on success
+  // the saved banner shows and the header reflects the new name.
+  await expect(page.getByText('Profile saved')).toBeVisible();
+  await expect(page.getByText('Nadia Driver')).toBeVisible();
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

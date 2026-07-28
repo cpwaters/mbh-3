@@ -20,6 +20,7 @@ import {
   type LoadRoute,
   type Role,
   type TenantCapability,
+  type UserProfile,
   type Vehicle,
 } from '@mbh/domain';
 import {
@@ -27,6 +28,7 @@ import {
   listingsCollection,
   MEMBERS_SUBCOLLECTION,
   tenantDoc,
+  userProfileDoc,
   vehiclesCollection,
 } from '@mbh/paths';
 import type {
@@ -36,6 +38,7 @@ import type {
   ListingReader,
   Membership,
   MembershipReader,
+  ProfileReader,
   VehicleReader,
 } from '@mbh/provider-interfaces';
 
@@ -67,7 +70,9 @@ interface JobDoc {
   deliveredAt?: string;
 }
 
-export class FirestoreReader implements JobReader, ListingReader, MembershipReader, VehicleReader {
+export class FirestoreReader
+  implements JobReader, ListingReader, MembershipReader, VehicleReader, ProfileReader
+{
   private readonly db: Firestore;
 
   constructor(options: FirestoreWebOptions) {
@@ -126,6 +131,12 @@ export class FirestoreReader implements JobReader, ListingReader, MembershipRead
       .map((d) => d.data() as Vehicle)
       .filter((v) => v.status === 'active')
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async profileForActor(actorId: string): Promise<UserProfile | null> {
+    // Rules authorize this via the doc id matching the caller's uid.
+    const snap = await getDoc(doc(this.db, userProfileDoc(actorId)));
+    return snap.exists() ? (snap.data() as UserProfile) : null;
   }
 
   async availableListings(): Promise<Listing[]> {

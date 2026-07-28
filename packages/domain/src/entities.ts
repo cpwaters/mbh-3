@@ -86,6 +86,16 @@ export interface Job {
   deliveredAt?: string;
 }
 
+// A user's own account profile — cross-tenant identity they control. Distinct
+// from their per-tenant Member.displayName (how they appear inside a company).
+// Keyed by actorId (the auth uid).
+export interface UserProfile {
+  actorId: string;
+  displayName: string;
+  phone: string; // optional contact number; may be empty
+  updatedAt: string;
+}
+
 // A Vehicle is a carrier's fleet asset, held under the owning carrier tenant.
 // Retired, never deleted — fleet history must survive.
 export type VehicleType = 'van' | 'rigid' | 'artic';

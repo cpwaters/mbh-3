@@ -13,6 +13,7 @@
 //   requests/{requestId}          (idempotency markers — never client-readable)
 //   outbox/{taskId}               (outbound work for the drain — never client-readable)
 //   listings/{loadId}             (carrier-facing projection of an available load)
+//   userProfiles/{actorId}        (a user's own account profile — keyed by uid)
 
 export const COLLECTIONS = {
   tenants: 'tenants',
@@ -22,6 +23,7 @@ export const COLLECTIONS = {
   requests: 'requests',
   outbox: 'outbox',
   listings: 'listings',
+  userProfiles: 'userProfiles',
 } as const;
 
 export function tenantDoc(tenantId: string): string {
@@ -108,4 +110,13 @@ export function listingsCollection(): string {
 // removed when the load is taken.
 export function listingDoc(loadId: string): string {
   return `${COLLECTIONS.listings}/${loadId}`;
+}
+
+export function userProfilesCollection(): string {
+  return COLLECTIONS.userProfiles;
+}
+
+// One profile per user, keyed by their actorId (auth uid).
+export function userProfileDoc(actorId: string): string {
+  return `${COLLECTIONS.userProfiles}/${actorId}`;
 }
