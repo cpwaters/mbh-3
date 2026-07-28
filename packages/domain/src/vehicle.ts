@@ -1,20 +1,34 @@
-import type { VehicleType } from './entities.js';
+import type { VehicleType, VehicleConfiguration } from './entities.js';
 
 // A carrier's fleet: what a valid vehicle record requires. Registration is a
-// UK number plate; capacity is integer kilograms, bounded by the UK maximum
-// gross vehicle weight.
+// UK number plate; type + configuration mirror the mbh-2 prototype's options.
 
-export const VEHICLE_TYPES: readonly VehicleType[] = ['van', 'rigid', 'artic'];
+export const VEHICLE_TYPES: readonly VehicleType[] = ['van', 'unit', 'trailer', 'rigid'];
 
-// Human labels for the vehicle classes (UI + docs).
 export const VEHICLE_TYPE_LABELS: Readonly<Record<VehicleType, string>> = {
   van: 'Van',
+  unit: 'Unit (Tractor)',
+  trailer: 'Trailer',
   rigid: 'Rigid',
-  artic: 'Articulated',
 };
 
-// UK maximum gross vehicle weight is 44 tonnes.
-export const MAX_VEHICLE_CAPACITY_KG = 44_000;
+export const VEHICLE_CONFIGURATIONS: readonly VehicleConfiguration[] = [
+  'refrigerated',
+  'flatbed',
+  'tanker',
+  'curtain sider',
+  'box',
+  'skeleton',
+];
+
+export const VEHICLE_CONFIGURATION_LABELS: Readonly<Record<VehicleConfiguration, string>> = {
+  refrigerated: 'Refrigerated',
+  flatbed: 'Flatbed',
+  tanker: 'Tanker',
+  'curtain sider': 'Curtain Sider',
+  box: 'Box',
+  skeleton: 'Skeleton',
+};
 
 // Normalize a plate for storage + de-duplication: trim, uppercase, and collapse
 // internal whitespace to single spaces.
@@ -31,14 +45,21 @@ export function isValidVehicleType(type: string): type is VehicleType {
   return (VEHICLE_TYPES as readonly string[]).includes(type);
 }
 
-export function isValidCapacityKg(kg: number): boolean {
-  return Number.isInteger(kg) && kg > 0 && kg <= MAX_VEHICLE_CAPACITY_KG;
+export function isValidVehicleConfiguration(config: string): config is VehicleConfiguration {
+  return (VEHICLE_CONFIGURATIONS as readonly string[]).includes(config);
+}
+
+export function isValidVehicleYear(year: number): boolean {
+  return Number.isInteger(year) && year >= 1900 && year <= new Date().getFullYear() + 1;
 }
 
 export interface VehicleInput {
   registration: string;
-  type: string;
-  capacityKg: number;
+  make: string;
+  model: string;
+  year: number;
+  vehicleType: string;
+  vehicleConfiguration: string;
 }
 
 export type VehicleCheck = { ok: true } | { ok: false; field: string; message: string };
@@ -49,11 +70,20 @@ export function validateVehicleInput(input: VehicleInput): VehicleCheck {
   if (!isValidRegistration(input.registration)) {
     return { ok: false, field: 'registration', message: 'Enter a valid registration.' };
   }
-  if (!isValidVehicleType(input.type)) {
-    return { ok: false, field: 'type', message: 'Choose a vehicle type.' };
+  if (input.make.trim() === '') {
+    return { ok: false, field: 'make', message: 'Enter the make.' };
   }
-  if (!isValidCapacityKg(input.capacityKg)) {
-    return { ok: false, field: 'capacityKg', message: 'Enter a capacity up to 44,000 kg.' };
+  if (input.model.trim() === '') {
+    return { ok: false, field: 'model', message: 'Enter the model.' };
+  }
+  if (!isValidVehicleYear(input.year)) {
+    return { ok: false, field: 'year', message: 'Enter a valid year.' };
+  }
+  if (!isValidVehicleType(input.vehicleType)) {
+    return { ok: false, field: 'vehicleType', message: 'Choose a vehicle type.' };
+  }
+  if (!isValidVehicleConfiguration(input.vehicleConfiguration)) {
+    return { ok: false, field: 'vehicleConfiguration', message: 'Choose a configuration.' };
   }
   return { ok: true };
 }

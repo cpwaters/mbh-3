@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  MAX_VEHICLE_CAPACITY_KG,
-  normalizeRegistration,
-  validateVehicleInput,
-} from './vehicle.js';
+import { isValidVehicleConfiguration, normalizeRegistration, validateVehicleInput } from './vehicle.js';
+
+const base = {
+  registration: 'AB12 CDE',
+  make: 'Volvo',
+  model: 'FH16',
+  year: 2020,
+  vehicleType: 'unit',
+  vehicleConfiguration: 'curtain sider',
+};
 
 describe('vehicle', () => {
   it('normalizes a registration: trim, uppercase, collapse whitespace', () => {
@@ -12,26 +17,24 @@ describe('vehicle', () => {
   });
 
   it('accepts a valid vehicle', () => {
-    expect(validateVehicleInput({ registration: 'AB12 CDE', type: 'artic', capacityKg: 26000 })).toEqual({
-      ok: true,
+    expect(validateVehicleInput(base)).toEqual({ ok: true });
+  });
+
+  it('rejects bad fields with the offending field', () => {
+    expect(validateVehicleInput({ ...base, registration: 'A' })).toMatchObject({ ok: false, field: 'registration' });
+    expect(validateVehicleInput({ ...base, make: '' })).toMatchObject({ ok: false, field: 'make' });
+    expect(validateVehicleInput({ ...base, model: '' })).toMatchObject({ ok: false, field: 'model' });
+    expect(validateVehicleInput({ ...base, year: 1800 })).toMatchObject({ ok: false, field: 'year' });
+    expect(validateVehicleInput({ ...base, vehicleType: 'spaceship' })).toMatchObject({ ok: false, field: 'vehicleType' });
+    expect(validateVehicleInput({ ...base, vehicleConfiguration: 'jet' })).toMatchObject({
+      ok: false,
+      field: 'vehicleConfiguration',
     });
   });
 
-  it('rejects a bad registration, type, and capacity with the offending field', () => {
-    expect(validateVehicleInput({ registration: 'A', type: 'artic', capacityKg: 100 })).toMatchObject({
-      ok: false,
-      field: 'registration',
-    });
-    expect(validateVehicleInput({ registration: 'AB12 CDE', type: 'jet', capacityKg: 100 })).toMatchObject({
-      ok: false,
-      field: 'type',
-    });
-    expect(
-      validateVehicleInput({ registration: 'AB12 CDE', type: 'van', capacityKg: MAX_VEHICLE_CAPACITY_KG + 1 })
-    ).toMatchObject({ ok: false, field: 'capacityKg' });
-    expect(validateVehicleInput({ registration: 'AB12 CDE', type: 'van', capacityKg: 2.5 })).toMatchObject({
-      ok: false,
-      field: 'capacityKg',
-    });
+  it('validates the configuration enum', () => {
+    expect(isValidVehicleConfiguration('flatbed')).toBe(true);
+    expect(isValidVehicleConfiguration('refrigerated')).toBe(true);
+    expect(isValidVehicleConfiguration('nope')).toBe(false);
   });
 });

@@ -220,8 +220,12 @@ describe('addVehicle / retireVehicle', () => {
   const validVehicle = (over: Record<string, unknown> = {}) => ({
     carrierTenantId: 'carrier-1',
     registration: 'ab12 cde',
-    type: 'artic',
-    capacityKg: 26000,
+    make: 'Volvo',
+    model: 'FH16',
+    year: 2020,
+    vin: '',
+    vehicleType: 'unit',
+    vehicleConfiguration: 'curtain sider',
     ...over,
   });
 
@@ -236,8 +240,10 @@ describe('addVehicle / retireVehicle', () => {
     expect(await h.store.getDoc('tenants/carrier-1/vehicles/veh-1')).toMatchObject({
       tenantId: 'carrier-1',
       registration: 'AB12 CDE', // normalized (uppercased)
-      type: 'artic',
-      capacityKg: 26000,
+      make: 'Volvo',
+      model: 'FH16',
+      vehicleType: 'unit',
+      vehicleConfiguration: 'curtain sider',
       status: 'active',
       createdBy: 'driver-1',
     });
@@ -258,10 +264,10 @@ describe('addVehicle / retireVehicle', () => {
   it('rejects an invalid vehicle with a field error', async () => {
     const h = await makeHarness();
     const err = await expectAppError(
-      h.run('driver-1', { type: 'addVehicle', payload: validVehicle({ type: 'spaceship' }), requestId: 'r-bad' }),
+      h.run('driver-1', { type: 'addVehicle', payload: validVehicle({ vehicleType: 'spaceship' }), requestId: 'r-bad' }),
       'invalid-payload'
     );
-    expect(err.field).toBe('type');
+    expect(err.field).toBe('vehicleType');
   });
 
   it('refuses a duplicate active registration in the same fleet', async () => {
@@ -295,34 +301,55 @@ describe('addVehicle / retireVehicle', () => {
   });
 });
 
+const validProfile = (over: Record<string, unknown> = {}) => ({
+  username: 'chriswaters',
+  firstName: 'Chris',
+  lastName: 'Waters',
+  email: 'chris@example.com',
+  dateOfBirth: '',
+  companyName: 'Waters Haulage',
+  companyRegistrationNumber: '',
+  companyAddress: { street: '', town: '', city: '', postcode: '' },
+  companyContact: { name: '', email: '', phone: '' },
+  vatNumber: '',
+  drivingLicenseNumber: '',
+  quantityOfVehicles: 0,
+  paymentType: { invoiced: false, instantPayment: false },
+  image: '',
+  ...over,
+});
+
 describe('updateProfile', () => {
-  it('a user upserts their own profile, keyed by their actor id, trimmed', async () => {
+  it('a user upserts their own profile, keyed by their actor id, with a derived name', async () => {
     const h = await makeHarness();
     const result = await h.run('driver-1', {
       type: 'updateProfile',
-      payload: { displayName: '  Chris Waters  ', phone: ' 07700 900123 ' },
+      payload: validProfile({ firstName: '  Chris  ', lastName: ' Waters ' }),
       requestId: 'r-prof-1',
     });
     expect(result).toEqual({ actorId: 'driver-1' });
     expect(await h.store.getDoc('userProfiles/driver-1')).toMatchObject({
       actorId: 'driver-1',
+      firstName: 'Chris',
+      lastName: 'Waters',
+      companyName: 'Waters Haulage',
       displayName: 'Chris Waters',
-      phone: '07700 900123',
+      rating: 0,
     });
   });
 
-  it('rejects a blank name and a malformed phone with a field error', async () => {
+  it('rejects a blank name and a malformed email with a field error', async () => {
     const h = await makeHarness();
     const nameErr = await expectAppError(
-      h.run('driver-1', { type: 'updateProfile', payload: { displayName: '  ', phone: '' }, requestId: 'r-n' }),
+      h.run('driver-1', { type: 'updateProfile', payload: validProfile({ firstName: '  ' }), requestId: 'r-n' }),
       'invalid-payload'
     );
-    expect(nameErr.field).toBe('displayName');
-    const phoneErr = await expectAppError(
-      h.run('driver-1', { type: 'updateProfile', payload: { displayName: 'Chris', phone: 'nope' }, requestId: 'r-p' }),
+    expect(nameErr.field).toBe('firstName');
+    const emailErr = await expectAppError(
+      h.run('driver-1', { type: 'updateProfile', payload: validProfile({ email: 'nope' }), requestId: 'r-e' }),
       'invalid-payload'
     );
-    expect(phoneErr.field).toBe('phone');
+    expect(emailErr.field).toBe('email');
   });
 });
 
@@ -350,13 +377,13 @@ describe('createTenant', () => {
 
   it("uses the creator's profile name for their membership when set", async () => {
     const h = await makeHarness();
-    await h.run('newcomer', { type: 'updateProfile', payload: { displayName: 'Nadia', phone: '' }, requestId: 'r-p' });
+    await h.run('newcomer', { type: 'updateProfile', payload: validProfile({ firstName: 'Nadia', lastName: 'Ferry' }), requestId: 'r-p' });
     await h.run('newcomer', {
       type: 'createTenant',
       payload: { name: 'Nadia Transport', capabilities: ['shipper', 'carrier'] },
       requestId: 'r-ct',
     });
-    expect(await h.store.getDoc('tenants/tenant-1/members/newcomer')).toMatchObject({ displayName: 'Nadia' });
+    expect(await h.store.getDoc('tenants/tenant-1/members/newcomer')).toMatchObject({ displayName: 'Nadia Ferry' });
   });
 
   it('rejects a too-short name and empty capabilities', async () => {

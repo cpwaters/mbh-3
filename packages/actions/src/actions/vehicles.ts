@@ -21,8 +21,12 @@ const FLEET_ROLES: readonly Role[] = ['owner', 'dispatcher', 'driver'];
 const addVehicleSchema = z.object({
   carrierTenantId: z.string().min(1),
   registration: z.string().min(1),
-  type: z.string().min(1),
-  capacityKg: z.number().int().positive(),
+  make: z.string().min(1),
+  model: z.string().min(1),
+  year: z.number().int(),
+  vin: z.string(),
+  vehicleType: z.string().min(1),
+  vehicleConfiguration: z.string().min(1),
 });
 
 export type AddVehiclePayload = z.infer<typeof addVehicleSchema>;
@@ -42,8 +46,11 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
     // The domain owns what a valid vehicle is (beyond the schema's shape).
     const check = validateVehicleInput({
       registration: payload.registration,
-      type: payload.type,
-      capacityKg: payload.capacityKg,
+      make: payload.make,
+      model: payload.model,
+      year: payload.year,
+      vehicleType: payload.vehicleType,
+      vehicleConfiguration: payload.vehicleConfiguration,
     });
     if (!check.ok) {
       throw new AppError('invalid-payload', check.message, { field: check.field });
@@ -64,8 +71,12 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
       vehicleId,
       tenantId: payload.carrierTenantId,
       registration,
-      type: payload.type as Vehicle['type'],
-      capacityKg: payload.capacityKg,
+      make: payload.make.trim(),
+      model: payload.model.trim(),
+      year: payload.year,
+      vin: payload.vin.trim(),
+      vehicleType: payload.vehicleType as Vehicle['vehicleType'],
+      vehicleConfiguration: payload.vehicleConfiguration as Vehicle['vehicleConfiguration'],
       status: 'active',
       createdAt: ctx.now,
       createdBy: ctx.actorId,

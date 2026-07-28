@@ -118,33 +118,45 @@ test('a driver sees earnings from delivered jobs', async ({ page }) => {
 test('a carrier adds a vehicle to their fleet', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   await page.getByRole('link', { name: 'Profile' }).click();
-  await expect(page.getByRole('heading', { name: 'Your vehicles' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+  await page.getByRole('button', { name: 'Add Vehicle' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Add Vehicle' })).toBeVisible();
 
-  await page.getByLabel('Registration').fill('MB03 HAL');
-  await page.getByLabel('Type').selectOption('rigid');
-  await page.getByLabel('Capacity (kg)').fill('18000');
-  await page.getByRole('button', { name: 'Add vehicle' }).click();
+  await page.getByLabel('Make *', { exact: true }).fill('Volvo');
+  await page.getByLabel('Model *', { exact: true }).fill('FH16');
+  await page.getByLabel('Year *', { exact: true }).fill('2021');
+  await page.getByLabel('Registration Number *', { exact: true }).fill('MB03 HAL');
+  await page.getByLabel('Vehicle Type *', { exact: true }).selectOption('rigid');
+  await page.getByLabel('Vehicle Configuration *', { exact: true }).selectOption('flatbed');
+  await page.getByRole('button', { name: 'Add Vehicle' }).click();
 
-  // The dispatch reaches Firestore through the functions emulator and the
-  // fleet re-reads, showing the new vehicle.
-  const row = page.getByRole('listitem').filter({ hasText: 'MB03 HAL' });
-  await expect(row).toBeVisible();
-  await expect(row).toContainText('Rigid');
+  // Back on Profile, the new vehicle shows in the fleet.
+  await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+  await expect(page.getByText('MB03 HAL')).toBeVisible();
+  await expect(page.getByText('Volvo FH16')).toBeVisible();
 });
 
 test('a user edits their account profile', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   await page.getByRole('link', { name: 'Profile' }).click();
-  await expect(page.getByRole('heading', { name: 'Edit profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Profile' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit Profile' })).toBeVisible();
 
-  await page.getByLabel('Name').fill('Nadia Driver');
-  await page.getByLabel('Phone').fill('07700 900123');
-  await page.getByRole('button', { name: 'Save profile' }).click();
+  await page.getByLabel('Username *', { exact: true }).fill('nadia');
+  await page.getByLabel('First Name *', { exact: true }).fill('Nadia');
+  await page.getByLabel('Last Name *', { exact: true }).fill('Driver');
+  await page.getByLabel('Email *', { exact: true }).fill('nadia@example.com');
+  await page.getByLabel('Company Name *', { exact: true }).fill('Solo Haulage');
+  await page.getByLabel('Street *', { exact: true }).fill('1 Depot Road');
+  await page.getByLabel('City *', { exact: true }).fill('Leeds');
+  await page.getByLabel('Postcode *', { exact: true }).fill('LS1 1AA');
+  await page.getByLabel('Contact Name *', { exact: true }).fill('Nadia Driver');
+  await page.getByLabel('Contact Email *', { exact: true }).fill('nadia@example.com');
+  await page.getByRole('button', { name: 'Save Profile' }).click();
 
-  // The dispatch reaches Firestore through the functions emulator; on success
-  // the saved banner shows and the header reflects the new name.
-  await expect(page.getByText('Profile saved')).toBeVisible();
-  await expect(page.getByText('Nadia Driver')).toBeVisible();
+  // On success the confirmation shows, then it returns to the profile.
+  await expect(page.getByText('Profile saved successfully!')).toBeVisible();
 });
 
 test('a new user creates their company and lands on the dashboard', async ({ page }) => {

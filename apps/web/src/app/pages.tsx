@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, User, Navigation } from 'lucide-react';
+import { CheckCircle, Navigation } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
@@ -12,13 +12,8 @@ import {
   JobCardActions,
   JobCardStatusBadge,
 } from './JobCard';
-import { Vehicles } from '../components/Vehicles';
 import { CreateCompany } from '../components/CreateCompany';
-import { EditProfile } from '../components/EditProfile';
-import { useProfile } from '../components/useProfile';
 import { useApp } from './context';
-
-const PAGE = 'max-w-4xl mx-auto px-4 py-6';
 
 function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
@@ -181,65 +176,3 @@ export function ActiveJobsPage() {
   );
 }
 
-export function ProfilePage() {
-  const app = useApp();
-  const s = app.auth.session;
-  const actorId = s?.actorId ?? null;
-  const { loading: profileLoading, profile, reload: reloadProfile } = useProfile(actorId);
-  const name = profile?.displayName ?? s?.displayName ?? s?.email ?? 'Driver';
-  return (
-    <div className={`${PAGE} space-y-4`}>
-      <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-            <User className="w-7 h-7" />
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-gray-900 truncate">{name}</p>
-            <p className="text-sm text-gray-500 truncate">{s?.email}</p>
-            {profile?.phone !== undefined && profile.phone !== '' && (
-              <p className="text-sm text-gray-500 truncate">{profile.phone}</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {!profileLoading && (
-        <EditProfile
-          getIdToken={app.auth.getIdToken}
-          initialName={profile?.displayName ?? s?.displayName ?? ''}
-          initialPhone={profile?.phone ?? ''}
-          onSaved={reloadProfile}
-        />
-      )}
-
-      {app.selected !== null && app.isCarrier && (
-        <Vehicles carrierTenantId={app.selected.tenantId} getIdToken={app.auth.getIdToken} />
-      )}
-
-      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-        <h2 className="font-bold text-gray-900 mb-3">Your companies</h2>
-        <ul className="space-y-2">
-          {app.tenants.map((t) => (
-            <li key={t.tenantId} className="flex items-center justify-between">
-              <span className="font-medium text-gray-800">{t.name}</span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                {t.capabilities.join(' / ')} · {t.role}
-              </span>
-            </li>
-          ))}
-          {app.tenants.length === 0 && <li className="text-gray-500">No companies linked yet.</li>}
-        </ul>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => void app.auth.signOut()}
-        className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
-      >
-        Sign out
-      </button>
-    </div>
-  );
-}

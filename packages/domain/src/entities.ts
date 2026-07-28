@@ -86,27 +86,69 @@ export interface Job {
   deliveredAt?: string;
 }
 
-// A user's own account profile — cross-tenant identity they control. Distinct
-// from their per-tenant Member.displayName (how they appear inside a company).
-// Keyed by actorId (the auth uid).
+// A user's own account profile — cross-tenant identity they control, keyed by
+// actorId (the auth uid). Mirrors the mbh-2 prototype's rich driver profile.
+export interface ProfileAddress {
+  street: string;
+  town: string;
+  city: string;
+  postcode: string;
+}
+
+export interface ProfileContact {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface ProfilePaymentType {
+  invoiced: boolean;
+  instantPayment: boolean;
+}
+
 export interface UserProfile {
   actorId: string;
-  displayName: string;
-  phone: string; // optional contact number; may be empty
+  username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  dateOfBirth: string;
+  companyName: string;
+  companyRegistrationNumber: string;
+  companyAddress: ProfileAddress;
+  companyContact: ProfileContact;
+  vatNumber: string;
+  drivingLicenseNumber: string;
+  quantityOfVehicles: number;
+  paymentType: ProfilePaymentType;
+  rating: number; // system-assigned; never user-editable
+  image: string; // profile image URL
+  displayName: string; // `${firstName} ${lastName}`, kept for the nav + onboarding
   updatedAt: string;
 }
 
 // A Vehicle is a carrier's fleet asset, held under the owning carrier tenant.
-// Retired, never deleted — fleet history must survive.
-export type VehicleType = 'van' | 'rigid' | 'artic';
+// Retired, never deleted — fleet history must survive. Fields mirror mbh-2.
+export type VehicleType = 'van' | 'unit' | 'trailer' | 'rigid';
+export type VehicleConfiguration =
+  | 'refrigerated'
+  | 'flatbed'
+  | 'tanker'
+  | 'curtain sider'
+  | 'box'
+  | 'skeleton';
 export type VehicleStatus = 'active' | 'retired';
 
 export interface Vehicle {
   vehicleId: string;
   tenantId: string; // the carrier tenant that owns the vehicle
   registration: string; // UK number plate, normalized (uppercase, single-spaced)
-  type: VehicleType;
-  capacityKg: number;
+  make: string;
+  model: string;
+  year: number;
+  vin: string; // may be empty
+  vehicleType: VehicleType;
+  vehicleConfiguration: VehicleConfiguration;
   status: VehicleStatus;
   createdAt: string;
   createdBy: string; // the actorId that added it

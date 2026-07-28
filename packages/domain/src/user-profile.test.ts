@@ -1,26 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPhone, validateProfileInput } from './user-profile.js';
+import { isValidEmail, validateProfileInput } from './user-profile.js';
 
 describe('user profile', () => {
-  it('accepts a valid profile (phone optional)', () => {
-    expect(validateProfileInput({ displayName: 'Chris Waters', phone: '07700 900123' })).toEqual({ ok: true });
-    expect(validateProfileInput({ displayName: 'Chris Waters', phone: '' })).toEqual({ ok: true });
-  });
-
-  it('treats an empty phone as valid but rejects a malformed one', () => {
-    expect(isValidPhone('')).toBe(true);
-    expect(isValidPhone('+44 7700 900123')).toBe(true);
-    expect(isValidPhone('not-a-phone')).toBe(false);
-  });
-
-  it('rejects a blank name and a bad phone with the offending field', () => {
-    expect(validateProfileInput({ displayName: '   ', phone: '' })).toMatchObject({
-      ok: false,
-      field: 'displayName',
+  it('accepts a valid profile', () => {
+    expect(validateProfileInput({ firstName: 'Chris', lastName: 'Waters', email: 'chris@example.com' })).toEqual({
+      ok: true,
     });
-    expect(validateProfileInput({ displayName: 'Chris', phone: 'abc' })).toMatchObject({
+  });
+
+  it('validates the email', () => {
+    expect(isValidEmail('a@b.com')).toBe(true);
+    expect(isValidEmail('nope')).toBe(false);
+    expect(isValidEmail('')).toBe(false);
+  });
+
+  it('rejects a missing name or bad email with the offending field', () => {
+    expect(validateProfileInput({ firstName: '  ', lastName: 'Waters', email: 'a@b.com' })).toMatchObject({
       ok: false,
-      field: 'phone',
+      field: 'firstName',
+    });
+    expect(validateProfileInput({ firstName: 'Chris', lastName: '', email: 'a@b.com' })).toMatchObject({
+      ok: false,
+      field: 'lastName',
+    });
+    expect(validateProfileInput({ firstName: 'Chris', lastName: 'Waters', email: 'bad' })).toMatchObject({
+      ok: false,
+      field: 'email',
     });
   });
 });
