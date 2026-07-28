@@ -47,3 +47,6 @@ test-results/
 # Terraform saved plan artifacts
 tfplan
 *.tfplan
+
+# Storybook build output
+storybook-static/
