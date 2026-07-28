@@ -22,12 +22,14 @@ test('sign-in screen', async ({ page }) => {
   await page.screenshot({ path: `${DIR}/sign-in.png` });
 });
 
-test('shipper — post a load', async ({ page }) => {
+test('shipper — create a load', async ({ page }) => {
   await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
-  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
-  await page.getByLabel('Collection town').fill('Trafford');
-  await page.getByLabel('Delivery town').fill('Leith');
-  await page.getByLabel('Price (£)').fill('680');
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+  await page.getByRole('link', { name: 'Create Load' }).click();
+  await expect(page.getByRole('heading', { name: 'Create New Load' })).toBeVisible();
+  await page.locator('#source_city').fill('Trafford');
+  await page.locator('#destination_city').fill('Leith');
+  await page.locator('#price').fill('680');
   await page.screenshot({ path: `${DIR}/post-a-load.png`, fullPage: true });
 });
 

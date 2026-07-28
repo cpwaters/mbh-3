@@ -42,6 +42,24 @@ export interface ConsignmentDetails {
 // operational life of the work after acceptance lives on the Job.
 export type LoadStatus = 'available' | 'matched' | 'cancelled' | 'fulfilled';
 
+// Extra distributor-supplied metadata from the create-load form, kept so the
+// shipper's loads round-trip faithfully. Optional — the marketplace core is
+// origin/destination/consignment/price/dates on the Load itself.
+export interface LoadPostingDetails {
+  sourceCompanyName: string;
+  destinationCompanyName: string;
+  sourceContact: ProfileContact;
+  destinationContact: ProfileContact;
+  pickupTime: string;
+  deliveryTime: string;
+  distanceMiles: number;
+  volumeM3: number;
+  specialInstructions: string;
+  vehicleSizes: string[]; // van / rigid / artic
+  vehicleTypes: string[]; // refrigerated / box / flat_bed / ...
+  paymentType: ProfilePaymentType;
+}
+
 export interface Load {
   loadId: string;
   tenantId: string; // the shipper tenant that owns the listing
@@ -53,6 +71,8 @@ export interface Load {
   pickupBy: string;
   deliverBy: string;
   createdAt: string;
+  // Distributor create-load metadata (optional).
+  postingDetails?: LoadPostingDetails;
   // System-written enrichment (geocode + driving route), absent until the
   // drain has processed this load. Never user-supplied.
   route?: LoadRoute;

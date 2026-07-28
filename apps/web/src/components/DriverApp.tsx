@@ -16,6 +16,17 @@ import DrivingTime from '../app/DrivingTime';
 import Profile from '../app/Profile';
 import EditProfile from '../app/EditProfile';
 import AddVehicle from '../app/AddVehicle';
+import DistributorNavigation from '../app/distributor/Navigation';
+import LoadsList from '../app/distributor/LoadsList';
+import CreateLoad from '../app/distributor/CreateLoad';
+
+function LoadingCard() {
+  return (
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">Loading…</div>
+    </div>
+  );
+}
 
 // The app island (browser-only). Mirrors the mbh-2 prototype's App.tsx: one
 // router, with unauthenticated (/login, /signup) routes when signed out and
@@ -30,6 +41,9 @@ export default function DriverApp() {
   const selected = tenants.selected;
   const isShipper = selected?.capabilities.includes('shipper') ?? false;
   const isCarrier = selected?.capabilities.includes('carrier') ?? false;
+  // A shipper-only tenant sees the distributor app; carriers (incl. dual-cap)
+  // see the driver app.
+  const showDistributor = isShipper && !isCarrier;
   const listings = useListings(isCarrier);
 
   async function commit(requestId: string, payload: DeliverCapture) {
@@ -77,15 +91,26 @@ export default function DriverApp() {
               <Route path="/signup" element={<SignUp auth={auth} />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+          ) : showDistributor ? (
+            <div className="pb-16 lg:pb-0">
+              <DistributorNavigation />
+              {loading ? (
+                <LoadingCard />
+              ) : (
+                <Routes>
+                  <Route path="/" element={<LoadsList />} />
+                  <Route path="/create" element={<CreateLoad />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/profile/edit" element={<EditProfile />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              )}
+            </div>
           ) : (
             <div className="pb-16 lg:pb-0">
               <Navigation />
               {loading ? (
-                <div className="p-6 max-w-7xl mx-auto">
-                  <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">
-                    Loading…
-                  </div>
-                </div>
+                <LoadingCard />
               ) : (
                 <Routes>
                   <Route path="/" element={<Dashboard />} />

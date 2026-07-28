@@ -399,3 +399,41 @@ describe('createTenant', () => {
     );
   });
 });
+
+describe('cancelLoad', () => {
+  it('cancels an available load and removes its listing', async () => {
+    const h = await makeHarness();
+    const { loadId } = (await h.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload(),
+      requestId: 'r-post',
+    })) as { loadId: string };
+
+    const result = await h.run('ship-owner', {
+      type: 'cancelLoad',
+      payload: { shipperTenantId: 'shipper-1', loadId },
+      requestId: 'r-cancel',
+    });
+    expect(result).toEqual({ loadId });
+    expect(await h.store.getDoc(`loads/${loadId}`)).toMatchObject({ status: 'cancelled' });
+    expect(await h.store.getDoc(`listings/${loadId}`)).toBeNull();
+  });
+
+  it('refuses a non-shipper role, a missing load, and another tenant’s load', async () => {
+    const h = await makeHarness();
+    const { loadId } = (await h.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload(),
+      requestId: 'r-post',
+    })) as { loadId: string };
+
+    await expectAppError(
+      h.run('ship-driver', { type: 'cancelLoad', payload: { shipperTenantId: 'shipper-1', loadId }, requestId: 'r-role' }),
+      'forbidden'
+    );
+    await expectAppError(
+      h.run('ship-owner', { type: 'cancelLoad', payload: { shipperTenantId: 'shipper-1', loadId: 'nope' }, requestId: 'r-nf' }),
+      'not-found'
+    );
+  });
+});

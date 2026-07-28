@@ -30,25 +30,39 @@ test('landing invites the driver into the app', async ({ page }) => {
   await expect(page.getByText('Sign in to your driver account')).toBeVisible();
 });
 
-test('a shipper posts a load through the UI', async ({ page }) => {
+test('a shipper posts a load through the distributor UI', async ({ page }) => {
   await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
-  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+  await page.getByRole('link', { name: 'Create Load' }).click();
+  await expect(page.getByRole('heading', { name: 'Create New Load' })).toBeVisible();
 
-  await page.getByLabel('Collection address').fill('10 Distribution Way');
-  await page.getByLabel('Collection town').fill('Trafford');
-  await page.getByLabel('Collection postcode').fill('M17 1WS');
-  await page.getByLabel('Delivery address').fill('5 Harbour Road');
-  await page.getByLabel('Delivery town').fill('Leith');
-  await page.getByLabel('Delivery postcode').fill('EH6 6JJ');
-  await page.getByLabel('Description').fill('Mixed pallets');
-  await page.getByLabel('Weight (kg)').fill('14200');
-  await page.getByLabel('Pallets').fill('16');
-  await page.getByLabel('Price (£)').fill('680');
-  await page.getByLabel('Collect by').fill('2026-08-02');
-  await page.getByLabel('Deliver by').fill('2026-08-03');
+  await page.locator('#source_company_name').fill('Tesco DC');
+  await page.locator('#source_street').fill('10 Distribution Way');
+  await page.locator('#source_city').fill('Trafford');
+  await page.locator('#source_postcode').fill('M17 1WS');
+  await page.locator('#source_contact_name').fill('John Smith');
+  await page.locator('#source_contact_email').fill('john@tesco.test');
+  await page.locator('#destination_company_name').fill('Asda Leith');
+  await page.locator('#destination_street').fill('5 Harbour Road');
+  await page.locator('#destination_city').fill('Leith');
+  await page.locator('#destination_postcode').fill('EH6 6JJ');
+  await page.locator('#destination_contact_name').fill('Sarah Johnson');
+  await page.locator('#destination_contact_email').fill('sarah@asda.test');
+  await page.locator('#description').fill('Mixed pallets');
+  await page.locator('#weight_kg').fill('14200');
+  await page.locator('#pallet_count').fill('16');
+  await page.locator('#price').fill('680');
+  await page.locator('#pickup_date').fill('2026-08-02');
+  await page.locator('#pickup_time').fill('09:00');
+  await page.locator('#delivery_date').fill('2026-08-03');
+  await page.locator('#delivery_time').fill('17:00');
 
-  await page.getByRole('button', { name: 'Post load' }).click();
-  await expect(page.getByRole('heading', { name: 'Load posted' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create Load' }).click();
+  await expect(page.getByText('Load created successfully!')).toBeVisible();
+
+  // It shows up on the All Loads page.
+  await page.getByRole('link', { name: 'All Loads' }).click();
+  await expect(page.getByText('Trafford, M17 1WS')).toBeVisible();
 });
 
 test('the guide explains how it works', async ({ page }) => {
@@ -64,10 +78,10 @@ test('a user in multiple tenants switches which they act as', async ({ page }) =
   await expect(switcher).toBeVisible();
 
   await switcher.selectOption(E2E.shipperTenantId);
-  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
 
   await switcher.selectOption(E2E.carrierTenantId);
-  await expect(page.getByRole('heading', { name: 'Post a load' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 });
 
@@ -167,9 +181,9 @@ test('a new user creates their company and lands on the dashboard', async ({ pag
   await page.getByLabel('Post loads (shipper)').check();
   await page.getByRole('button', { name: 'Create company' }).click();
 
-  // Onboarded: the app refreshes memberships, selects the new tenant, and the
-  // shipper dashboard (post a load) renders.
-  await expect(page.getByRole('heading', { name: 'Post a load' })).toBeVisible();
+  // Onboarded: the app refreshes memberships, selects the new shipper tenant,
+  // and the distributor app (All Loads) renders.
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
 });
 
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the

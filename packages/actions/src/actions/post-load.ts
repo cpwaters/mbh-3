@@ -22,6 +22,24 @@ const addressSchema = z.object({
   postcode: z.string().min(1),
 });
 
+const contactSchema = z.object({ name: z.string(), email: z.string(), phone: z.string() });
+
+// Optional distributor create-load metadata (see LoadPostingDetails).
+const postingDetailsSchema = z.object({
+  sourceCompanyName: z.string(),
+  destinationCompanyName: z.string(),
+  sourceContact: contactSchema,
+  destinationContact: contactSchema,
+  pickupTime: z.string(),
+  deliveryTime: z.string(),
+  distanceMiles: z.number(),
+  volumeM3: z.number(),
+  specialInstructions: z.string(),
+  vehicleSizes: z.array(z.string()),
+  vehicleTypes: z.array(z.string()),
+  paymentType: z.object({ invoiced: z.boolean(), instantPayment: z.boolean() }),
+});
+
 const postLoadSchema = z.object({
   shipperTenantId: z.string().min(1),
   origin: addressSchema,
@@ -34,6 +52,7 @@ const postLoadSchema = z.object({
   priceGbpPence: z.number().int().positive().max(MAX_LOAD_PRICE_GBP_PENCE),
   pickupBy: z.string().min(1),
   deliverBy: z.string().min(1),
+  postingDetails: postingDetailsSchema.optional(),
 });
 
 export type PostLoadPayload = z.infer<typeof postLoadSchema>;
@@ -62,6 +81,7 @@ export const postLoadHandler: ActionHandler<PostLoadPayload, PostLoadResult> = {
       pickupBy: payload.pickupBy,
       deliverBy: payload.deliverBy,
       createdAt: ctx.now,
+      ...(payload.postingDetails !== undefined ? { postingDetails: payload.postingDetails } : {}),
     };
 
     tx.write({ kind: 'create', path: loadDoc(loadId), data: { ...load } });

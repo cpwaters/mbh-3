@@ -1,5 +1,11 @@
 import type { Listing } from '@mbh/domain';
-import type { ListingReader, Membership, MembershipReader } from '@mbh/provider-interfaces';
+import type {
+  ListingReader,
+  Membership,
+  MembershipReader,
+  ShipperLoad,
+  ShipperLoadReader,
+} from '@mbh/provider-interfaces';
 
 // Scriptable in-memory readers for the carrier browse — the CI default.
 
@@ -7,6 +13,13 @@ export class MockListingReader implements ListingReader {
   constructor(private readonly listings: Listing[] = []) {}
   async availableListings(): Promise<Listing[]> {
     return [...this.listings];
+  }
+}
+
+export class MockShipperLoadReader implements ShipperLoadReader {
+  constructor(private readonly byTenant: Record<string, ShipperLoad[]> = {}) {}
+  async loadsForShipper(shipperTenantId: string): Promise<ShipperLoad[]> {
+    return [...(this.byTenant[shipperTenantId] ?? [])];
   }
 }
 

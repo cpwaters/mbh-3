@@ -40,6 +40,32 @@ async function measureOverflow(page: Page): Promise<{ scrollWidth: number; inner
   });
 }
 
+// The distributor (shipper) app, at mobile + desktop.
+for (const vp of [
+  { name: '390-phone', width: 390, height: 844 },
+  { name: '1280-desktop', width: 1280, height: 800 },
+]) {
+  test(`distributor app has no horizontal overflow @ ${vp.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto('/app/');
+    await page.getByLabel('Email').fill(E2E.shipperEmail);
+    await page.getByLabel('Password', { exact: true }).fill(E2E.shipperPassword);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+    let m = await measureOverflow(page);
+    expect(m.scrollWidth, `dist loads @ ${vp.name}`).toBeLessThanOrEqual(m.innerWidth + 1);
+    await page.screenshot({ path: `${SHOTS}/dist-${vp.name}-loads.png`, fullPage: true });
+
+    const createLink = vp.width >= LG ? 'Create Load' : 'Create';
+    await page.getByRole('link', { name: createLink, exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Create New Load' })).toBeVisible();
+    await page.waitForTimeout(150);
+    m = await measureOverflow(page);
+    expect(m.scrollWidth, `dist create @ ${vp.name}`).toBeLessThanOrEqual(m.innerWidth + 1);
+    await page.screenshot({ path: `${SHOTS}/dist-${vp.name}-create.png`, fullPage: true });
+  });
+}
+
 // Public pages (no auth) — the first thing a mobile visitor meets.
 const PUBLIC = [
   { key: 'landing', path: '/', heading: /Fill your empty/ },

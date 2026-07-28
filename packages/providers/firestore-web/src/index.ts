@@ -17,6 +17,7 @@ import {
   type Address,
   type JobStatus,
   type Listing,
+  type Load,
   type LoadRoute,
   type Role,
   type TenantCapability,
@@ -26,6 +27,7 @@ import {
 import {
   jobsCollection,
   listingsCollection,
+  loadsCollection,
   MEMBERS_SUBCOLLECTION,
   tenantDoc,
   userProfileDoc,
@@ -39,6 +41,8 @@ import type {
   Membership,
   MembershipReader,
   ProfileReader,
+  ShipperLoad,
+  ShipperLoadReader,
   VehicleReader,
 } from '@mbh/provider-interfaces';
 
@@ -71,7 +75,7 @@ interface JobDoc {
 }
 
 export class FirestoreReader
-  implements JobReader, ListingReader, MembershipReader, VehicleReader, ProfileReader
+  implements JobReader, ListingReader, MembershipReader, VehicleReader, ProfileReader, ShipperLoadReader
 {
   private readonly db: Firestore;
 
@@ -145,6 +149,30 @@ export class FirestoreReader
     const listings = snap.docs.map((d) => d.data() as Listing);
     // Newest first — deterministic without needing a composite index.
     return listings.sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
+  }
+
+  async loadsForShipper(shipperTenantId: string): Promise<ShipperLoad[]> {
+    // Rules authorize this list via the `tenantId == the member's tenant` match.
+    const snap = await getDocs(
+      query(collection(this.db, loadsCollection()), where('tenantId', '==', shipperTenantId))
+    );
+    return snap.docs
+      .map((d) => d.data() as Load)
+      .map((load) => ({
+        loadId: load.loadId,
+        origin: `${load.origin.town}, ${load.origin.postcode}`,
+        destination: `${load.destination.town}, ${load.destination.postcode}`,
+        distanceMiles: load.postingDetails?.distanceMiles ?? 0,
+        weightKg: load.consignment.weightKg,
+        palletCount: load.consignment.palletCount,
+        priceGbpPence: load.priceGbpPence,
+        pickupBy: load.pickupBy,
+        pickupTime: load.postingDetails?.pickupTime ?? '',
+        deliverBy: load.deliverBy,
+        deliveryTime: load.postingDetails?.deliveryTime ?? '',
+        status: load.status,
+      }))
+      .sort((a, b) => (a.loadId < b.loadId ? 1 : -1));
   }
 
   async membershipsFor(actorId: string): Promise<Membership[]> {
