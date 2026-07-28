@@ -27,6 +27,8 @@ export class AuthClientError extends Error {
 
 export interface AuthClient {
   signInWithPassword(email: string, password: string): Promise<AuthSession>;
+  // Create a new account with a display name, then sign in as that user.
+  signUpWithPassword(email: string, password: string, displayName: string): Promise<AuthSession>;
   signInWithGoogle(): Promise<AuthSession>;
   signOut(): Promise<void>;
   // The current bearer token for POST /api/dispatch, or null when signed out.

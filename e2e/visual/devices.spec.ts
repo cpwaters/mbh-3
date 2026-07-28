@@ -21,8 +21,8 @@ for (const name of ['iPhone 13', 'Pixel 7'] as const) {
     test('the app fits the device screen', async ({ page }) => {
       await page.goto('/app/');
       await page.getByLabel('Email').fill(E2E.email);
-      await page.getByLabel('Password').fill(E2E.password);
-      await page.getByRole('button', { name: 'Sign in' }).click();
+      await page.getByLabel('Password', { exact: true }).fill(E2E.password);
+      await page.getByRole('button', { name: 'Sign In', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
       const m = await page.evaluate(() => {

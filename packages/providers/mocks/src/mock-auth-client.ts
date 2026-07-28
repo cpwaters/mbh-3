@@ -46,6 +46,16 @@ export class MockAuthClient implements AuthClient {
     });
   }
 
+  async signUpWithPassword(email: string, password: string, displayName: string): Promise<AuthSession> {
+    if (this.credentials.some((c) => c.email.toLowerCase() === email.toLowerCase())) {
+      throw new AuthClientError('unknown', 'That email is already registered.');
+    }
+    const actorId = `mock-${email.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const credential: MockCredential = { actorId, email, password, displayName };
+    this.credentials.push(credential);
+    return this.setSession({ actorId, email, displayName: displayName || null });
+  }
+
   async signInWithGoogle(): Promise<AuthSession> {
     if (this.googleAccount === null) {
       throw new AuthClientError('cancelled', 'Google sign-in was cancelled.');

@@ -12,13 +12,13 @@ const PNG = Buffer.from(
 async function signIn(page: Page, email: string, password: string): Promise<void> {
   await page.goto('/app/');
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 }
 
 test('sign-in screen', async ({ page }) => {
   await page.goto('/app/');
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
   await page.screenshot({ path: `${DIR}/sign-in.png` });
 });
 

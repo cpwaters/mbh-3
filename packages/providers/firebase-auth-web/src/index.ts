@@ -1,12 +1,14 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   connectAuthEmulator,
+  createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
   onIdTokenChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updateProfile,
   type Auth,
   type User,
 } from 'firebase/auth';
@@ -72,6 +74,19 @@ export class FirebaseAuthClient implements AuthClient {
   async signInWithPassword(email: string, password: string): Promise<AuthSession> {
     try {
       const cred = await signInWithEmailAndPassword(this.auth, email, password);
+      return toSession(cred.user);
+    } catch (error) {
+      throw mapError(error);
+    }
+  }
+
+  async signUpWithPassword(email: string, password: string, displayName: string): Promise<AuthSession> {
+    try {
+      const cred = await createUserWithEmailAndPassword(this.auth, email, password);
+      const trimmed = displayName.trim();
+      if (trimmed !== '') {
+        await updateProfile(cred.user, { displayName: trimmed });
+      }
       return toSession(cred.user);
     } catch (error) {
       throw mapError(error);

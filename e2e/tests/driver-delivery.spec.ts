@@ -10,10 +10,10 @@ const PNG = Buffer.from(
 
 async function signIn(page: Page, email: string, password: string): Promise<void> {
   await page.goto('/app/');
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 }
 
 // The app is a multi-page SPA now; delivery lives on the Active Jobs page.
@@ -26,7 +26,7 @@ test('landing invites the driver into the app', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Fill your empty return legs.' })).toBeVisible();
   await page.getByRole('link', { name: 'Open the driver app' }).click();
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
 });
 
 test('a shipper posts a load through the UI', async ({ page }) => {

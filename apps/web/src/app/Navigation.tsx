@@ -1,92 +1,102 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Truck, Map as MapIcon, Clock, PoundSterling, User, LogOut } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, User, Clock, LogOut, TrendingUp } from 'lucide-react';
 import { TenantSwitcher } from '../components/TenantSwitcher';
 import { useApp } from './context';
 
-const NAV = [
-  { to: '/', label: 'Dashboard', mobile: 'Home', Icon: LayoutDashboard, end: true },
-  { to: '/active', label: 'Active Jobs', mobile: 'Jobs', Icon: Truck, end: false },
-  { to: '/map', label: 'Map', mobile: 'Map', Icon: MapIcon, end: false },
-  { to: '/driving', label: 'Driving', mobile: 'Time', Icon: Clock, end: false },
-  { to: '/earnings', label: 'Earnings', mobile: 'Earn', Icon: PoundSterling, end: false },
-  { to: '/profile', label: 'Profile', mobile: 'Profile', Icon: User, end: false },
+// Ported from the mbh-2 prototype (client/src/components/Navigation.tsx):
+// desktop top-bar pills + Logout; mobile bottom tab bar. Wired to mbh-3's app
+// context (sign-out + the tenant switcher, shown only for multi-tenant users
+// so the single-tenant look stays exactly like the prototype).
+const navItems = [
+  { path: '/', label: 'Dashboard', mobileLabel: 'Home', icon: LayoutDashboard },
+  { path: '/active', label: 'Active Jobs', mobileLabel: 'Jobs', icon: Truck },
+  { path: '/map', label: 'Map', mobileLabel: 'Map', icon: Map },
+  { path: '/driving', label: 'Driving Time', mobileLabel: 'Time', icon: Clock },
+  { path: '/earnings', label: 'Earnings', mobileLabel: 'Earn', icon: TrendingUp },
+  { path: '/profile', label: 'Profile', mobileLabel: 'Profile', icon: User },
 ];
 
-// Ported from the prototype: desktop top-bar pills, mobile fixed bottom tab bar.
 export function Navigation() {
   const app = useApp();
+  const showSwitcher = app.selected !== null && app.tenants.length > 1;
+
   return (
     <>
-      <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 lg:px-6">
+      <nav className="bg-white shadow-md border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 lg:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              <Truck className="w-7 h-7 lg:w-8 lg:h-8 text-blue-600" />
-              <span className="text-lg lg:text-xl font-bold text-gray-900">MyBackHaul</span>
+              <Truck className="w-8 h-8 text-blue-600" />
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900">MyBackHaul</h1>
             </div>
 
-            <div className="hidden lg:flex items-center gap-1">
-              {NAV.map(({ to, label, Icon, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`
-                  }
-                >
-                  <Icon className="w-5 h-5" />
-                  <span>{label}</span>
-                </NavLink>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-3">
-              {app.selected !== null && (
-                <TenantSwitcher
-                  tenants={app.tenants}
-                  selected={app.selected}
-                  onSelect={app.selectTenant}
-                />
+            {/* Right cluster: desktop nav pills (lg only) + one switcher + one
+                logout (icon on mobile, icon+text on desktop). */}
+            <div className="flex items-center gap-1">
+              <div className="hidden lg:flex items-center gap-1">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      end={item.path === '/'}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 px-3 py-2 rounded-lg font-medium transition-colors ${
+                          isActive
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        }`
+                      }
+                    >
+                      <Icon className="w-5 h-5" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+              {showSwitcher && app.selected !== null && (
+                <div className="ml-1 lg:ml-2">
+                  <TenantSwitcher tenants={app.tenants} selected={app.selected} onSelect={app.selectTenant} />
+                </div>
               )}
               <button
-                type="button"
                 onClick={() => void app.auth.signOut()}
-                title="Sign out"
-                className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+                className="flex items-center gap-2 px-2 lg:px-3 py-2 rounded-lg font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors ml-1 lg:ml-2"
+                title="Logout"
               >
                 <LogOut className="w-5 h-5" />
-                <span className="hidden lg:inline">Sign out</span>
+                <span className="hidden lg:inline">Logout</span>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
+      {/* Bottom tab bar, shown below lg:. z-index clears Leaflet's panes. */}
       <div
         className="lg:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white border-t border-gray-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="grid grid-cols-6">
-          {NAV.map(({ to, mobile, Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
-                  isActive ? 'text-blue-600' : 'text-gray-500'
-                }`
-              }
-            >
-              <Icon className="w-5 h-5" />
-              <span>{mobile}</span>
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/'}
+                className={({ isActive }) =>
+                  `flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+                    isActive ? 'text-blue-600' : 'text-gray-500'
+                  }`
+                }
+              >
+                <Icon className="w-5 h-5" />
+                <span>{item.mobileLabel}</span>
+              </NavLink>
+            );
+          })}
         </div>
       </div>
     </>

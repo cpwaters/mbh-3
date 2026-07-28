@@ -29,8 +29,8 @@ const PAGES = [
 async function signIn(page: Page): Promise<void> {
   await page.goto('/app/');
   await page.getByLabel('Email').fill(E2E.email);
-  await page.getByLabel('Password').fill(E2E.password);
-  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByLabel('Password', { exact: true }).fill(E2E.password);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 }
 
 async function measureOverflow(page: Page): Promise<{ scrollWidth: number; innerWidth: number }> {
@@ -44,7 +44,7 @@ async function measureOverflow(page: Page): Promise<{ scrollWidth: number; inner
 const PUBLIC = [
   { key: 'landing', path: '/', heading: /Fill your empty/ },
   { key: 'guide', path: '/guide', heading: /How MyBackHaul works/ },
-  { key: 'signin', path: '/app/', heading: /Sign in/ },
+  { key: 'signin', path: '/app/', heading: /MyBackHaul/ },
 ];
 
 for (const vp of VIEWPORTS) {

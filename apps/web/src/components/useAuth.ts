@@ -6,6 +6,7 @@ export interface AuthView {
   ready: boolean; // the initial session has resolved
   session: AuthSession | null;
   signInWithPassword: (email: string, password: string) => Promise<void>;
+  signUpWithPassword: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
@@ -31,11 +32,17 @@ export function useAuth(): AuthView {
     },
     [auth]
   );
+  const signUpWithPassword = useCallback(
+    async (email: string, password: string, displayName: string) => {
+      await auth.signUpWithPassword(email, password, displayName);
+    },
+    [auth]
+  );
   const signInWithGoogle = useCallback(async () => {
     await auth.signInWithGoogle();
   }, [auth]);
   const signOut = useCallback(() => auth.signOut(), [auth]);
   const getIdToken = useCallback(() => auth.getIdToken(), [auth]);
 
-  return { ready, session, signInWithPassword, signInWithGoogle, signOut, getIdToken };
+  return { ready, session, signInWithPassword, signUpWithPassword, signInWithGoogle, signOut, getIdToken };
 }
