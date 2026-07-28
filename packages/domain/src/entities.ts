@@ -86,6 +86,22 @@ export interface Job {
   deliveredAt?: string;
 }
 
+// A Vehicle is a carrier's fleet asset, held under the owning carrier tenant.
+// Retired, never deleted — fleet history must survive.
+export type VehicleType = 'van' | 'rigid' | 'artic';
+export type VehicleStatus = 'active' | 'retired';
+
+export interface Vehicle {
+  vehicleId: string;
+  tenantId: string; // the carrier tenant that owns the vehicle
+  registration: string; // UK number plate, normalized (uppercase, single-spaced)
+  type: VehicleType;
+  capacityKg: number;
+  status: VehicleStatus;
+  createdAt: string;
+  createdBy: string; // the actorId that added it
+}
+
 export type EventSource = 'member' | 'system';
 
 // JobEvents are append-only. Corrections are new events that name what they

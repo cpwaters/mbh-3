@@ -4,6 +4,7 @@ import { formatGbp } from '@mbh/domain';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
+import { Vehicles } from '../components/Vehicles';
 import { useEarnings } from '../components/useEarnings';
 import LiveLocationMap from './LiveLocationMap';
 import { useApp } from './context';
@@ -292,6 +293,10 @@ export function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {app.selected !== null && app.isCarrier && (
+        <Vehicles carrierTenantId={app.selected.tenantId} getIdToken={app.auth.getIdToken} />
+      )}
 
       <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
         <h2 className="font-bold text-gray-900 mb-3">Your companies</h2>

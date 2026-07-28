@@ -215,3 +215,82 @@ describe('acceptLoad', () => {
     );
   });
 });
+
+describe('addVehicle / retireVehicle', () => {
+  const validVehicle = (over: Record<string, unknown> = {}) => ({
+    carrierTenantId: 'carrier-1',
+    registration: 'ab12 cde',
+    type: 'artic',
+    capacityKg: 26000,
+    ...over,
+  });
+
+  it('a carrier member adds a vehicle: normalized reg, active, attributed', async () => {
+    const h = await makeHarness();
+    const result = await h.run('driver-1', {
+      type: 'addVehicle',
+      payload: validVehicle(),
+      requestId: 'r-veh-1',
+    });
+    expect(result).toEqual({ vehicleId: 'veh-1' });
+    expect(await h.store.getDoc('tenants/carrier-1/vehicles/veh-1')).toMatchObject({
+      tenantId: 'carrier-1',
+      registration: 'AB12 CDE', // normalized (uppercased)
+      type: 'artic',
+      capacityKg: 26000,
+      status: 'active',
+      createdBy: 'driver-1',
+    });
+  });
+
+  it('refuses a non-member and a non-carrier tenant', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run('outsider', { type: 'addVehicle', payload: validVehicle(), requestId: 'r-out' }),
+      'forbidden'
+    );
+    await expectAppError(
+      h.run('ship-owner', { type: 'addVehicle', payload: validVehicle({ carrierTenantId: 'shipper-1' }), requestId: 'r-cap' }),
+      'forbidden'
+    );
+  });
+
+  it('rejects an invalid vehicle with a field error', async () => {
+    const h = await makeHarness();
+    const err = await expectAppError(
+      h.run('driver-1', { type: 'addVehicle', payload: validVehicle({ type: 'spaceship' }), requestId: 'r-bad' }),
+      'invalid-payload'
+    );
+    expect(err.field).toBe('type');
+  });
+
+  it('refuses a duplicate active registration in the same fleet', async () => {
+    const h = await makeHarness();
+    await h.run('driver-1', { type: 'addVehicle', payload: validVehicle(), requestId: 'r-a' });
+    // Different casing/spacing, same normalized plate → still a duplicate.
+    await expectAppError(
+      h.run('car-owner', { type: 'addVehicle', payload: validVehicle({ registration: '  Ab12   cde ' }), requestId: 'r-b' }),
+      'conflict'
+    );
+  });
+
+  it('retires a vehicle (append-only status change) and 404s a missing one', async () => {
+    const h = await makeHarness();
+    await h.run('driver-1', { type: 'addVehicle', payload: validVehicle(), requestId: 'r-add' });
+    await h.run('car-owner', {
+      type: 'retireVehicle',
+      payload: { carrierTenantId: 'carrier-1', vehicleId: 'veh-1' },
+      requestId: 'r-ret',
+    });
+    expect(await h.store.getDoc('tenants/carrier-1/vehicles/veh-1')).toMatchObject({ status: 'retired' });
+
+    await expectAppError(
+      h.run('car-owner', {
+        type: 'retireVehicle',
+        payload: { carrierTenantId: 'carrier-1', vehicleId: 'nope' },
+        requestId: 'r-ret-nf',
+      }),
+      'not-found'
+    );
+  });
+});

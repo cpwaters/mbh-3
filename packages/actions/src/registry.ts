@@ -3,6 +3,7 @@ import { postLoadHandler } from './actions/post-load.js';
 import { acceptLoadHandler } from './actions/accept-load.js';
 import { collectJobHandler, startTransitHandler } from './actions/progress-job.js';
 import { deliverJobHandler } from './actions/deliver-job.js';
+import { addVehicleHandler, retireVehicleHandler } from './actions/vehicles.js';
 
 // Every action the dispatch function can run. Adding an action means adding
 // it here — nothing else discovers handlers.
@@ -12,6 +13,8 @@ const HANDLERS: readonly AnyHandler[] = [
   collectJobHandler,
   startTransitHandler,
   deliverJobHandler,
+  addVehicleHandler,
+  retireVehicleHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -34,6 +37,8 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'collectJob',
   'startTransit',
   'deliverJob',
+  'addVehicle',
+  'retireVehicle',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

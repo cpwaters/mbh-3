@@ -35,6 +35,13 @@ service cloud.firestore {
         allow read: if isActiveMember(tenantId);
         allow write: if false;
       }
+
+      // A carrier's fleet: readable by active members of the tenant; only the
+      // server writes it (via addVehicle / retireVehicle).
+      match /vehicles/{vehicleId} {
+        allow read: if isActiveMember(tenantId);
+        allow write: if false;
+      }
     }
 
     // Loads are shipper-private (price, contacts). Only active members of the

@@ -45,6 +45,7 @@ beforeEach(async () => {
     await setDoc(doc(db, `tenants/shipper-1/members/${SHIP_OWNER}`), { tenantId: 'shipper-1', actorId: SHIP_OWNER, role: 'owner', status: 'active' });
     await setDoc(doc(db, `tenants/carrier-1/members/${CAR_DRIVER}`), { tenantId: 'carrier-1', actorId: CAR_DRIVER, role: 'driver', status: 'active' });
     await setDoc(doc(db, `tenants/carrier-1/members/${DISABLED}`), { tenantId: 'carrier-1', actorId: DISABLED, role: 'driver', status: 'disabled' });
+    await setDoc(doc(db, 'tenants/carrier-1/vehicles/veh-1'), { vehicleId: 'veh-1', tenantId: 'carrier-1', registration: 'AB12 CDE', type: 'artic', capacityKg: 26000, status: 'active' });
     await setDoc(doc(db, 'loads/load-1'), { loadId: 'load-1', tenantId: 'shipper-1', status: 'available', priceGbpPence: 68000 });
     await setDoc(doc(db, 'jobs/job-1'), { jobId: 'job-1', loadId: 'load-1', shipperTenantId: 'shipper-1', carrierTenantId: 'carrier-1', driverActorId: CAR_DRIVER, status: 'accepted' });
     await setDoc(doc(db, 'jobs/job-1/events/evt-1'), { eventId: 'evt-1', jobId: 'job-1', type: 'job.accepted', source: 'member', actorId: CAR_DRIVER });
@@ -78,6 +79,32 @@ describe('tenants + members', () => {
   it('no client can write a tenant or member', async () => {
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1'), { name: 'Hacked' }));
     await assertFails(setDoc(doc(db(SHIP_OWNER), `tenants/shipper-1/members/${SHIP_OWNER}`), { role: 'owner', status: 'active', tenantId: 'shipper-1', hacked: true }));
+  });
+});
+
+describe('vehicles (a carrier fleet)', () => {
+  it('an active member of the carrier reads a vehicle and lists the fleet', async () => {
+    await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'tenants/carrier-1/vehicles/veh-1')));
+    await assertSucceeds(getDocs(collection(db(CAR_DRIVER), 'tenants/carrier-1/vehicles')));
+  });
+
+  it('a non-member / disabled / anonymous cannot read the fleet', async () => {
+    await assertFails(getDoc(doc(db(SHIP_OWNER), 'tenants/carrier-1/vehicles/veh-1')));
+    await assertFails(getDoc(doc(db(DISABLED), 'tenants/carrier-1/vehicles/veh-1')));
+    await assertFails(getDoc(doc(db(null), 'tenants/carrier-1/vehicles/veh-1')));
+  });
+
+  it('no client can write a vehicle', async () => {
+    await assertFails(
+      setDoc(doc(db(CAR_DRIVER), 'tenants/carrier-1/vehicles/veh-1'), {
+        vehicleId: 'veh-1',
+        tenantId: 'carrier-1',
+        registration: 'HACK 1',
+        type: 'van',
+        capacityKg: 1,
+        status: 'active',
+      })
+    );
   });
 });
 

@@ -5,6 +5,7 @@
 // Collections:
 //   tenants/{tenantId}
 //   tenants/{tenantId}/members/{actorId}
+//   tenants/{tenantId}/vehicles/{vehicleId}   (a carrier's fleet)
 //   loads/{loadId}
 //   jobs/{jobId}
 //   jobs/{jobId}/events/{eventId}
@@ -37,6 +38,18 @@ export function membersCollection(tenantId: string): string {
 
 export function memberDoc(tenantId: string, actorId: string): string {
   return `${membersCollection(tenantId)}/${actorId}`;
+}
+
+// A carrier's fleet lives under the owning tenant, so reads are gated by
+// membership of that tenant (no field-alignment needed).
+export const VEHICLES_SUBCOLLECTION = 'vehicles';
+
+export function vehiclesCollection(tenantId: string): string {
+  return `${tenantDoc(tenantId)}/${VEHICLES_SUBCOLLECTION}`;
+}
+
+export function vehicleDoc(tenantId: string, vehicleId: string): string {
+  return `${vehiclesCollection(tenantId)}/${vehicleId}`;
 }
 
 export function loadsCollection(): string {

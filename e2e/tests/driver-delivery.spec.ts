@@ -111,6 +111,23 @@ test('a driver sees earnings from delivered jobs', async ({ page }) => {
   await expect(row).toContainText('£915.00');
 });
 
+test('a carrier adds a vehicle to their fleet', async ({ page }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Profile' }).click();
+  await expect(page.getByRole('heading', { name: 'Your vehicles' })).toBeVisible();
+
+  await page.getByLabel('Registration').fill('MB03 HAL');
+  await page.getByLabel('Type').selectOption('rigid');
+  await page.getByLabel('Capacity (kg)').fill('18000');
+  await page.getByRole('button', { name: 'Add vehicle' }).click();
+
+  // The dispatch reaches Firestore through the functions emulator and the
+  // fleet re-reads, showing the new vehicle.
+  const row = page.getByRole('listitem').filter({ hasText: 'MB03 HAL' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Rigid');
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

@@ -20,8 +20,15 @@ import {
   type LoadRoute,
   type Role,
   type TenantCapability,
+  type Vehicle,
 } from '@mbh/domain';
-import { jobsCollection, listingsCollection, MEMBERS_SUBCOLLECTION, tenantDoc } from '@mbh/paths';
+import {
+  jobsCollection,
+  listingsCollection,
+  MEMBERS_SUBCOLLECTION,
+  tenantDoc,
+  vehiclesCollection,
+} from '@mbh/paths';
 import type {
   CompletedJobView,
   DriverJobView,
@@ -29,6 +36,7 @@ import type {
   ListingReader,
   Membership,
   MembershipReader,
+  VehicleReader,
 } from '@mbh/provider-interfaces';
 
 // The ONLY package that imports the Firestore web SDK. Business READS go
@@ -59,7 +67,7 @@ interface JobDoc {
   deliveredAt?: string;
 }
 
-export class FirestoreReader implements JobReader, ListingReader, MembershipReader {
+export class FirestoreReader implements JobReader, ListingReader, MembershipReader, VehicleReader {
   private readonly db: Firestore;
 
   constructor(options: FirestoreWebOptions) {
@@ -109,6 +117,15 @@ export class FirestoreReader implements JobReader, ListingReader, MembershipRead
         deliveredAt: data.deliveredAt ?? '',
       }))
       .sort((a, b) => (a.deliveredAt < b.deliveredAt ? 1 : -1));
+  }
+
+  async vehiclesForTenant(tenantId: string): Promise<Vehicle[]> {
+    // Rules authorize this subcollection read via membership of the tenant.
+    const snap = await getDocs(collection(this.db, vehiclesCollection(tenantId)));
+    return snap.docs
+      .map((d) => d.data() as Vehicle)
+      .filter((v) => v.status === 'active')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
 
   async availableListings(): Promise<Listing[]> {
