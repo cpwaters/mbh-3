@@ -26,6 +26,11 @@ export class NonQueueableActionError extends Error {
 // every item carries a stable requestId, a resend after a lost response is
 // deduped server-side — so "retry" is always safe.
 export class SyncQueue {
+  // Ensures only one drain runs at a time. Enqueue, the reconnect handler, and
+  // the interval backstop can all fire a drain; overlapping drains would
+  // double-process reclaimed items.
+  private draining = false;
+
   constructor(
     private readonly storage: QueueStorage,
     private readonly transport: DispatchTransport,
@@ -60,42 +65,57 @@ export class SyncQueue {
     return this.storage.list();
   }
 
-  // Attempt to deliver every deliverable item (queued only; a 'failed' item
-  // is terminal and needs a human, not an automatic retry). Safe to call on
-  // reconnect and on an interval.
+  // Attempt to deliver every deliverable item. Safe to call on reconnect and
+  // on an interval. A 'failed' item is terminal and needs a human, not an
+  // automatic retry.
   async drain(): Promise<DrainSummary> {
     const summary: DrainSummary = { delivered: 0, retrying: 0, failedPermanent: 0 };
-    const items = await this.storage.list();
+    // One drain at a time — otherwise a second drain could pick up an item the
+    // first has already marked 'sending' and resend it in parallel.
+    if (this.draining) return summary;
+    this.draining = true;
+    try {
+      const items = await this.storage.list();
 
-    for (const item of items) {
-      if (item.status !== 'queued') continue;
+      for (const item of items) {
+        // Deliver 'queued' items, and RECLAIM 'sending' ones. An item is only
+        // left 'sending' when a previous drain was interrupted (page reload,
+        // PWA suspend, tab close) between marking it in-flight and recording
+        // the outcome. Since no drain runs concurrently (guard above) and every
+        // item carries a stable requestId the server dedupes, resending is
+        // always safe — without this, an orphaned 'sending' item would be
+        // skipped forever and appear stuck "waiting to send" despite signal.
+        if (item.status !== 'queued' && item.status !== 'sending') continue;
 
-      // Mark in-flight without counting the attempt yet — the attempt is
-      // counted exactly once, on the terminal outcome below.
-      await this.storage.put({ ...item, status: 'sending' });
+        // Mark in-flight without counting the attempt yet — the attempt is
+        // counted exactly once, on the terminal outcome below.
+        await this.storage.put({ ...item, status: 'sending' });
 
-      let outcome;
-      try {
-        outcome = await this.transport.send({
-          type: item.type,
-          payload: item.payload,
-          requestId: item.requestId,
-        });
-      } catch (err) {
-        // A thrown transport (unexpected) is treated as transient.
-        outcome = { outcome: 'retry' as const, error: err instanceof Error ? err.message : 'send failed' };
+        let outcome;
+        try {
+          outcome = await this.transport.send({
+            type: item.type,
+            payload: item.payload,
+            requestId: item.requestId,
+          });
+        } catch (err) {
+          // A thrown transport (unexpected) is treated as transient.
+          outcome = { outcome: 'retry' as const, error: err instanceof Error ? err.message : 'send failed' };
+        }
+
+        if (outcome.outcome === 'ok') {
+          await this.storage.delete(item.requestId);
+          summary.delivered += 1;
+        } else if (outcome.outcome === 'retry') {
+          await this.storage.put({ ...item, status: 'queued', attempts: item.attempts + 1, lastError: outcome.error });
+          summary.retrying += 1;
+        } else {
+          await this.storage.put({ ...item, status: 'failed', attempts: item.attempts + 1, lastError: outcome.error });
+          summary.failedPermanent += 1;
+        }
       }
-
-      if (outcome.outcome === 'ok') {
-        await this.storage.delete(item.requestId);
-        summary.delivered += 1;
-      } else if (outcome.outcome === 'retry') {
-        await this.storage.put({ ...item, status: 'queued', attempts: item.attempts + 1, lastError: outcome.error });
-        summary.retrying += 1;
-      } else {
-        await this.storage.put({ ...item, status: 'failed', attempts: item.attempts + 1, lastError: outcome.error });
-        summary.failedPermanent += 1;
-      }
+    } finally {
+      this.draining = false;
     }
 
     return summary;

@@ -97,6 +97,39 @@ describe('drain (delivery on reconnect)', () => {
     expect(transport.sends.map((s) => s.requestId)).toEqual(['req-1', 'req-1']);
   });
 
+  it('reclaims an orphaned "sending" item (a drain interrupted by reload) and delivers it', async () => {
+    const { queue, storage, transport } = makeQueue();
+    // A previous drain marked this item 'sending' then the page reloaded before
+    // the outcome was recorded — leaving it orphaned in IndexedDB.
+    await storage.put({
+      requestId: 'req-1',
+      type: 'deliverJob',
+      payload: { jobId: 'j1' },
+      status: 'sending',
+      attempts: 1,
+      enqueuedAt: '2026-08-01T00:00:00.000Z',
+    });
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+
+    const summary = await queue.drain();
+    expect(summary).toMatchObject({ delivered: 1 });
+    expect(await queue.pendingCount()).toBe(0);
+  });
+
+  it('does not run two drains at once (no double-send of the same request)', async () => {
+    const { queue, transport } = makeQueue();
+    await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+
+    // Fire two drains without awaiting the first — the guard makes the second a
+    // no-op, so the request is sent exactly once.
+    const [a, b] = await Promise.all([queue.drain(), queue.drain()]);
+    const totalDelivered = a.delivered + b.delivered;
+    expect(totalDelivered).toBe(1);
+    expect(transport.sends.filter((s) => s.requestId === 'req-1')).toHaveLength(1);
+    expect(await queue.pendingCount()).toBe(0);
+  });
+
   it('drains multiple items oldest-first', async () => {
     const { queue, transport } = makeQueue();
     await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');

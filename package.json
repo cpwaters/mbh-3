@@ -17,6 +17,7 @@
     "check:web": "pnpm --filter @mbh/web check",
     "build": "pnpm --filter @mbh/web build",
     "test:e2e": "bash scripts/run-e2e.sh",
+    "test:visual": "bash scripts/run-visual.sh",
     "docs:screenshots": "bash scripts/capture-screenshots.sh",
     "seed": "tsx scripts/seed.ts",
     "smoke:prod": "tsx scripts/smoke-prod.ts"

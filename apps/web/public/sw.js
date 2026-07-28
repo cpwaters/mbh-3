@@ -1,7 +1,7 @@
 // Hand-written service worker. Network-first for navigations (always try the
 // live app, fall back to the cached shell when offline); versioned shell
 // cache — BUMP CACHE_NAME to force-clear stale clients on the next visit.
-const CACHE_NAME = 'mbh-shell-v1';
+const CACHE_NAME = 'mbh-shell-v2';
 const SHELL = ['/', '/app', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {
