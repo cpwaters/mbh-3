@@ -22,6 +22,9 @@ export interface CompletedJobView {
   destination: Address;
   priceGbpPence: number;
   deliveredAt: string;
+  // Server-computed route distance, when the load had been enriched. Powers the
+  // total-distance performance stat.
+  distanceMeters?: number;
 }
 
 export interface JobReader {

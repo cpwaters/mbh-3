@@ -21,7 +21,7 @@ const VIEWPORTS = [
 const PAGES = [
   { key: 'dashboard', desktop: 'Dashboard', mobile: 'Home', heading: /Available Loads/ },
   { key: 'active', desktop: 'Active Jobs', mobile: 'Jobs', heading: /Active Jobs/ },
-  { key: 'map', desktop: 'Map', mobile: 'Map', heading: /^Map$/ },
+  { key: 'map', desktop: 'Map', mobile: 'Map', heading: /Route Map/ },
   { key: 'earnings', desktop: 'Earnings', mobile: 'Earn', heading: /Earnings/ },
   { key: 'profile', desktop: 'Profile', mobile: 'Profile', heading: /Profile/ },
 ];

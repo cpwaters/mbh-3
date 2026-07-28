@@ -110,10 +110,9 @@ test('a driver sees earnings from delivered jobs', async ({ page }) => {
   await page.getByRole('link', { name: 'Earnings' }).click();
   await expect(page.getByRole('heading', { name: /Earnings/ })).toBeVisible();
 
-  // The seeded delivered job (Hull → Newport, £915) appears with its pay.
-  const row = page.getByRole('listitem').filter({ hasText: 'Hull → Newport' });
-  await expect(row).toBeVisible();
-  await expect(row).toContainText('£915.00');
+  // The seeded delivered job (Hull → Newport, £915) appears in Recent Trips.
+  await expect(page.getByText('Hull → Newport')).toBeVisible();
+  await expect(page.getByText('£915.00').first()).toBeVisible();
 });
 
 test('a carrier adds a vehicle to their fleet', async ({ page }) => {

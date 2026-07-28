@@ -1,14 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  MapPin,
-  PoundSterling,
-  Clock,
-  TrendingUp,
-  CheckCircle2,
-  CheckCircle,
-  User,
-  Navigation,
-} from 'lucide-react';
+import { CheckCircle, User, Navigation } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
@@ -24,9 +15,7 @@ import {
 import { Vehicles } from '../components/Vehicles';
 import { CreateCompany } from '../components/CreateCompany';
 import { EditProfile } from '../components/EditProfile';
-import { useEarnings } from '../components/useEarnings';
 import { useProfile } from '../components/useProfile';
-import LiveLocationMap from './LiveLocationMap';
 import { useApp } from './context';
 
 const PAGE = 'max-w-4xl mx-auto px-4 py-6';
@@ -35,11 +24,6 @@ function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
 }
 
-function fmtDate(iso: string): string {
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return '';
-  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { town: string; postcode: string }; destination: { town: string; postcode: string } }): ActiveJob {
   return {
     jobId: job.jobId,
@@ -193,156 +177,6 @@ export function ActiveJobsPage() {
           </ul>
         </section>
       )}
-    </div>
-  );
-}
-
-export function MapPage() {
-  const app = useApp();
-  const route = app.job?.route;
-  return (
-    <div className={`${PAGE} space-y-4`}>
-      <h1 className="text-2xl font-bold text-gray-900">Map</h1>
-      {app.job !== null && route !== undefined ? (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-          <div className="p-4 flex items-center gap-2 text-sm text-gray-600 border-b border-gray-100">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            {fmtAddr(app.job.origin)} → {fmtAddr(app.job.destination)}
-            <span className="ml-auto font-semibold text-gray-900">
-              {Math.round(route.distanceMeters / 1000)} km
-            </span>
-          </div>
-          <div className="h-[60vh] min-h-[320px]">
-            <LiveLocationMap
-              origin={{ ...route.origin, label: fmtAddr(app.job.origin) }}
-              destination={{ ...route.destination, label: fmtAddr(app.job.destination) }}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-8 text-center">
-          <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mx-auto mb-3">
-            <MapPin className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">No route to show</h2>
-          <p className="text-gray-500">
-            When you have an active delivery, its route appears here.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-  tint,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  tint: string;
-}) {
-  return (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`p-2 rounded-lg ${tint}`}>{icon}</div>
-        <span className="text-gray-600 text-sm">{label}</span>
-      </div>
-      <div className="text-3xl font-bold text-gray-900">{value}</div>
-    </div>
-  );
-}
-
-export function EarningsPage() {
-  const app = useApp();
-  const actorId = app.auth.session?.actorId ?? null;
-  const { loading, jobs } = useEarnings(actorId);
-
-  const startToday = new Date();
-  startToday.setHours(0, 0, 0, 0);
-  const startWeek = new Date(startToday);
-  startWeek.setDate(startToday.getDate() - ((startToday.getDay() + 6) % 7)); // Monday
-  const startMonth = new Date(startToday);
-  startMonth.setDate(1);
-
-  const sumSince = (since: number): number =>
-    jobs.reduce((total, j) => {
-      const at = Date.parse(j.deliveredAt);
-      return !Number.isNaN(at) && at >= since ? total + j.priceGbpPence : total;
-    }, 0);
-
-  const today = sumSince(startToday.getTime());
-  const week = sumSince(startWeek.getTime());
-  const month = sumSince(startMonth.getTime());
-  const allTime = jobs.reduce((total, j) => total + j.priceGbpPence, 0);
-
-  return (
-    <div className={PAGE}>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Earnings &amp; Performance</h1>
-      <p className="text-gray-600 mb-6">Track your income and performance metrics</p>
-
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">
-          Loading…
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard icon={<PoundSterling className="w-5 h-5 text-green-600" />} tint="bg-green-100" label="Today" value={formatGbp(today)} />
-            <StatCard icon={<TrendingUp className="w-5 h-5 text-blue-600" />} tint="bg-blue-100" label="This week" value={formatGbp(week)} />
-            <StatCard icon={<PoundSterling className="w-5 h-5 text-purple-600" />} tint="bg-purple-100" label="This month" value={formatGbp(month)} />
-          </div>
-
-          <section className="mt-6 bg-white rounded-lg shadow-md border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-gray-900">Recent deliveries</h2>
-              <span className="text-sm text-gray-500">
-                {jobs.length} total · {formatGbp(allTime)}
-              </span>
-            </div>
-            {jobs.length === 0 ? (
-              <p className="text-gray-500">Earnings appear here as you complete deliveries.</p>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {jobs.slice(0, 10).map((j) => (
-                  <li key={j.jobId} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-800 flex items-center gap-1.5">
-                        <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
-                        <span className="truncate">
-                          {j.origin.town} → {j.destination.town}
-                        </span>
-                      </p>
-                      <p className="text-sm text-gray-500">{fmtDate(j.deliveredAt)}</p>
-                    </div>
-                    <span className="font-semibold text-green-600 shrink-0">{formatGbp(j.priceGbpPence)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-export function DrivingTimePage() {
-  return (
-    <div className={PAGE}>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Driving time</h1>
-      <p className="text-gray-600 mb-6">Your hours at the wheel and remaining drive time</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard icon={<Clock className="w-5 h-5 text-blue-600" />} tint="bg-blue-100" label="Driven today" value="0h 00m" />
-        <StatCard icon={<Clock className="w-5 h-5 text-amber-600" />} tint="bg-amber-100" label="Remaining" value="9h 00m" />
-        <StatCard icon={<CheckCircle2 className="w-5 h-5 text-green-600" />} tint="bg-green-100" label="Break due in" value="4h 30m" />
-      </div>
-      <div className="mt-6 bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">
-        Drive-time tracking turns on once your vehicle is linked.
-      </div>
     </div>
   );
 }

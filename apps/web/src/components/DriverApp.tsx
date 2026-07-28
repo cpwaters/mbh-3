@@ -9,14 +9,10 @@ import Login from '../app/Login';
 import SignUp from '../app/SignUp';
 import { AppProvider, type AppData } from '../app/context';
 import { Navigation } from '../app/Navigation';
-import {
-  Dashboard,
-  ActiveJobsPage,
-  MapPage,
-  EarningsPage,
-  DrivingTimePage,
-  ProfilePage,
-} from '../app/pages';
+import { Dashboard, ActiveJobsPage, ProfilePage } from '../app/pages';
+import MapView from '../app/MapView';
+import Earnings from '../app/Earnings';
+import DrivingTime from '../app/DrivingTime';
 
 // The app island (browser-only). Mirrors the mbh-2 prototype's App.tsx: one
 // router, with unauthenticated (/login, /signup) routes when signed out and
@@ -91,9 +87,9 @@ export default function DriverApp() {
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/active" element={<ActiveJobsPage />} />
-                  <Route path="/map" element={<MapPage />} />
-                  <Route path="/driving" element={<DrivingTimePage />} />
-                  <Route path="/earnings" element={<EarningsPage />} />
+                  <Route path="/map" element={<MapView />} />
+                  <Route path="/driving" element={<DrivingTime />} />
+                  <Route path="/earnings" element={<Earnings />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

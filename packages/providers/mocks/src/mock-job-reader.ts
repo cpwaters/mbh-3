@@ -40,6 +40,7 @@ export class MockJobReader implements JobReader {
         destination: j.destination,
         priceGbpPence: j.priceGbpPence,
         deliveredAt: j.deliveredAt ?? '',
+        ...(j.route !== undefined ? { distanceMeters: j.route.distanceMeters } : {}),
       }))
       .sort((a, b) => (a.deliveredAt < b.deliveredAt ? 1 : -1));
   }

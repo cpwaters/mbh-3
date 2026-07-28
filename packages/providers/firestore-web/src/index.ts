@@ -120,6 +120,7 @@ export class FirestoreReader
         destination: data.destination,
         priceGbpPence: data.priceGbpPence,
         deliveredAt: data.deliveredAt ?? '',
+        ...(data.route !== undefined ? { distanceMeters: data.route.distanceMeters } : {}),
       }))
       .sort((a, b) => (a.deliveredAt < b.deliveredAt ? 1 : -1));
   }
