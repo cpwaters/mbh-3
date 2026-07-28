@@ -19,7 +19,8 @@ async function signIn(page: Page, email: string, password: string): Promise<void
 // The app is a multi-page SPA now; delivery lives on the Active Jobs page.
 async function goToActiveJobs(page: Page): Promise<void> {
   await page.getByRole('link', { name: 'Active Jobs' }).click();
-  await expect(page.getByRole('heading', { name: 'Active Jobs' })).toBeVisible();
+  // exact: the page title "Active Jobs" must not also match "No Active Jobs".
+  await expect(page.getByRole('heading', { name: 'Active Jobs', exact: true })).toBeVisible();
 }
 
 test('landing invites the driver into the app', async ({ page }) => {
@@ -67,17 +68,19 @@ test('a user in multiple tenants switches which they act as', async ({ page }) =
 
   await switcher.selectOption(E2E.carrierTenantId);
   await expect(page.getByRole('heading', { name: 'Post a load' })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: /Available loads|No loads available/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 });
 
 test('a carrier browses available loads and accepts one', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   // No active job -> the carrier sees the browse (loads read from Firestore).
-  await expect(page.getByRole('heading', { name: 'Available loads' })).toBeVisible();
-  const row = page.getByRole('listitem').filter({ hasText: 'Avonmouth → Cardiff' });
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+  // The prototype JobCard shows origin/destination on separate lines.
+  const row = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
   await expect(row).toBeVisible();
+  await expect(row).toContainText('Cardiff');
 
-  await row.getByRole('button', { name: 'Accept load' }).click();
+  await row.getByRole('button', { name: 'Accept Load' }).click();
 
   // Accepted -> the driver now has an active delivery on the Active Jobs page.
   await goToActiveJobs(page);
@@ -88,7 +91,9 @@ test('the active job is read from Firestore and shows its route', async ({ page 
   await signIn(page, E2E.email, E2E.password);
   await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
-  await expect(page.getByText(/Trafford.*Leith/)).toBeVisible();
+  // The route shows on both the job card and the delivery card — first is fine.
+  await expect(page.getByText('Trafford, M17 1WS').first()).toBeVisible();
+  await expect(page.getByText('Leith, EH6 6JJ').first()).toBeVisible();
 });
 
 test('capture refuses to submit without the required proof', async ({ page }) => {
@@ -168,6 +173,7 @@ test('the 30-second moment closes the loop to Firestore', async ({ page }) => {
   await page.getByPlaceholder('Who took delivery?').fill('J. Smith');
 
   const canvas = page.locator('canvas');
+  await canvas.scrollIntoViewIfNeeded(); // it sits below the job card now
   const box = await canvas.boundingBox();
   if (box === null) throw new Error('signature canvas not found');
   await page.mouse.move(box.x + 30, box.y + 30);

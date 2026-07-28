@@ -23,7 +23,7 @@ for (const name of ['iPhone 13', 'Pixel 7'] as const) {
       await page.getByLabel('Email').fill(E2E.email);
       await page.getByLabel('Password', { exact: true }).fill(E2E.password);
       await page.getByRole('button', { name: 'Sign In', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 
       const m = await page.evaluate(() => {
         const el = document.scrollingElement ?? document.documentElement;

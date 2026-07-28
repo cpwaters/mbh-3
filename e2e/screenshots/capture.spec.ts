@@ -33,7 +33,7 @@ test('shipper — post a load', async ({ page }) => {
 
 test('carrier — available loads', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
-  await expect(page.getByRole('heading', { name: /Available loads|No loads available/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
   await page.screenshot({ path: `${DIR}/available-loads.png`, fullPage: true });
 });
 
@@ -54,6 +54,7 @@ test('driver — mark delivered and confirmation', async ({ page }) => {
   await page.setInputFiles('input[type="file"]', { name: 'pod.png', mimeType: 'image/png', buffer: PNG });
   await page.getByPlaceholder('Who took delivery?').fill('J. Smith');
   const canvas = page.locator('canvas');
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   if (box !== null) {
     await page.mouse.move(box.x + 30, box.y + 30);

@@ -19,7 +19,7 @@ const VIEWPORTS = [
 // Pages to walk, with the nav link label above/below lg and the heading that
 // confirms arrival.
 const PAGES = [
-  { key: 'dashboard', desktop: 'Dashboard', mobile: 'Home', heading: /Dashboard/ },
+  { key: 'dashboard', desktop: 'Dashboard', mobile: 'Home', heading: /Available Loads/ },
   { key: 'active', desktop: 'Active Jobs', mobile: 'Jobs', heading: /Active Jobs/ },
   { key: 'map', desktop: 'Map', mobile: 'Map', heading: /^Map$/ },
   { key: 'earnings', desktop: 'Earnings', mobile: 'Earn', heading: /Earnings/ },
@@ -69,7 +69,7 @@ for (const vp of VIEWPORTS) {
   test(`layout has no horizontal overflow @ ${vp.name}`, async ({ page }) => {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await signIn(page);
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 
     const problems: string[] = [];
     for (const p of PAGES) {
