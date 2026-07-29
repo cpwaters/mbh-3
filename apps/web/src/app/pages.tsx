@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Navigation } from 'lucide-react';
+import { CheckCircle, Navigation, MapPin, Loader2 } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
@@ -14,9 +14,18 @@ import {
 } from './JobCard';
 import { CreateCompany } from '../components/CreateCompany';
 import { useApp } from './context';
+import { STATUS_PROGRESS } from '../lib/progress';
+
+// The device must be within this much of the journey (percent) before the
+// delivery form is offered — "you've arrived".
+const DELIVER_GATE = 95;
 
 function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
+}
+
+function fmtDistance(meters: number): string {
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
 
 function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { town: string; postcode: string }; destination: { town: string; postcode: string } }): ActiveJob {
@@ -27,16 +36,6 @@ function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { to
     destination: fmtAddr(job.destination),
   };
 }
-
-// Rough progress from the job's real status — a status-derived visual, not
-// invented telemetry.
-const STATUS_PROGRESS: Record<string, number> = {
-  accepted: 20,
-  collected: 55,
-  in_transit: 85,
-  delivered: 100,
-  closed: 100,
-};
 
 export function Dashboard() {
   const app = useApp();
@@ -92,6 +91,67 @@ export function ActiveJobsPage() {
   const navigate = useNavigate();
   const job = app.job;
 
+  // GPS journey progress when we have a fix; otherwise fall back to the
+  // status-derived visual so the bar isn't blank before location is granted.
+  const barPct = app.progress ?? (job ? (STATUS_PROGRESS[job.status] ?? 0) : 0);
+  const atDestination = app.progress !== null && app.progress >= DELIVER_GATE;
+
+  function viewRoute() {
+    // Ask for location permission (if not already tracking) so progress starts
+    // flowing, then head to the map.
+    app.requestLocation();
+    navigate('/map');
+  }
+
+  // The delivery form is only offered once the device shows we've arrived AND
+  // the job has reached in_transit (so deliverJob is a legal transition). Until
+  // then we explain why it's locked — location is required, by design.
+  function deliverySection() {
+    if (job === null) return null;
+    if (atDestination && job.status === 'in_transit') {
+      return <MarkDelivered job={toActiveJob(job)} location={app.location ?? undefined} onCommit={app.commit} />;
+    }
+    if (atDestination) {
+      // Arrived, but the status is still catching up to in_transit.
+      return (
+        <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 flex items-center gap-3 text-gray-600">
+          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+          <span>Getting your delivery ready…</span>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-gray-400" />
+          Delivery locked
+        </h2>
+        {!app.tracking ? (
+          <>
+            <p className="text-gray-600 mb-4">
+              Turn on location so we can tell when you reach {job.destination.town}. The delivery form
+              unlocks automatically when you arrive.
+            </p>
+            {app.locationError && <p className="text-sm text-red-700 mb-3">{app.locationError}</p>}
+            <button
+              onClick={app.requestLocation}
+              className="bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Enable location
+            </button>
+          </>
+        ) : (
+          <p className="text-gray-600">
+            {app.distanceRemainingMeters !== null
+              ? `You're ${fmtDistance(app.distanceRemainingMeters)} from ${job.destination.town}. `
+              : ''}
+            The delivery form unlocks when you reach the destination ({DELIVER_GATE}% of the route).
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -125,18 +185,21 @@ export function ActiveJobsPage() {
             <JobCardSection>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600">Progress</span>
-                <span className="font-medium text-gray-900 capitalize">{job.status.replace('_', ' ')}</span>
+                <span className="font-medium text-gray-900">
+                  {barPct}%
+                  {app.progress === null && <span className="text-gray-400 font-normal"> · from status</span>}
+                </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div
                   className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{ width: `${STATUS_PROGRESS[job.status] ?? 0}%` }}
+                  style={{ width: `${barPct}%` }}
                 ></div>
               </div>
             </JobCardSection>
             <JobCardActions>
               <button
-                onClick={() => navigate('/map')}
+                onClick={viewRoute}
                 className="w-full sm:flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
                 <Navigation className="w-4 h-4" />
@@ -145,7 +208,7 @@ export function ActiveJobsPage() {
             </JobCardActions>
           </JobCard>
 
-          <MarkDelivered job={toActiveJob(job)} onCommit={app.commit} />
+          {deliverySection()}
         </div>
       )}
 

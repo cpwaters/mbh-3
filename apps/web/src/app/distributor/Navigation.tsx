@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Truck, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, LogOut, User } from 'lucide-react';
 import { TenantSwitcher } from '../../components/TenantSwitcher';
 import { useApp } from '../context';
 
@@ -21,7 +21,7 @@ export default function DistributorNavigation() {
         <div className="max-w-7xl mx-auto px-4 lg:px-6">
           <div className="flex items-center justify-between h-16 gap-2">
             <div className="flex items-center gap-2 shrink-0">
-              <Truck className="w-8 h-8 text-blue-600" />
+              <img src="/android-chrome-384x384.png" alt="MyBackHaul logo" className="w-8 h-8" />
               {/* Drop the wordmark on phones when the switcher is present so the
                   logo + switcher + logout fit a 320px bar; single-tenant users
                   (no switcher) keep it at every width. */}

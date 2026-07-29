@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, Truck, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import type { AuthView } from '../components/useAuth';
 
 // Ported from the mbh-2 prototype (client/src/pages/Login.tsx). Visuals are
@@ -61,7 +61,7 @@ export default function Login({ auth }: { auth: AuthView }) {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Truck className="w-12 h-12 text-blue-600" />
+            <img src="/android-chrome-384x384.png" alt="MyBackHaul logo" className="w-12 h-12" />
             <h1 className="text-3xl font-bold text-gray-900">MyBackHaul</h1>
           </div>
           <p className="text-gray-600">Sign in to your driver account</p>

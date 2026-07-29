@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import type { DeliverCapture } from '@mbh/client';
 import { useSyncQueue } from './useSyncQueue';
@@ -5,6 +6,10 @@ import { useAuth } from './useAuth';
 import { useTenants } from './useTenants';
 import { useActiveJob } from './useActiveJob';
 import { useListings } from './useListings';
+import { useDeviceLocation } from './useDeviceLocation';
+import { useJobEndpoints } from './useJobEndpoints';
+import { useJobProgressSync } from './useJobProgressSync';
+import { haversineMeters, journeyProgress } from '../lib/progress';
 import Login from '../app/Login';
 import SignUp from '../app/SignUp';
 import { AppProvider, type AppData } from '../app/context';
@@ -46,6 +51,28 @@ export default function DriverApp() {
   const showDistributor = isShipper && !isCarrier;
   const listings = useListings(isCarrier);
 
+  // Live device location + the GPS journey progress derived from it. Resolved
+  // once here so every page reads the same fix and the driver is prompted for
+  // location permission only once.
+  const device = useDeviceLocation();
+  const endpoints = useJobEndpoints(job);
+  const progress = useMemo(() => {
+    if (device.location && endpoints.origin && endpoints.destination) {
+      return journeyProgress(endpoints.origin, endpoints.destination, device.location);
+    }
+    return null;
+  }, [device.location, endpoints.origin, endpoints.destination]);
+  const distanceRemainingMeters = useMemo(() => {
+    if (device.location && endpoints.destination) {
+      return haversineMeters(device.location, endpoints.destination);
+    }
+    return null;
+  }, [device.location, endpoints.destination]);
+
+  // GPS progress advances the real job status (accepted → collected →
+  // in_transit) so a delivery is a legal transition when it's recorded.
+  useJobProgressSync(job, progress, auth.getIdToken, reloadJob);
+
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
   }
@@ -69,6 +96,12 @@ export default function DriverApp() {
     reloadListings: listings.reload,
     commit,
     onAccepted,
+    location: device.location,
+    tracking: device.tracking,
+    locationError: device.error,
+    requestLocation: device.requestLocation,
+    progress,
+    distanceRemainingMeters,
   };
 
   if (!auth.ready) {

@@ -156,6 +156,15 @@ export async function seedDeliverableJob(): Promise<void> {
     pickupBy: '2026-08-04',
     deliverBy: '2026-08-05',
     createdAt: new Date().toISOString(),
+    // A pre-enriched route so the accepted job carries coordinates — the driver
+    // app derives GPS progress from these without a network geocode.
+    route: {
+      origin: { lat: 51.5045, lng: -2.6993 },
+      destination: { lat: 51.4816, lng: -3.1791 },
+      distanceMeters: 20000,
+      durationSeconds: 1500,
+      enrichedAt: new Date().toISOString(),
+    },
   });
   await db.doc(`listings/${E2E.browseLoadId}`).set({
     loadId: E2E.browseLoadId,

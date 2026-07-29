@@ -4,6 +4,7 @@ import type { Listing } from '@mbh/domain';
 import type { DriverJobView, Membership } from '@mbh/provider-interfaces';
 import type { AuthView } from '../components/useAuth';
 import type { QueueView } from '../components/useSyncQueue';
+import type { GeoPoint } from '../lib/geocode';
 
 // The shared app state, resolved once in the shell and read by every page.
 export interface AppData {
@@ -21,6 +22,14 @@ export interface AppData {
   reloadListings: () => void;
   commit: (requestId: string, payload: DeliverCapture) => Promise<void>;
   onAccepted: () => void;
+  // Live device GPS + the journey progress derived from it. Progress is null
+  // until there's a fix and known endpoints; the map marker reads `location`.
+  location: GeoPoint | null;
+  tracking: boolean;
+  locationError: string | null;
+  requestLocation: () => void;
+  progress: number | null;
+  distanceRemainingMeters: number | null;
 }
 
 const Ctx = createContext<AppData | null>(null);
