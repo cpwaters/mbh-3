@@ -13,12 +13,14 @@ export function TenantSwitcher({
 }) {
   if (tenants.length <= 1) return null;
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="text-gray-500 font-medium">Acting as</span>
+    <label className="flex items-center gap-1.5 text-sm min-w-0">
+      {/* "Acting as" is dropped on small screens to leave room for the select. */}
+      <span className="hidden sm:inline text-gray-500 font-medium shrink-0">Acting as</span>
       <select
         value={selected.tenantId}
         onChange={(e) => onSelect(e.target.value)}
-        className="border border-gray-300 rounded-lg py-1.5 pl-2.5 pr-8 bg-white text-gray-900 font-medium outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        aria-label="Acting as"
+        className="min-w-0 max-w-[42vw] sm:max-w-[220px] truncate border border-gray-300 rounded-lg py-1.5 pl-2.5 pr-8 bg-white text-gray-900 font-medium outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
       >
         {tenants.map((t) => (
           <option key={t.tenantId} value={t.tenantId}>

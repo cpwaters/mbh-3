@@ -66,6 +66,26 @@ for (const vp of [
   });
 }
 
+// A multi-tenant user shows the "Acting as" switcher in the top bar — on a
+// narrow phone that must not push the nav (top or fixed bottom) off-screen.
+for (const vp of [
+  { name: '320-small', width: 320, height: 720 },
+  { name: '390-phone', width: 390, height: 844 },
+]) {
+  test(`multi-tenant nav with the switcher fits @ ${vp.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await page.goto('/app/');
+    await page.getByLabel('Email').fill(E2E.multiEmail);
+    await page.getByLabel('Password', { exact: true }).fill(E2E.multiPassword);
+    await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+    await expect(page.getByLabel('Acting as')).toBeVisible();
+
+    const m = await measureOverflow(page);
+    await page.screenshot({ path: `${SHOTS}/multi-${vp.name}.png`, fullPage: true });
+    expect(m.scrollWidth, `multi-tenant nav @ ${vp.name}`).toBeLessThanOrEqual(m.innerWidth + 1);
+  });
+}
+
 // Public pages (no auth) — the first thing a mobile visitor meets.
 const PUBLIC = [
   { key: 'landing', path: '/', heading: /Fill your empty/ },

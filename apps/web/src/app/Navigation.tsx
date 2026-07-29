@@ -24,15 +24,19 @@ export function Navigation() {
     <>
       <nav className="bg-white shadow-md border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 lg:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between h-16 gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <Truck className="w-8 h-8 text-blue-600" />
-              <h1 className="text-xl lg:text-2xl font-bold text-gray-900">MyBackHaul</h1>
+              {/* Drop the wordmark on phones when the switcher is present so the
+                  logo + switcher + logout fit a 320px bar; single-tenant users
+                  (no switcher) keep it at every width. */}
+              <h1 className={`text-xl lg:text-2xl font-bold text-gray-900${showSwitcher ? ' hidden sm:block' : ''}`}>MyBackHaul</h1>
             </div>
 
             {/* Right cluster: desktop nav pills (lg only) + one switcher + one
-                logout (icon on mobile, icon+text on desktop). */}
-            <div className="flex items-center gap-1">
+                logout (icon on mobile, icon+text on desktop). min-w-0 so the
+                switcher shrinks instead of overflowing the bar. */}
+            <div className="flex items-center gap-1 min-w-0">
               <div className="hidden lg:flex items-center gap-1">
                 {navItems.map((item) => {
                   const Icon = item.icon;
