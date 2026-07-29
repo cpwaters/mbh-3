@@ -140,3 +140,35 @@ describe('drain (delivery on reconnect)', () => {
     expect(transport.sends.map((s) => s.requestId)).toEqual(['req-1', 'req-2']);
   });
 });
+
+describe('retry and discard (failed-record recovery)', () => {
+  it('re-arms a failed item so the next drain resends it, succeeding once the cause is fixed', async () => {
+    const { queue, transport } = makeQueue();
+    await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');
+
+    // A permanent failure (e.g. an illegal transition) marks it 'failed'.
+    transport.setOutcome('req-1', { outcome: 'permanent', error: 'A job cannot move from accepted to delivered.' });
+    await queue.drain();
+    expect((await queue.items())[0]).toMatchObject({
+      status: 'failed',
+      lastError: 'A job cannot move from accepted to delivered.',
+    });
+
+    // A plain drain never touches a failed item — it needs a human.
+    expect(await queue.drain()).toEqual({ delivered: 0, retrying: 0, failedPermanent: 0 });
+
+    // The driver reached the destination (job now in_transit): re-arm + resend.
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+    await queue.retry('req-1');
+    expect((await queue.items())[0]).toMatchObject({ status: 'queued' });
+    expect(await queue.drain()).toMatchObject({ delivered: 1 });
+    expect(await queue.pendingCount()).toBe(0);
+  });
+
+  it('discards an item the driver gives up on', async () => {
+    const { queue } = makeQueue();
+    await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');
+    await queue.remove('req-1');
+    expect(await queue.pendingCount()).toBe(0);
+  });
+});

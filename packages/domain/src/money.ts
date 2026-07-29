@@ -8,6 +8,9 @@ export function isValidLoadPriceGbpPence(pence: number): boolean {
 }
 
 export function formatGbp(pence: number): string {
+  // Defensive: a malformed record (missing/NaN price) must render as a dash,
+  // never "£NaN".
+  if (!Number.isFinite(pence)) return '£—';
   return `£${(pence / 100).toLocaleString('en-GB', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

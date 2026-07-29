@@ -11,6 +11,10 @@ export interface QueueView {
   online: boolean;
   enqueue: (type: string, payload: unknown, requestId: string) => Promise<void>;
   drainNow: () => Promise<DrainSummary>;
+  // Re-arm a failed record and try to send it again.
+  retry: (requestId: string) => Promise<void>;
+  // Discard a record the driver gives up on.
+  remove: (requestId: string) => Promise<void>;
 }
 
 export function useSyncQueue(getIdToken: () => Promise<string | null>): QueueView {
@@ -45,6 +49,23 @@ export function useSyncQueue(getIdToken: () => Promise<string | null>): QueueVie
     [queue, refresh, drainNow]
   );
 
+  const retry = useCallback(
+    async (requestId: string) => {
+      await queue.retry(requestId);
+      await refresh();
+      await drainNow();
+    },
+    [queue, refresh, drainNow]
+  );
+
+  const remove = useCallback(
+    async (requestId: string) => {
+      await queue.remove(requestId);
+      await refresh();
+    },
+    [queue, refresh]
+  );
+
   useEffect(() => {
     void refresh();
     void drainNow();
@@ -68,5 +89,5 @@ export function useSyncQueue(getIdToken: () => Promise<string | null>): QueueVie
     };
   }, [refresh, drainNow]);
 
-  return { items, pending: items.length, online, enqueue, drainNow };
+  return { items, pending: items.length, online, enqueue, drainNow, retry, remove };
 }

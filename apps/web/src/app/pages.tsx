@@ -225,19 +225,40 @@ export function ActiveJobsPage() {
           <h3 className="font-bold text-gray-900 mb-2">Waiting to send</h3>
           <ul className="divide-y divide-gray-100">
             {app.queue.items.map((item) => (
-              <li key={item.requestId} className="flex items-center justify-between py-2.5">
-                <span className="text-gray-700 text-sm">Delivery record</span>
-                <span
-                  className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                    item.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
-                  {item.status === 'failed'
-                    ? 'Needs attention'
-                    : app.queue.online
-                      ? 'Sending…'
-                      : 'Waiting for signal…'}
-                </span>
+              <li key={item.requestId} className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-gray-700 text-sm">Delivery record</span>
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                      item.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {item.status === 'failed'
+                      ? 'Needs attention'
+                      : app.queue.online
+                        ? 'Sending…'
+                        : 'Waiting for signal…'}
+                  </span>
+                </div>
+                {item.status === 'failed' && (
+                  <div className="mt-1.5">
+                    {item.lastError && <p className="text-xs text-red-700 mb-2">{item.lastError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void app.queue.retry(item.requestId)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                      >
+                        Try again
+                      </button>
+                      <button
+                        onClick={() => void app.queue.remove(item.requestId)}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

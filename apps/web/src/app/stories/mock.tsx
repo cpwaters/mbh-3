@@ -25,6 +25,8 @@ export function makeMockApp(over: Partial<AppData> = {}): AppData {
       online: true,
       enqueue: async () => {},
       drainNow: async () => ({ delivered: 0, retrying: 0, failedPermanent: 0 }),
+      retry: async () => {},
+      remove: async () => {},
     },
     tenants: [{ ...carrierTenant, capabilities: ['carrier'] }],
     selected: { ...carrierTenant, capabilities: ['carrier'] },
