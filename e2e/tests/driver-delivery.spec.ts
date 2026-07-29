@@ -205,6 +205,23 @@ test('a new user creates their company and lands on the dashboard', async ({ pag
   await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
 });
 
+test('the founder sees a nav bar to home and the carrier/shipper sign-up pages', async ({ page }) => {
+  await signIn(page, E2E.founderEmail, E2E.founderPassword);
+  // The founder toolbar sits above the app nav.
+  await expect(page.getByText('Founder')).toBeVisible();
+  const carrier = page.getByRole('link', { name: 'Carrier sign-up' });
+  const shipper = page.getByRole('link', { name: 'Shipper sign-up' });
+  await expect(carrier).toBeVisible();
+  await expect(shipper).toBeVisible();
+  if (process.env.SHOT_PATH) await page.screenshot({ path: process.env.SHOT_PATH, fullPage: true });
+
+  // Each link opens its role-specific sign-up page.
+  await carrier.click();
+  await expect(page.getByText('Create your carrier account')).toBeVisible();
+  await page.getByRole('link', { name: 'Shipper sign-up' }).click();
+  await expect(page.getByText('Create your shipper account')).toBeVisible();
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

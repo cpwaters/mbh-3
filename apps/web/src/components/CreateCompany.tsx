@@ -3,6 +3,7 @@ import { Building2 } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { TENANT_CAPABILITIES, TENANT_CAPABILITY_LABELS, type TenantCapability } from '@mbh/domain';
 import { dispatchAction } from '../lib/dispatch';
+import { takeSignupIntent } from '../lib/signupIntent';
 
 const INPUT =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -18,7 +19,11 @@ export function CreateCompany({
   onCreated: (tenantId: string) => void;
 }) {
   const [name, setName] = useState('');
-  const [caps, setCaps] = useState<TenantCapability[]>([]);
+  // Pre-select the capability the user chose on a carrier/shipper sign-up page.
+  const [caps, setCaps] = useState<TenantCapability[]>(() => {
+    const intent = takeSignupIntent();
+    return intent ? [intent] : [];
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

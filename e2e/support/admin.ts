@@ -37,6 +37,11 @@ export const E2E = {
   newbieUid: 'newbie-e2e-user',
   newbieEmail: 'newbie.e2e@nobody.test',
   newbiePassword: 'test-password-def',
+  // The founder account — sees the founder-only nav bar. Email must match
+  // FOUNDER_EMAIL in apps/web/src/lib/founder.ts.
+  founderUid: 'founder-e2e-user',
+  founderEmail: 'nvwebdevelopers@gmail.com',
+  founderPassword: 'test-password-ghi',
 } as const;
 
 function app() {
@@ -64,6 +69,8 @@ export async function seedDeliverableJob(): Promise<void> {
   await ensureUser(E2E.multiUid, E2E.multiEmail, E2E.multiPassword);
   // No membership for the newbie — they create their company through the UI.
   await ensureUser(E2E.newbieUid, E2E.newbieEmail, E2E.newbiePassword);
+  // The founder — a carrier driver, so the founder bar sits above the app nav.
+  await ensureUser(E2E.founderUid, E2E.founderEmail, E2E.founderPassword);
 
   const db = getFirestore();
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({
@@ -99,7 +106,7 @@ export async function seedDeliverableJob(): Promise<void> {
     status: 'active',
     displayName: 'Multi User',
   });
-  for (const uid of [E2E.uid, E2E.joblessUid]) {
+  for (const uid of [E2E.uid, E2E.joblessUid, E2E.founderUid]) {
     await db.doc(`tenants/${E2E.carrierTenantId}/members/${uid}`).set({
       tenantId: E2E.carrierTenantId,
       actorId: uid,

@@ -1,12 +1,22 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import type { TenantCapability } from '@mbh/domain';
 import type { AuthView } from '../components/useAuth';
+import { setSignupIntent } from '../lib/signupIntent';
 
 // Ported from the mbh-2 prototype (client/src/pages/SignUp.tsx). Visuals are
 // verbatim; account creation goes through mbh-3's AuthClient. After sign-up the
-// driver has no company yet, so the dashboard shows the onboarding flow.
-export default function SignUp({ auth }: { auth: AuthView }) {
+// user has no company yet, so the dashboard shows the onboarding flow. An
+// optional `role` powers the carrier/shipper sign-up pages: it themes the copy
+// and pre-selects the matching capability in that onboarding step.
+export default function SignUp({ auth, role }: { auth: AuthView; role?: TenantCapability }) {
+  const subtitle =
+    role === 'carrier'
+      ? 'Create your carrier account'
+      : role === 'shipper'
+        ? 'Create your shipper account'
+        : 'Create your driver account';
   const [formData, setFormData] = useState({
     firstName: '',
     surname: '',
@@ -51,6 +61,7 @@ export default function SignUp({ auth }: { auth: AuthView }) {
     try {
       const displayName = `${formData.firstName} ${formData.surname}`;
       await auth.signUpWithPassword(formData.email, formData.password, displayName);
+      if (role) setSignupIntent(role);
       navigate('/');
     } catch (err) {
       setErrors({ email: err instanceof Error ? err.message : 'Failed to create account. Please try again' });
@@ -72,6 +83,7 @@ export default function SignUp({ auth }: { auth: AuthView }) {
     try {
       setIsSubmitting(true);
       await auth.signInWithGoogle();
+      if (role) setSignupIntent(role);
       navigate('/');
     } catch (err) {
       setErrors({ email: err instanceof Error ? err.message : 'Failed to sign up with Google. Please try again' });
@@ -119,7 +131,7 @@ export default function SignUp({ auth }: { auth: AuthView }) {
             <img src="/android-chrome-384x384.png" alt="MyBackHaul logo" className="w-12 h-12" />
             <h1 className="text-3xl font-bold text-gray-900">MyBackHaul</h1>
           </div>
-          <p className="text-gray-600">Create your driver account</p>
+          <p className="text-gray-600">{subtitle}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -243,6 +255,19 @@ export default function SignUp({ auth }: { auth: AuthView }) {
           </svg>
           Sign up with Google
         </button>
+
+        {role === undefined && (
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Setting up a company?{' '}
+            <Link to="/signup/carrier" className="font-medium text-blue-600 hover:text-blue-700">
+              Carrier
+            </Link>{' '}
+            ·{' '}
+            <Link to="/signup/shipper" className="font-medium text-blue-600 hover:text-blue-700">
+              Shipper
+            </Link>
+          </p>
+        )}
 
         <p className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
