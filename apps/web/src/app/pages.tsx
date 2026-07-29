@@ -17,8 +17,12 @@ import { useApp } from './context';
 import { STATUS_PROGRESS } from '../lib/progress';
 
 // The device must be within this much of the journey (percent) before the
-// delivery form is offered — "you've arrived".
+// delivery form is offered — "you've arrived". The device must be BOTH this far
+// along the route AND within DELIVER_PROXIMITY_M of the destination: the percent
+// guards very short trips (don't unlock near the origin) while the absolute cap
+// stops a long trip unlocking miles out (95% of 355 km is still ~18 km away).
 const DELIVER_GATE = 95;
+const DELIVER_PROXIMITY_M = 500;
 
 function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
@@ -94,7 +98,11 @@ export function ActiveJobsPage() {
   // GPS journey progress when we have a fix; otherwise fall back to the
   // status-derived visual so the bar isn't blank before location is granted.
   const barPct = app.progress ?? (job ? (STATUS_PROGRESS[job.status] ?? 0) : 0);
-  const atDestination = app.progress !== null && app.progress >= DELIVER_GATE;
+  const atDestination =
+    app.progress !== null &&
+    app.progress >= DELIVER_GATE &&
+    app.distanceRemainingMeters !== null &&
+    app.distanceRemainingMeters <= DELIVER_PROXIMITY_M;
 
   function viewRoute() {
     // Ask for location permission (if not already tracking) so progress starts
@@ -145,7 +153,7 @@ export function ActiveJobsPage() {
             {app.distanceRemainingMeters !== null
               ? `You're ${fmtDistance(app.distanceRemainingMeters)} from ${job.destination.town}. `
               : ''}
-            The delivery form unlocks when you reach the destination ({DELIVER_GATE}% of the route).
+            The delivery form unlocks within {DELIVER_PROXIMITY_M} m of the destination.
           </p>
         )}
       </div>
