@@ -65,6 +65,21 @@ export class SyncQueue {
     return this.storage.list();
   }
 
+  // Re-arm a failed item for another attempt — e.g. the driver has now reached
+  // the destination (so the delivery is a legal transition), or signal is back.
+  // The next drain picks it up. No-op if the item is gone.
+  async retry(requestId: string): Promise<void> {
+    const item = await this.storage.get(requestId);
+    if (item === null) return;
+    await this.storage.put({ ...item, status: 'queued' });
+  }
+
+  // Discard an item the driver has chosen to give up on (a permanently-failed
+  // record that will never succeed — e.g. it belonged to a job that's gone).
+  async remove(requestId: string): Promise<void> {
+    await this.storage.delete(requestId);
+  }
+
   // Attempt to deliver every deliverable item. Safe to call on reconnect and
   // on an interval. A 'failed' item is terminal and needs a human, not an
   // automatic retry.
