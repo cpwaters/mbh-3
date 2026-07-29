@@ -3,6 +3,7 @@ import { postLoadHandler } from './actions/post-load.js';
 import { acceptLoadHandler } from './actions/accept-load.js';
 import { collectJobHandler, startTransitHandler } from './actions/progress-job.js';
 import { deliverJobHandler } from './actions/deliver-job.js';
+import { relistJobHandler } from './actions/relist-job.js';
 import { addVehicleHandler, retireVehicleHandler } from './actions/vehicles.js';
 import { updateProfileHandler } from './actions/update-profile.js';
 import { createTenantHandler } from './actions/create-tenant.js';
@@ -16,6 +17,7 @@ const HANDLERS: readonly AnyHandler[] = [
   collectJobHandler,
   startTransitHandler,
   deliverJobHandler,
+  relistJobHandler,
   addVehicleHandler,
   retireVehicleHandler,
   updateProfileHandler,
@@ -43,6 +45,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'collectJob',
   'startTransit',
   'deliverJob',
+  'relistJob',
   'addVehicle',
   'retireVehicle',
   'updateProfile',

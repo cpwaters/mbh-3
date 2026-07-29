@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, Navigation, MapPin, Loader2 } from 'lucide-react';
+import { CheckCircle, Navigation, MapPin, Loader2, RotateCcw } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
+import { genRequestId } from '@mbh/client';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
@@ -15,6 +17,8 @@ import {
 import { CreateCompany } from '../components/CreateCompany';
 import { useApp } from './context';
 import { STATUS_PROGRESS } from '../lib/progress';
+import { dispatchAction } from '../lib/dispatch';
+import { isFounder } from '../lib/founder';
 
 // The device must be within this much of the journey (percent) before the
 // delivery form is offered — "you've arrived". The device must be BOTH this far
@@ -94,6 +98,8 @@ export function ActiveJobsPage() {
   const app = useApp();
   const navigate = useNavigate();
   const job = app.job;
+  const founder = isFounder(app.auth.session);
+  const [relisting, setRelisting] = useState(false);
 
   // GPS journey progress when we have a fix; otherwise fall back to the
   // status-derived visual so the bar isn't blank before location is granted.
@@ -109,6 +115,27 @@ export function ActiveJobsPage() {
     // flowing, then head to the map.
     app.requestLocation();
     navigate('/map');
+  }
+
+  // Founder-only: return this job's load to the available pool and clear the
+  // active job (drops the job, re-lists the load).
+  async function completeJob() {
+    if (job === null) return;
+    setRelisting(true);
+    try {
+      const res = await dispatchAction(
+        app.auth.getIdToken,
+        'relistJob',
+        { carrierTenantId: job.carrierTenantId, jobId: job.jobId },
+        genRequestId()
+      );
+      if (res.ok) {
+        app.reloadJob();
+        app.reloadListings();
+      }
+    } finally {
+      setRelisting(false);
+    }
   }
 
   // The delivery form is only offered once the device shows we've arrived AND
@@ -213,6 +240,17 @@ export function ActiveJobsPage() {
                 <Navigation className="w-4 h-4" />
                 View Route
               </button>
+              {founder && (
+                <button
+                  onClick={() => void completeJob()}
+                  disabled={relisting}
+                  title="Founder: complete this job and return its load to Available Loads"
+                  className="w-full sm:flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  {relisting ? 'Completing…' : 'Complete'}
+                </button>
+              )}
             </JobCardActions>
           </JobCard>
 

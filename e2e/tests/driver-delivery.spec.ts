@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { E2E, getJobStatus } from '../support/admin.js';
+import { E2E, getJobStatus, getLoadStatus } from '../support/admin.js';
 
 // A minimal valid 1x1 PNG — the "photo of the delivered goods". Inline so
 // there is no binary fixture to maintain.
@@ -220,6 +220,20 @@ test('the founder sees a nav bar to home and the carrier/shipper sign-up pages',
   await expect(page.getByText('Create your carrier account')).toBeVisible();
   await page.getByRole('link', { name: 'Shipper sign-up' }).click();
   await expect(page.getByText('Create your shipper account')).toBeVisible();
+});
+
+test('the founder completes a job, returning its load to Available Loads', async ({ page }) => {
+  await signIn(page, E2E.founderEmail, E2E.founderPassword);
+  await goToActiveJobs(page);
+  // The founder's active job (Preston -> Blackpool) with the founder-only button.
+  await expect(page.getByText('Preston, PR1 2AB').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Complete' }).click();
+
+  // The job clears from the driver's view...
+  await expect(page.getByRole('heading', { name: 'No Active Jobs' })).toBeVisible();
+  // ...the job doc is gone and the load is back in the available pool.
+  await expect.poll(() => getJobStatus(E2E.founderJobId), { timeout: 15_000 }).toBeUndefined();
+  await expect.poll(() => getLoadStatus(E2E.founderLoadId), { timeout: 15_000 }).toBe('available');
 });
 
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
