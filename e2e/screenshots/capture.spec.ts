@@ -48,6 +48,10 @@ test('driver — map', async ({ page }) => {
 });
 
 test('driver — mark delivered and confirmation', async ({ page }) => {
+  // Delivery is location-gated: park the device at the job's destination (Leith)
+  // so the Mark delivered card appears.
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude: 55.9758, longitude: -3.1706 });
   await signIn(page, E2E.email, E2E.password);
   await page.getByRole('link', { name: 'Active Jobs' }).click();
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();

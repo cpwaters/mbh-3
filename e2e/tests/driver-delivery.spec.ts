@@ -23,6 +23,18 @@ async function goToActiveJobs(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Active Jobs', exact: true })).toBeVisible();
 }
 
+// Delivery is location-gated now: the Mark delivered card only appears once the
+// device's GPS shows it has reached the destination (≥95% of the journey).
+// Grant permission and park the device on the job's destination so the gate
+// clears; the app auto-resumes tracking when permission is already granted.
+async function arriveAtDestination(page: Page, latitude: number, longitude: number): Promise<void> {
+  await page.context().grantPermissions(['geolocation']);
+  await page.context().setGeolocation({ latitude, longitude });
+}
+// job-e2e (Trafford → Leith) and the browse job (Avonmouth → Cardiff) destinations.
+const LEITH = { latitude: 55.9758, longitude: -3.1706 };
+const CARDIFF = { latitude: 51.4816, longitude: -3.1791 };
+
 test('landing invites the driver into the app', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Fill your empty return legs.' })).toBeVisible();
@@ -86,6 +98,9 @@ test('a user in multiple tenants switches which they act as', async ({ page }) =
 });
 
 test('a carrier browses available loads and accepts one', async ({ page }) => {
+  // Park at the destination first: after accepting, GPS progress drives the
+  // job accepted → collected → in_transit and clears the delivery gate.
+  await arriveAtDestination(page, CARDIFF.latitude, CARDIFF.longitude);
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   // No active job -> the carrier sees the browse (loads read from Firestore).
   await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
@@ -97,11 +112,14 @@ test('a carrier browses available loads and accepts one', async ({ page }) => {
   await row.getByRole('button', { name: 'Accept Load' }).click();
 
   // Accepted -> the driver now has an active delivery on the Active Jobs page.
+  // GPS progress advances the real status to in_transit, so the location-gated
+  // Mark delivered card appears.
   await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
   await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
@@ -111,6 +129,7 @@ test('the active job is read from Firestore and shows its route', async ({ page 
 });
 
 test('capture refuses to submit without the required proof', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
   await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
@@ -189,6 +208,7 @@ test('a new user creates their company and lands on the dashboard', async ({ pag
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
   await goToActiveJobs(page);
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();

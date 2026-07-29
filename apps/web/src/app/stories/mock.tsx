@@ -38,6 +38,12 @@ export function makeMockApp(over: Partial<AppData> = {}): AppData {
     reloadListings: () => {},
     commit: async () => {},
     onAccepted: () => {},
+    location: null,
+    tracking: false,
+    locationError: null,
+    requestLocation: () => {},
+    progress: null,
+    distanceRemainingMeters: null,
     ...over,
   };
 }

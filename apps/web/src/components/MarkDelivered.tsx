@@ -14,9 +14,12 @@ export interface ActiveJob {
 // to the offline queue — succeeds instantly with no signal.
 export function MarkDelivered({
   job,
+  location,
   onCommit,
 }: {
   job: ActiveJob;
+  // The device GPS fix at the point of delivery, stamped onto the evidence.
+  location?: { lat: number; lng: number };
   onCommit: (requestId: string, payload: DeliverCapture) => Promise<void>;
 }) {
   const [photoRefs, setPhotoRefs] = useState<string[]>([]);
@@ -40,6 +43,7 @@ export function MarkDelivered({
       photoRefs,
       signatureRef: signatureRef ?? '',
       recipientName,
+      ...(location !== undefined ? { location } : {}),
     };
     const built = buildDeliverRequest(capture, genRequestId());
     if (!built.ok) {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, Navigation as NavIcon, MapPin } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { useApp } from './context';
@@ -7,22 +7,15 @@ import { getDrivingRoute } from '../lib/routing';
 import { getWhat3Words } from '../lib/w3w';
 import { openNativeNavigation } from '../lib/nativeNav';
 import type { GeoPoint } from '../lib/geocode';
+import { STATUS_PROGRESS } from '../lib/progress';
 import { JobCard, JobCardRoute, JobCardPayment, JobCardStatusBadge } from './JobCard';
-
-// Rough progress from the job's real status.
-const STATUS_PROGRESS: Record<string, number> = {
-  accepted: 20,
-  collected: 55,
-  in_transit: 85,
-  delivered: 100,
-  closed: 100,
-};
 
 // Ported from the mbh-2 prototype (client/src/pages/MapView.tsx): the map + a
 // Route Details panel + an available-loads list + the location-consent modal.
 // The endpoints come already geocoded from mbh-3's server-computed job route;
-// the road-following polyline and What3Words are fetched client-side, and the
-// live GPS position is shown on the driver's own screen (no server write yet).
+// the road-following polyline and What3Words are fetched client-side. The live
+// GPS position and the route progress it drives are shared app-wide (resolved
+// once in the app shell), so this screen just reads them.
 export default function MapView() {
   const app = useApp();
   const job = app.job;
@@ -33,16 +26,13 @@ export default function MapView() {
   const originLabel = job ? `${job.origin.town}, ${job.origin.postcode}` : '';
   const destinationLabel = job ? `${job.destination.town}, ${job.destination.postcode}` : '';
   const distanceKm = route ? Math.round(route.distanceMeters / 1000) : null;
-  const progress = job ? (STATUS_PROGRESS[job.status] ?? 0) : 0;
+  // Real GPS journey progress when there's a fix; status-derived otherwise.
+  const progress = app.progress ?? (job ? (STATUS_PROGRESS[job.status] ?? 0) : 0);
 
   const [routeGeometry, setRouteGeometry] = useState<GeoPoint[] | null>(null);
   const [originW3W, setOriginW3W] = useState<string | null>(null);
   const [destinationW3W, setDestinationW3W] = useState<string | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<GeoPoint | null>(null);
-  const [isTracking, setIsTracking] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [showLocationConsent, setShowLocationConsent] = useState(false);
-  const watchIdRef = useRef<number | null>(null);
 
   const originLat = originPin?.lat;
   const originLng = originPin?.lng;
@@ -81,52 +71,19 @@ export default function MapView() {
     getWhat3Words(destLat, destLng).then(setDestinationW3W);
   }, [destLat, destLng]);
 
-  // Stop tracking if we navigate away.
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
-  }, []);
+  const currentLocation = app.location;
 
-  function beginLocationTracking() {
-    if (!navigator.geolocation) {
-      setLocationError('Location tracking is not supported on this device.');
+  function handleStartNavigation() {
+    if (!destinationPin) {
+      // No endpoints yet — nothing to navigate to.
       return;
     }
-    setLocationError(null);
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => setCurrentLocation({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      (error) => {
-        setLocationError(
-          error.code === error.PERMISSION_DENIED
-            ? "Location access was denied, so your position can't be shown. Enable location for this site in your browser/device settings to turn it back on."
-            : 'Could not get your location. Check location permissions and try again.'
-        );
-        setIsTracking(false);
-      },
-      { enableHighAccuracy: true }
-    );
-    watchIdRef.current = watchId;
-    setIsTracking(true);
-  }
-
-  function handleToggleNavigation() {
-    if (isTracking) {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-      setIsTracking(false);
-      return;
+    openNativeNavigation(originPin, destinationPin);
+    // Make sure our own live tracking is running too (drives the progress bar
+    // and the delivery gate). Prompt via the explainer if not yet granted.
+    if (!app.tracking) {
+      setShowLocationConsent(true);
     }
-    if (destinationPin) {
-      openNativeNavigation(originPin, destinationPin);
-    } else {
-      setLocationError('Still working out the destination — try again in a moment.');
-      return;
-    }
-    setLocationError(null);
-    setShowLocationConsent(true);
   }
 
   return (
@@ -168,6 +125,9 @@ export default function MapView() {
                 <div>
                   <div className="text-sm text-gray-500">Route Progress</div>
                   <div className="text-2xl font-bold text-gray-900">{progress}%</div>
+                  {app.progress === null && (
+                    <div className="text-xs text-gray-400">Enable location for live progress</div>
+                  )}
                 </div>
                 <div>
                   <div className="text-sm text-gray-500">Status</div>
@@ -180,21 +140,19 @@ export default function MapView() {
                 </div>
               </div>
 
-              {locationError && (
+              {app.locationError && (
                 <div className="mt-4 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
                   <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>{locationError}</span>
+                  <span>{app.locationError}</span>
                 </div>
               )}
 
               <button
-                onClick={handleToggleNavigation}
-                className={`w-full mt-6 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                  isTracking ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+                onClick={handleStartNavigation}
+                className="w-full mt-6 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700"
               >
                 <NavIcon className="w-5 h-5" />
-                {isTracking ? 'Stop Navigation' : 'Start Navigation'}
+                {app.tracking ? 'Open Navigation' : 'Start Navigation'}
               </button>
             </div>
 
@@ -269,14 +227,14 @@ export default function MapView() {
               <h3 className="text-lg font-semibold text-gray-900">Share your location?</h3>
             </div>
             <p className="text-sm text-gray-600 mb-6">
-              MyBackHaul uses your device's location to show your live position on the map while you're
-              navigating this job. Your location stays on your device.
+              MyBackHaul uses your device's location to track your progress along this job and to
+              unlock the delivery form when you arrive. Your location stays on your device.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setShowLocationConsent(false);
-                  beginLocationTracking();
+                  app.requestLocation();
                 }}
                 className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
