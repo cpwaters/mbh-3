@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import type { DeliverCapture } from '@mbh/client';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
@@ -24,11 +24,25 @@ import AddVehicle from '../app/AddVehicle';
 import DistributorNavigation from '../app/distributor/Navigation';
 import LoadsList from '../app/distributor/LoadsList';
 import CreateLoad from '../app/distributor/CreateLoad';
+import { FounderBar } from '../app/FounderBar';
+import { isFounder } from '../lib/founder';
 
 function LoadingCard() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">Loading…</div>
+    </div>
+  );
+}
+
+// The signed-in chrome: the role's nav bar plus the matched page. A layout
+// route so the carrier/shipper sign-up pages can render full-screen alongside
+// it (they're siblings, without the app nav).
+function AppLayout({ distributor, loading }: { distributor: boolean; loading: boolean }) {
+  return (
+    <div className="pb-16 lg:pb-0">
+      {distributor ? <DistributorNavigation /> : <Navigation />}
+      {loading ? <LoadingCard /> : <Outlet />}
     </div>
   );
 }
@@ -113,6 +127,7 @@ export default function DriverApp() {
   }
 
   const loading = tenants.loading || jobLoading || listings.loading;
+  const founder = isFounder(auth.session);
 
   return (
     <AppProvider value={app}>
@@ -122,42 +137,41 @@ export default function DriverApp() {
             <Routes>
               <Route path="/login" element={<Login auth={auth} />} />
               <Route path="/signup" element={<SignUp auth={auth} />} />
+              <Route path="/signup/carrier" element={<SignUp auth={auth} role="carrier" />} />
+              <Route path="/signup/shipper" element={<SignUp auth={auth} role="shipper" />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
-          ) : showDistributor ? (
-            <div className="pb-16 lg:pb-0">
-              <DistributorNavigation />
-              {loading ? (
-                <LoadingCard />
-              ) : (
-                <Routes>
-                  <Route path="/" element={<LoadsList />} />
-                  <Route path="/create" element={<CreateLoad />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/profile/edit" element={<EditProfile />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              )}
-            </div>
           ) : (
-            <div className="pb-16 lg:pb-0">
-              <Navigation />
-              {loading ? (
-                <LoadingCard />
-              ) : (
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/active" element={<ActiveJobsPage />} />
-                  <Route path="/map" element={<MapView />} />
-                  <Route path="/driving" element={<DrivingTime />} />
-                  <Route path="/earnings" element={<Earnings />} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="/profile/edit" element={<EditProfile />} />
-                  <Route path="/vehicles/add" element={<AddVehicle />} />
+            <>
+              {founder && <FounderBar />}
+              <Routes>
+                {/* Founder previews (and direct sign-up links): full-screen, no app nav. */}
+                <Route path="/signup/carrier" element={<SignUp auth={auth} role="carrier" />} />
+                <Route path="/signup/shipper" element={<SignUp auth={auth} role="shipper" />} />
+                <Route element={<AppLayout distributor={showDistributor} loading={loading} />}>
+                  {showDistributor ? (
+                    <>
+                      <Route path="/" element={<LoadsList />} />
+                      <Route path="/create" element={<CreateLoad />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/profile/edit" element={<EditProfile />} />
+                    </>
+                  ) : (
+                    <>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/active" element={<ActiveJobsPage />} />
+                      <Route path="/map" element={<MapView />} />
+                      <Route path="/driving" element={<DrivingTime />} />
+                      <Route path="/earnings" element={<Earnings />} />
+                      <Route path="/profile" element={<Profile />} />
+                      <Route path="/profile/edit" element={<EditProfile />} />
+                      <Route path="/vehicles/add" element={<AddVehicle />} />
+                    </>
+                  )}
                   <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              )}
-            </div>
+                </Route>
+              </Routes>
+            </>
           )}
         </div>
       </MemoryRouter>
