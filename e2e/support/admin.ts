@@ -42,6 +42,10 @@ export const E2E = {
   founderUid: 'founder-e2e-user',
   founderEmail: 'nvwebdevelopers@gmail.com',
   founderPassword: 'test-password-ghi',
+  // An active job the founder owns — exercises the founder-only "Complete"
+  // (re-list) button, which returns this load to Available Loads.
+  founderJobId: 'job-founder-e2e',
+  founderLoadId: 'load-founder-e2e',
 } as const;
 
 function app() {
@@ -186,10 +190,43 @@ export async function seedDeliverableJob(): Promise<void> {
     deliverBy: '2026-08-05',
     postedAt: new Date().toISOString(),
   });
+
+  // The founder's active job + its matched load (listing removed on accept), so
+  // the founder-only "Complete" button can re-list it back to available.
+  await db.doc(`loads/${E2E.founderLoadId}`).set({
+    loadId: E2E.founderLoadId,
+    tenantId: 'shipper-e2e',
+    status: 'matched',
+    origin: { line1: '1 Fylde Road', town: 'Preston', postcode: 'PR1 2AB' },
+    destination: { line1: '2 Promenade', town: 'Blackpool', postcode: 'FY1 1AA' },
+    consignment: { description: 'Bagged aggregate', weightKg: 12000, palletCount: 10 },
+    priceGbpPence: 55000,
+    pickupBy: '2026-08-06',
+    deliverBy: '2026-08-07',
+    createdAt: new Date().toISOString(),
+  });
+  await db.doc(`jobs/${E2E.founderJobId}`).set({
+    jobId: E2E.founderJobId,
+    loadId: E2E.founderLoadId,
+    shipperTenantId: 'shipper-e2e',
+    carrierTenantId: E2E.carrierTenantId,
+    driverActorId: E2E.founderUid,
+    status: 'accepted',
+    priceGbpPence: 55000,
+    origin: { line1: '1 Fylde Road', town: 'Preston', postcode: 'PR1 2AB' },
+    destination: { line1: '2 Promenade', town: 'Blackpool', postcode: 'FY1 1AA' },
+    createdAt: new Date().toISOString(),
+  });
 }
 
 export async function getJobStatus(jobId: string): Promise<string | undefined> {
   app();
   const snap = await getFirestore().doc(`jobs/${jobId}`).get();
+  return snap.data()?.status as string | undefined;
+}
+
+export async function getLoadStatus(loadId: string): Promise<string | undefined> {
+  app();
+  const snap = await getFirestore().doc(`loads/${loadId}`).get();
   return snap.data()?.status as string | undefined;
 }
