@@ -34,6 +34,60 @@ const validPod = {
   recipientName: 'J. Smith',
 };
 
+describe('acceptLoad denormalizes collection/delivery company names', () => {
+  it('copies the load posting-details company names onto the job', async () => {
+    const h = await makeHarness();
+    const { loadId } = (await h.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload({
+        postingDetails: {
+          sourceCompanyName: 'Tesco Distribution',
+          destinationCompanyName: 'Asda Leith',
+          sourceContact: { name: 'John', email: 'j@t.co', phone: '1' },
+          destinationContact: { name: 'Sarah', email: 's@a.co', phone: '2' },
+          pickupTime: '09:00',
+          deliveryTime: '17:00',
+          distanceMiles: 200,
+          volumeM3: 40,
+          specialInstructions: '',
+          vehicleSizes: [],
+          vehicleTypes: [],
+          paymentType: { invoiced: true, instantPayment: false },
+        },
+      }),
+      requestId: `post-${Math.random()}`,
+    })) as { loadId: string };
+    const { jobId } = (await h.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId },
+      requestId: `accept-${Math.random()}`,
+    })) as { jobId: string };
+
+    expect(await h.store.getDoc(`jobs/${jobId}`)).toMatchObject({
+      originCompanyName: 'Tesco Distribution',
+      destinationCompanyName: 'Asda Leith',
+    });
+  });
+
+  it('omits the names when the load carried no posting details', async () => {
+    const h = await makeHarness();
+    const { loadId } = (await h.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload(),
+      requestId: `post-${Math.random()}`,
+    })) as { loadId: string };
+    const { jobId } = (await h.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId },
+      requestId: `accept-${Math.random()}`,
+    })) as { jobId: string };
+
+    const job = (await h.store.getDoc(`jobs/${jobId}`)) as Record<string, unknown>;
+    expect(job.originCompanyName).toBeUndefined();
+    expect(job.destinationCompanyName).toBeUndefined();
+  });
+});
+
 describe('job progression: collect -> in transit', () => {
   it('walks accepted -> collected -> in_transit with events', async () => {
     const h = await makeHarness();

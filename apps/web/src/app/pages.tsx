@@ -32,6 +32,15 @@ function fmtAddr(a: { town: string; postcode: string }): string {
   return `${a.town}, ${a.postcode}`;
 }
 
+// Full address (street + town + postcode), skipping any blank part. Shown on
+// the driver's own accepted job — never on the anonymised public browse.
+function fmtFullAddr(a: { line1: string; town: string; postcode: string }): string {
+  return [a.line1, a.town, a.postcode]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 function fmtDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
@@ -220,6 +229,28 @@ export function ActiveJobsPage() {
               destination={fmtAddr(job.destination)}
             />
             <JobCardPayment amount={formatGbp(job.priceGbpPence)} />
+            <JobCardSection>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                    Collection
+                  </div>
+                  {job.originCompanyName && (
+                    <div className="font-semibold text-gray-900">{job.originCompanyName}</div>
+                  )}
+                  <div className="text-sm text-gray-600">{fmtFullAddr(job.origin)}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                    Delivery
+                  </div>
+                  {job.destinationCompanyName && (
+                    <div className="font-semibold text-gray-900">{job.destinationCompanyName}</div>
+                  )}
+                  <div className="text-sm text-gray-600">{fmtFullAddr(job.destination)}</div>
+                </div>
+              </div>
+            </JobCardSection>
             <JobCardSection>
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600">Progress</span>

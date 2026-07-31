@@ -96,6 +96,12 @@ export interface Job {
   // present only if the drain had enriched the load by acceptance time.
   origin: Address;
   destination: Address;
+  // Collection/delivery company names, denormalized from the load's posting
+  // details at acceptance so the driver sees who they're collecting from and
+  // delivering to — without reading the shipper-private load. Absent if the
+  // load carried no posting details.
+  originCompanyName?: string;
+  destinationCompanyName?: string;
   // The carrier's pay for the job, denormalized from the load at acceptance so
   // it is fixed at the price agreed and the driver's earnings read never needs
   // the shipper-private load.

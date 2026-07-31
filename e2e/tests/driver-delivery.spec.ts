@@ -126,6 +126,10 @@ test('the active job is read from Firestore and shows its route', async ({ page 
   // The route shows on both the job card and the delivery card — first is fine.
   await expect(page.getByText('Trafford, M17 1WS').first()).toBeVisible();
   await expect(page.getByText('Leith, EH6 6JJ').first()).toBeVisible();
+  // After accepting, the driver sees the full collection/delivery name + address.
+  await expect(page.getByText('Tesco Distribution')).toBeVisible();
+  await expect(page.getByText('10 Distribution Way, Trafford, M17 1WS')).toBeVisible();
+  await expect(page.getByText('Asda Leith')).toBeVisible();
 });
 
 test('capture refuses to submit without the required proof', async ({ page }) => {
