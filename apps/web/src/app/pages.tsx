@@ -71,6 +71,9 @@ export function Dashboard() {
         onAccepted={app.onAccepted}
         onChanged={app.reloadListings}
         hasActiveJob={app.job !== null}
+        driverLocation={app.location}
+        tracking={app.tracking}
+        onEnableLocation={app.requestLocation}
       />
     );
   }
