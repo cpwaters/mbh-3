@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Package, Weight, Box, AlertCircle } from 'lucide-react';
+import { Package, Weight, Box, AlertCircle, Navigation, MapPin } from 'lucide-react';
 import { formatGbp, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { dispatchAction } from '../lib/dispatch';
+import type { GeoPoint } from '../lib/geocode';
+import { useNearbyListings } from './useNearbyListings';
 import {
   JobCard,
   JobCardRoute,
@@ -23,6 +25,9 @@ export function AvailableLoads({
   onAccepted,
   onChanged,
   hasActiveJob,
+  driverLocation = null,
+  tracking = false,
+  onEnableLocation,
 }: {
   carrierTenantId: string | null;
   listings: Listing[];
@@ -30,10 +35,18 @@ export function AvailableLoads({
   onAccepted: () => void;
   onChanged: () => void;
   hasActiveJob: boolean;
+  // Live driver position — sorts loads by nearest pickup when present.
+  driverLocation?: GeoPoint | null;
+  tracking?: boolean;
+  onEnableLocation?: () => void;
 }) {
   const [expandedLoadId, setExpandedLoadId] = useState<string | null>(null);
   const [acceptingLoadId, setAcceptingLoadId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Rank the browse by proximity to the driver; re-ranks live as they move.
+  const ranked = useNearbyListings(listings, driverLocation);
+  const sortedByLocation = driverLocation !== null;
 
   async function handleAccept(load: Listing): Promise<void> {
     if (carrierTenantId === null) {
@@ -59,8 +72,25 @@ export function AvailableLoads({
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Available Loads</h1>
-        <p className="text-gray-600">Find your next haul</p>
+        <p className="text-gray-600">
+          {sortedByLocation ? 'Sorted by nearest pickup to you' : 'Find your next haul'}
+        </p>
       </div>
+
+      {!tracking && onEnableLocation && listings.length > 0 && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <p className="text-sm text-blue-800 flex-1">
+            Turn on location to sort loads by the nearest pickup to you — the list re-orders as you drive.
+          </p>
+          <button
+            onClick={onEnableLocation}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors whitespace-nowrap"
+          >
+            Enable location
+          </button>
+        </div>
+      )}
 
       {hasActiveJob && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
@@ -88,13 +118,20 @@ export function AvailableLoads({
         </div>
       ) : (
         <div className="grid gap-4">
-          {listings.map((load) => (
+          {ranked.map(({ listing: load, distanceMeters }) => (
             <JobCard key={load.loadId}>
               <JobCardRoute
                 badge={<JobCardStatusBadge status="available" />}
                 origin={`${load.origin.town}, ${load.origin.postcode}`}
                 destination={`${load.destination.town}, ${load.destination.postcode}`}
               />
+
+              {distanceMeters !== null && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-700">
+                  <Navigation className="w-3.5 h-3.5" />
+                  {(distanceMeters / 1000).toFixed(1)} km away
+                </div>
+              )}
 
               <JobCardPayment amount={formatGbp(load.priceGbpPence)} />
 
