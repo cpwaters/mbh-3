@@ -129,6 +129,8 @@ export async function seedDeliverableJob(): Promise<void> {
     priceGbpPence: 68000,
     origin: { line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS' },
     destination: { line1: '5 Harbour Road', town: 'Leith', postcode: 'EH6 6JJ' },
+    originCompanyName: 'Tesco Distribution',
+    destinationCompanyName: 'Asda Leith',
     route: {
       origin: { lat: 53.4673, lng: -2.2915 },
       destination: { lat: 55.9758, lng: -3.1706 },

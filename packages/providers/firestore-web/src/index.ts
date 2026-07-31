@@ -69,6 +69,8 @@ interface JobDoc {
   status: JobStatus;
   origin: Address;
   destination: Address;
+  originCompanyName?: string;
+  destinationCompanyName?: string;
   priceGbpPence: number;
   route?: LoadRoute;
   deliveredAt?: string;
@@ -101,6 +103,10 @@ export class FirestoreReader
           status: data.status,
           origin: data.origin,
           destination: data.destination,
+          ...(data.originCompanyName !== undefined ? { originCompanyName: data.originCompanyName } : {}),
+          ...(data.destinationCompanyName !== undefined
+            ? { destinationCompanyName: data.destinationCompanyName }
+            : {}),
           priceGbpPence: data.priceGbpPence,
           ...(data.route !== undefined ? { route: data.route } : {}),
         };

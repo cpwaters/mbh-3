@@ -76,6 +76,12 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
       // and earnings render without reading the shipper-private load.
       origin: load.origin,
       destination: load.destination,
+      ...(load.postingDetails?.sourceCompanyName
+        ? { originCompanyName: load.postingDetails.sourceCompanyName }
+        : {}),
+      ...(load.postingDetails?.destinationCompanyName
+        ? { destinationCompanyName: load.postingDetails.destinationCompanyName }
+        : {}),
       priceGbpPence: load.priceGbpPence,
       ...(load.route !== undefined ? { route: load.route } : {}),
     };

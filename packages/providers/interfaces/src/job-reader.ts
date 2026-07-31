@@ -10,6 +10,10 @@ export interface DriverJobView {
   status: JobStatus;
   origin: Address;
   destination: Address;
+  // Collection/delivery company names, shown to the driver once they've
+  // accepted. Absent when the load carried no posting details.
+  originCompanyName?: string;
+  destinationCompanyName?: string;
   priceGbpPence: number;
   route?: LoadRoute;
 }
