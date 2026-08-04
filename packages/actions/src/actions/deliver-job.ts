@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { AppError, validateDeliveryEvidence, type JobEvent, type JobEvidence } from '@mbh/domain';
-import { jobDoc, jobEventDoc, jobEvidenceDoc } from '@mbh/paths';
+import { AppError, validateDeliveryEvidence, type JobEvent, type JobEvidence, type OutboxTask } from '@mbh/domain';
+import { jobDoc, jobEventDoc, jobEvidenceDoc, outboxTaskDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { guardJobTransition, loadJobForDriver } from '../job-access.js';
@@ -65,10 +65,25 @@ export const deliverJobHandler: ActionHandler<DeliverJobPayload, DeliverJobResul
       detail: { evidenceId },
     };
 
-    // One batch: evidence + status + event.
+    // Enqueue the invoice email for the drain to send — atomically with the
+    // delivery itself, so the billing trigger can never be lost or fire from
+    // the request path. Third-party calls only ever happen in the drain.
+    const taskId = ctx.newId('task');
+    const task: OutboxTask = {
+      taskId,
+      type: 'sendInvoiceEmail',
+      status: 'pending',
+      tenantId: job.shipperTenantId,
+      jobId: job.jobId,
+      attempts: 0,
+      createdAt: ctx.now,
+    };
+
+    // One batch: evidence + status + event + the invoice task.
     tx.write({ kind: 'create', path: jobEvidenceDoc(job.jobId, evidenceId), data: { ...evidence } });
     tx.write({ kind: 'update', path: jobDoc(job.jobId), data: { status: 'delivered', deliveredAt: ctx.now } });
     tx.write({ kind: 'create', path: jobEventDoc(job.jobId, eventId), data: { ...event } });
+    tx.write({ kind: 'create', path: outboxTaskDoc(taskId), data: { ...task } });
 
     return {
       result: { jobId: job.jobId, evidenceId },

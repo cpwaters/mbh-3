@@ -219,6 +219,24 @@ describe('deliverJob — the atomic legal event', () => {
     expect(events.some((e) => e.data.type === 'job.delivered' && (e.data.detail as { evidenceId?: string })?.evidenceId === result.evidenceId)).toBe(true);
   });
 
+  it('enqueues a sendInvoiceEmail outbox task atomically with the delivery', async () => {
+    const h = await makeHarness();
+    const jobId = await jobInTransit(h);
+
+    await h.run('driver-1', {
+      type: 'deliverJob',
+      payload: { carrierTenantId: 'carrier-1', jobId, ...validPod },
+      requestId: 'r-invoice-task',
+    });
+
+    const tasks = await h.store.query({
+      collection: 'outbox',
+      filters: [{ field: 'type', op: '==', value: 'sendInvoiceEmail' }],
+    });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.data).toMatchObject({ status: 'pending', jobId, tenantId: 'shipper-1', attempts: 0 });
+  });
+
   it('refuses a PoD missing the signature (nothing is written)', async () => {
     const h = await makeHarness();
     const jobId = await jobInTransit(h);
@@ -232,6 +250,13 @@ describe('deliverJob — the atomic legal event', () => {
     );
     expect(err.field).toBe('signatureRef');
     expect(await h.store.getDoc(`jobs/${jobId}`)).toMatchObject({ status: 'in_transit' }); // unchanged
+    // Nothing written means no invoice task either — evidence and billing
+    // are the same atomic batch, not two separate writes that could diverge.
+    const invoiceTasks = await h.store.query({
+      collection: 'outbox',
+      filters: [{ field: 'type', op: '==', value: 'sendInvoiceEmail' }],
+    });
+    expect(invoiceTasks).toHaveLength(0);
   });
 
   it('refuses a PoD with no photos', async () => {

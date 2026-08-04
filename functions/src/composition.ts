@@ -5,8 +5,10 @@ import { randomUUID } from 'node:crypto';
 import { FirestoreDataStore } from '@mbh/provider-firestore';
 import { PostcodesIoGeocoder } from '@mbh/provider-postcodes-io';
 import { OsrmRouteProvider } from '@mbh/provider-osrm';
+import { NodemailerMailer } from '@mbh/provider-nodemailer';
 import { buildRegistry, type DrainDeps, type HttpDispatchDeps } from '@mbh/actions';
 import type { AuthProvider, VerifiedActor } from '@mbh/provider-interfaces';
+import { smtpPassword, smtpUser } from './secrets.js';
 
 // The server composition root: the ONE place the concrete cloud providers are
 // chosen and injected. Everything above depends on interfaces. Built lazily
@@ -54,6 +56,13 @@ let cachedDrain: DrainDeps | null = null;
 // A plain env read (not a defineString param) so the emulator never prompts.
 const osrmBaseUrl = process.env.OSRM_BASE_URL ?? 'https://router.project-osrm.org';
 
+// SMTP connection details — not secret (a host/port/from address, same
+// security model as OSRM_BASE_URL): a plain env var applied via
+// functions/.env at deploy. The user/pass ARE secrets — see secrets.ts.
+const smtpHost = process.env.SMTP_HOST ?? '';
+const smtpPort = Number(process.env.SMTP_PORT ?? '587');
+const smtpFrom = process.env.SMTP_FROM ?? 'invoices@mybackhaul.app';
+
 // The drain's providers: the real HTTP adapters. postcodes.io is keyless.
 export function getDrainDeps(): DrainDeps {
   if (cachedDrain !== null) return cachedDrain;
@@ -62,6 +71,13 @@ export function getDrainDeps(): DrainDeps {
     store: new FirestoreDataStore(getFirestore()),
     geocoder: new PostcodesIoGeocoder(),
     routeProvider: new OsrmRouteProvider({ baseUrl: osrmBaseUrl }),
+    mailer: new NodemailerMailer({
+      from: smtpFrom,
+      host: smtpHost,
+      port: smtpPort,
+      user: smtpUser.value(),
+      pass: smtpPassword.value(),
+    }),
     now: isoNow,
     newId: prefixedId,
   };

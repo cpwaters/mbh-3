@@ -389,10 +389,61 @@ walks the founder through the build + deploy (heavy/costly, so founder-run).
 Verified: composition change loads cleanly (test:functions 4/4), terraform
 validate clean.
 
+## Invoice email on delivery (config + infra-as-code; founder provisions SMTP)
+
+Once deliverJob commits (PoD evidence + delivered status + event), it
+atomically enqueues a `sendInvoiceEmail` outbox task (a second OutboxTaskType
+alongside `enrichLoadRoute` — the same claim/retry/settle drain machinery,
+extended, not duplicated). The drain builds the invoice from the job + both
+tenants' own records — carrier/shipper company names from Tenant.name, the
+recipient email from the shipper tenant owner's (falling back to a
+dispatcher's) own UserProfile.email, the carrier's VAT number from their
+owner's profile if set (best-effort — its absence never fails the invoice) —
+and sends it via a new Mailer provider interface
+(packages/providers/interfaces/src/mailer.ts), implemented by
+`@mbh/provider-nodemailer` (nodemailer over SMTP + pdfkit for the PDF
+attachment; CI runs on the in-memory mock, `InMemoryMailer`). A styled HTML
+email + a matching one-page PDF, both rendered from the same InvoiceData (see
+packages/domain/src/invoice.ts) so they can't drift apart. Records the send as
+an append-only `job.invoiceSent` JobEvent + a system audit entry, same pattern
+as `enrichLoadRoute`.
+
+SMTP auth is a real secret (unlike OSRM_BASE_URL): Secret Manager, via
+infrastructure/environments/production/smtp.tf, bound onto the drain
+function's config (`secrets: [...]`) and read only inside the handler, never
+at module load. FOUNDER ACTION NEEDED: this only creates the secret
+containers —
+1. Provision an SMTP mailbox for outbound invoices (any provider works; the
+   integration is plain SMTP, not vendor-specific).
+2. `cd infrastructure/environments/production && terraform apply
+   -var="smtp_user=..." -var="smtp_password=..."` (plus the existing
+   billing_account/alert_email vars) — never paste these into chat or a
+   commit.
+3. Set the GitHub Actions repo VARIABLES `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`
+   (non-secret connection details — same pattern as OSRM_BASE_URL) so CI
+   writes them into functions/.env at deploy.
+
+Until then the drain's `sendInvoiceEmail` tasks fail permanently on the
+first real SMTP attempt (no host configured) — everything else (evidence,
+delivery status, the job event trail) is unaffected; billing is additive, not
+load-bearing for the delivery flow.
+
+Verified: 192 unit tests green (drain claim/retry/failure paths, invoice
+HTML/PDF rendering, NodemailerMailer with an injected fake transport — no
+real SMTP call in CI), `pnpm seed`'s walking skeleton now runs deliverJob ->
+a second drain pass -> a captured invoice end-to-end against the in-memory
+mock. Could NOT run `terraform fmt`/`validate` (no terraform binary in this
+sandbox) — the founder should run both before applying.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
   OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
+- Founder: provision an SMTP mailbox, `terraform apply` the SMTP secrets
+  (infrastructure/environments/production/smtp.tf), and set the
+  SMTP_HOST/SMTP_PORT/SMTP_FROM repo variables — see "Invoice email on
+  delivery" above. Until then, invoice emails fail permanently (harmlessly —
+  delivery itself is unaffected).
 
 ## Known deferred items
 
