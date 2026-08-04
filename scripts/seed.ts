@@ -9,6 +9,7 @@ import { formatGbp } from '@mbh/domain';
 import {
   InMemoryDataStore,
   InMemoryGeocoder,
+  InMemoryMailer,
   InMemoryRouteProvider,
   MockAuthProvider,
 } from '@mbh/provider-mocks';
@@ -35,6 +36,8 @@ async function main(): Promise<void> {
     { kind: 'create', path: 'tenants/carrier-1', data: { tenantId: 'carrier-1', name: 'Waters Haulage', capabilities: ['carrier'] } },
     { kind: 'create', path: 'tenants/shipper-1/members/ship-owner', data: { tenantId: 'shipper-1', actorId: 'ship-owner', role: 'owner', status: 'active', displayName: 'Acme Owner' } },
     { kind: 'create', path: 'tenants/carrier-1/members/driver-1', data: { tenantId: 'carrier-1', actorId: 'driver-1', role: 'driver', status: 'active', displayName: 'Chris Waters' } },
+    // The invoice email address is read from the shipper owner's own profile.
+    { kind: 'create', path: 'userProfiles/ship-owner', data: { actorId: 'ship-owner', email: 'billing@acme-distribution.test' } },
   ]);
   auth.grant('ship-owner-token', 'ship-owner');
   auth.grant('driver-token', 'driver-1');
@@ -58,6 +61,7 @@ async function main(): Promise<void> {
   // postLoad enqueued an outbound enrichment task. The scheduled drain would
   // process it in production; here we run one pass with in-memory providers to
   // prove the outbound leg (geocode -> route -> recorded as a system action).
+  const mailer = new InMemoryMailer();
   const drainSummary = await runDrainOnce({
     store,
     geocoder: new InMemoryGeocoder({
@@ -65,6 +69,7 @@ async function main(): Promise<void> {
       'EH6 6JJ': { lat: 55.9758, lng: -3.1706 },
     }),
     routeProvider: new InMemoryRouteProvider(),
+    mailer,
     now: () => new Date().toISOString(),
     newId: deps.newId, // shared counter -> no audit id collision
   });
@@ -106,6 +111,17 @@ async function main(): Promise<void> {
     },
   })) as { jobId: string; evidenceId: string };
 
+  // deliverJob enqueued the billing task; a second drain pass sends it (the
+  // same scheduled drain in production, run once more one minute later).
+  const invoiceDrainSummary = await runDrainOnce({
+    store,
+    geocoder: new InMemoryGeocoder(),
+    routeProvider: new InMemoryRouteProvider(),
+    mailer,
+    now: () => new Date().toISOString(),
+    newId: deps.newId,
+  });
+
   const load = await store.getDoc(`loads/${posted.loadId}`);
   const job = await store.getDoc(`jobs/${accepted.jobId}`);
   const events = await store.query({ collection: `jobs/${accepted.jobId}/events` });
@@ -133,6 +149,10 @@ async function main(): Promise<void> {
   console.log(`  proof of delivery: ${String(evidence?.recipientName)} signed (${delivered.evidenceId})`);
   console.log(`  audit entries: ${audit.map((a) => String(a.data.action)).join(', ')}`);
   console.log(`  idempotent replay returned the original job (${replay.jobId})`);
+  const invoice = mailer.sent[0];
+  console.log(
+    `  invoice: ${invoice ? `${invoice.invoiceNumber} → ${invoice.recipientEmail} (${formatGbp(invoice.totalGbpPence)})` : 'none'} [${invoiceDrainSummary.invoiced} invoiced]`
+  );
 }
 
 main().catch((err) => {

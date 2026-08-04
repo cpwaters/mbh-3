@@ -2,6 +2,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as logger from 'firebase-functions/logger';
 import { runDrainOnce } from '@mbh/actions';
 import { getDrainDeps } from './composition.js';
+import { smtpPassword, smtpUser } from './secrets.js';
 
 // The scheduled drain: the ONLY place third-party delivery happens (never in a
 // user request). Every minute it walks pending outbound work, claims each item
@@ -16,6 +17,8 @@ export const drain = onSchedule(
     // One run at a time: a run that overshoots a minute must not overlap the
     // next. The claim CAS already makes concurrency safe; this keeps it simple.
     maxInstances: 1,
+    // SMTP auth for the invoice email — see composition.ts's getDrainDeps.
+    secrets: [smtpUser, smtpPassword],
   },
   async () => {
     const summary = await runDrainOnce(getDrainDeps());

@@ -7,3 +7,4 @@ export * from './mock-profile-reader.js';
 export * from './mock-carrier-readers.js';
 export * from './in-memory-geocoder.js';
 export * from './in-memory-route-provider.js';
+export * from './in-memory-mailer.js';

@@ -9,3 +9,4 @@ export * from './user-profile.js';
 export * from './tenant.js';
 export * from './errors.js';
 export * from './evidence.js';
+export * from './invoice.js';
