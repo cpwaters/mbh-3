@@ -13,7 +13,14 @@ export interface DeviceLocationView {
   requestLocation: () => void;
 }
 
-const POLL_MS = 60_000;
+// A compromise between battery life and freshness: a native maps app tracks
+// continuously with sensor fusion (accelerometer/gyroscope dead-reckoning
+// between GPS fixes), which the browser Geolocation API can't do — the best
+// we can offer is a fresh fix often enough that a moving vehicle doesn't
+// visibly outrun the last one. 60s (the original interval) meant the pin
+// could lag up to a minute of travel behind reality; this trades some of
+// the battery saving back for much less staleness.
+const POLL_MS = 15_000;
 
 // A GPS fix is typically accurate to single-digit/low-tens of metres. A
 // reading this coarse is the device falling back to WiFi/cell-tower
@@ -37,9 +44,10 @@ export function useDeviceLocation(): DeviceLocationView {
   const hasLocationRef = useRef(false);
   const coarseStreakRef = useRef(0);
 
-  // A fresh fix once a minute, not a continuous watch — the GPS radio isn't
-  // kept running between samples (a real battery win on a multi-hour job),
-  // and maximumAge: 0 means each sample is a live read, not a cached one.
+  // A fresh fix every POLL_MS, not a continuous watch — the GPS radio isn't
+  // kept running between samples (still a battery win over watchPosition on
+  // a multi-hour job, just a smaller one now), and maximumAge: 0 means each
+  // sample is a live read, not a cached one.
   const poll = useCallback(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -70,10 +78,12 @@ export function useDeviceLocation(): DeviceLocationView {
           return;
         }
         // A transient failure (no fix yet, timeout) — keep polling, the next
-        // minute's attempt may succeed.
+        // attempt may succeed.
         setError('Could not get your location. Check location permissions and try again.');
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }
+      // A shorter timeout than POLL_MS so a slow fix can't still be pending
+      // when the next poll fires — no overlapping/out-of-order requests.
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
     );
   }, []);
 
@@ -84,7 +94,7 @@ export function useDeviceLocation(): DeviceLocationView {
       return;
     }
     setError(null);
-    poll(); // an immediate first fix, then once a minute
+    poll(); // an immediate first fix, then every POLL_MS
     pollIdRef.current = window.setInterval(poll, POLL_MS);
   }, [poll]);
 
