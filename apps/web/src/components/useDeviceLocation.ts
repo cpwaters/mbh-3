@@ -19,14 +19,23 @@ const POLL_MS = 60_000;
 // reading this coarse is the device falling back to WiFi/cell-tower
 // positioning (common right after a cold GPS start, or briefly indoors/under
 // cover at a loading bay) — accurate as a position, just not for THIS device's
-// location. Reject it rather than jump the pin to a wrong spot.
+// location.
 const MAX_ACCURACY_METERS = 100;
+
+// A driver must always have SOME position to track against — never leave the
+// map blank. So a coarse fix is only held back while we already have a
+// decent one AND haven't been stuck for too long; the very first fix ever,
+// and anything after a couple of misses in a row, is accepted regardless of
+// accuracy rather than risk showing nothing.
+const MAX_CONSECUTIVE_COARSE_FIXES = 2;
 
 export function useDeviceLocation(): DeviceLocationView {
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollIdRef = useRef<number | null>(null);
+  const hasLocationRef = useRef(false);
+  const coarseStreakRef = useRef(0);
 
   // A fresh fix once a minute, not a continuous watch — the GPS radio isn't
   // kept running between samples (a real battery win on a multi-hour job),
@@ -34,11 +43,16 @@ export function useDeviceLocation(): DeviceLocationView {
   const poll = useCallback(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        if (position.coords.accuracy > MAX_ACCURACY_METERS) {
-          // Keep showing the last good fix (or none yet) — honest silence,
-          // not a wrong pin. The next minute's poll is likely a real GPS lock.
+        const isCoarse = position.coords.accuracy > MAX_ACCURACY_METERS;
+        if (isCoarse && hasLocationRef.current && coarseStreakRef.current < MAX_CONSECUTIVE_COARSE_FIXES) {
+          // Already have a decent fix and this one's a probable WiFi/cell
+          // fallback — wait rather than jump to a worse position, but only
+          // for a couple of misses; see MAX_CONSECUTIVE_COARSE_FIXES.
+          coarseStreakRef.current += 1;
           return;
         }
+        coarseStreakRef.current = 0;
+        hasLocationRef.current = true;
         setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
         setTracking(true);
         setError(null);
