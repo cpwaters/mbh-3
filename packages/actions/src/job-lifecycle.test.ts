@@ -128,6 +128,63 @@ describe('job progression: collect -> in transit', () => {
   });
 });
 
+describe('recordRoutePoint — breadcrumbs the laden journey', () => {
+  const point = { carrierTenantId: 'carrier-1', location: { lat: 53.4673, lng: -2.2915 } };
+
+  it('appends a job.routePoint event once the job is collected', async () => {
+    const h = await makeHarness();
+    const { jobId } = await acceptedJob(h);
+    await h.run('driver-1', { type: 'collectJob', payload: { carrierTenantId: 'carrier-1', jobId }, requestId: 'r-collect' });
+
+    const result = await h.run('driver-1', {
+      type: 'recordRoutePoint',
+      payload: { ...point, jobId },
+      requestId: 'r-point-1',
+    });
+    expect(result).toMatchObject({ jobId });
+
+    const event = await h.store.getDoc(`jobs/${jobId}/events/${(result as { eventId: string }).eventId}`);
+    expect(event).toMatchObject({ type: 'job.routePoint', detail: point.location });
+  });
+
+  it('refuses a point before the job has been collected', async () => {
+    const h = await makeHarness();
+    const { jobId } = await acceptedJob(h);
+    await expectAppError(
+      h.run('driver-1', { type: 'recordRoutePoint', payload: { ...point, jobId }, requestId: 'r-early' }),
+      'conflict'
+    );
+  });
+
+  it("refuses a driver recording a point on someone else's job", async () => {
+    const h = await makeHarness();
+    const { jobId } = await acceptedJob(h);
+    await h.run('driver-1', { type: 'collectJob', payload: { carrierTenantId: 'carrier-1', jobId }, requestId: 'r-collect-2' });
+    await expectAppError(
+      h.run('driver-2', { type: 'recordRoutePoint', payload: { ...point, jobId }, requestId: 'r-other-point' }),
+      'forbidden'
+    );
+  });
+
+  it('replaying the same requestId returns the original event, not a duplicate', async () => {
+    const h = await makeHarness();
+    const { jobId } = await acceptedJob(h);
+    await h.run('driver-1', { type: 'collectJob', payload: { carrierTenantId: 'carrier-1', jobId }, requestId: 'r-collect-3' });
+
+    const first = await h.run('driver-1', {
+      type: 'recordRoutePoint',
+      payload: { ...point, jobId },
+      requestId: 'r-idempotent',
+    });
+    const replay = await h.run('driver-1', {
+      type: 'recordRoutePoint',
+      payload: { ...point, jobId },
+      requestId: 'r-idempotent',
+    });
+    expect(replay).toEqual(first);
+  });
+});
+
 describe('deliverJob — the atomic legal event', () => {
   async function jobInTransit(h: Harness): Promise<string> {
     const { jobId } = await acceptedJob(h);
