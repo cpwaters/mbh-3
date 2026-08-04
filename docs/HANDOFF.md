@@ -408,48 +408,66 @@ packages/domain/src/invoice.ts) so they can't drift apart. Records the send as
 an append-only `job.invoiceSent` JobEvent + a system audit entry, same pattern
 as `enrichLoadRoute`.
 
-SMTP auth is a real secret (unlike OSRM_BASE_URL): Secret Manager, via
-infrastructure/environments/production/smtp.tf, read only inside the drain
-handler, never at module load.
+SMTP auth is read as a plain env var (functions/.env, written at deploy from
+a GitHub Actions repository SECRET — encrypted, never committed, never in
+chat), the same delivery mechanism as the non-secret SMTP_HOST/PORT/FROM,
+just via the `secrets.` context instead of `vars.`. This is a deliberate
+stopgap, not the intended end state — see the incident below for why.
 
-**INCIDENT (self-inflicted, caught same-day):** the first version of this
-change declared `secrets: [smtpUser, smtpPassword]` on the drain function's
-config. Firebase resolves a function's declared secrets against Secret
-Manager AT DEPLOY TIME — since neither the secrets nor the Secret Manager
-API existed yet, this failed the deploy with `Secret Manager API has not
-been used in project mybackhaul-app...`, and because functions/hosting/
-firestore deploy as one command, NOTHING deployed (hosting and firestore
-rules included) until fixed. Two changes: (1) `drain.ts` no longer declares
-`secrets: [...]` — re-add it once the founder confirms the secrets exist
-(step 3 below); (2) `NodemailerMailer` takes `user`/`pass` as getters
-(`() => smtpUser.value()`), not plain values, so `.value()` (which itself
-throws on an unbound secret) is deferred to an actual send attempt — caught
-by the existing sendInvoice try/catch — instead of running unconditionally
-in `getDrainDeps()` on every drain tick.
+**INCIDENT (self-inflicted, caught same-day, two rounds):**
 
-FOUNDER ACTION NEEDED — this only creates the secret containers, nothing
-sends real email yet:
-1. Enable the Secret Manager API on the `mybackhaul-app` GCP project (the
-   deploy failure above links directly to the console page to do this).
-2. Provision an SMTP mailbox for outbound invoices (any provider works; the
-   integration is plain SMTP, not vendor-specific), then
-   `cd infrastructure/environments/production && terraform apply
-   -var="smtp_user=..." -var="smtp_password=..."` (plus the existing
-   billing_account/alert_email vars) — never paste these into chat or a
-   commit.
+*Round 1:* the first version of this change used firebase-functions'
+`defineSecret()` + declared `secrets: [smtpUser, smtpPassword]` on the drain
+function's config. Firebase resolves a function's declared secrets against
+Secret Manager AT DEPLOY TIME — since neither the secrets nor the Secret
+Manager API existed yet on the project, the deploy failed outright with
+`Secret Manager API has not been used in project mybackhaul-app...`, and
+because functions/hosting/firestore deploy as one command, NOTHING deployed
+(hosting and firestore rules included) until fixed.
+
+*Round 1's fix, and why it wasn't enough:* removed `secrets: [...]` from the
+function config, expecting that to stop Firebase from checking Secret
+Manager. It didn't — the deploy failed with the EXACT SAME error. Turns out
+firebase-functions' parameterized-config system resolves EVERY `defineSecret()`
+call found anywhere in the deployed bundle during deploy analysis,
+independent of whether any specific function's `secrets: [...]` references
+it — merely calling `defineSecret('SMTP_USER')` in a module that gets
+bundled in is enough to trigger the Secret Manager lookup for the whole
+deploy.
+
+*Round 2's fix (current state):* stopped calling `defineSecret()` at all —
+deleted functions/src/secrets.ts, and composition.ts now reads
+`process.env.SMTP_USER`/`SMTP_PASSWORD` directly, exactly like
+SMTP_HOST/PORT/FROM already do, sourced from a GitHub Actions repository
+SECRET (`.github/workflows/ci.yml`) rather than Secret Manager. The intended
+Secret-Manager-backed path is still real infrastructure
+(infrastructure/environments/production/smtp.tf) — it's just not wired up
+to the code right now, and applying or not applying it has no effect on
+deploys either way (see the comment at the top of that file).
+
+FOUNDER ACTION NEEDED — nothing sends real email yet:
+1. Provision an SMTP mailbox for outbound invoices (any provider works; the
+   integration is plain SMTP, not vendor-specific).
+2. Set two GitHub Actions repository SECRETS (Settings → Secrets and
+   variables → Actions → Secrets, NOT Variables): `SMTP_USER`,
+   `SMTP_PASSWORD` — never paste these into chat or a commit.
 3. Set the GitHub Actions repo VARIABLES `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`
-   (non-secret connection details — same pattern as OSRM_BASE_URL) so CI
-   writes them into functions/.env at deploy.
-4. Re-add `secrets: [smtpUser, smtpPassword]` to the `onSchedule` config in
-   functions/src/drain.ts (see the comment there) and confirm a deploy
-   succeeds before relying on invoices actually sending.
+   (non-secret connection details — same pattern as OSRM_BASE_URL).
+4. Confirm the next deploy succeeds and an invoice actually sends (check the
+   drain's logs / the job's `job.invoiceSent` event).
+5. Optional, later: migrate to real Secret Manager — enable the Secret
+   Manager API, `terraform apply` smtp.tf, then reintroduce
+   `defineSecret()`/`secrets: [...]` in a dedicated, deploy-tested change
+   (not assumed to work from reading the docs, given this incident).
 
-Until step 4, the drain's `sendInvoiceEmail` tasks fail cleanly (the secret
-getter throws when the send is attempted, caught and retried/settled like
-any other Mailer failure) — everything else (evidence, delivery status, the
-job event trail) is unaffected; billing is additive, not load-bearing for
-the delivery flow, and — critically, after this incident — deploying it
-being unconfigured no longer blocks deploying anything else either.
+Until step 4, `SMTP_USER`/`SMTP_PASSWORD` are empty strings, so the drain's
+`sendInvoiceEmail` tasks fail cleanly (the SMTP connection attempt fails
+inside sendInvoice's existing try/catch, wrapped as a recoverable
+MailerError, retried a few times then permanently failed — no different
+from any other Mailer failure) — everything else (evidence, delivery
+status, the job event trail) is unaffected; billing is additive, not
+load-bearing for the delivery flow, and — critically, after this incident —
+it being unconfigured no longer blocks deploying anything else either.
 
 Verified: 194 unit tests green (drain claim/retry/failure paths, invoice
 HTML/PDF rendering, NodemailerMailer with an injected fake transport — no
@@ -464,11 +482,12 @@ founder should run both before applying.
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
   OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
-- Founder: provision an SMTP mailbox, `terraform apply` the SMTP secrets
-  (infrastructure/environments/production/smtp.tf), and set the
-  SMTP_HOST/SMTP_PORT/SMTP_FROM repo variables — see "Invoice email on
-  delivery" above. Until then, invoice emails fail permanently (harmlessly —
-  delivery itself is unaffected).
+- Founder: provision an SMTP mailbox, set the SMTP_USER/SMTP_PASSWORD repo
+  SECRETS and the SMTP_HOST/SMTP_PORT/SMTP_FROM repo VARIABLES — see
+  "Invoice email on delivery" above. Until then, invoice emails fail
+  permanently (harmlessly — delivery itself is unaffected). Migrating to
+  real Secret Manager (infrastructure/environments/production/smtp.tf) is
+  optional, later work, not blocking.
 
 ## Known deferred items
 

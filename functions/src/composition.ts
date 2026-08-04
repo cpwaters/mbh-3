@@ -8,7 +8,6 @@ import { OsrmRouteProvider } from '@mbh/provider-osrm';
 import { NodemailerMailer } from '@mbh/provider-nodemailer';
 import { buildRegistry, type DrainDeps, type HttpDispatchDeps } from '@mbh/actions';
 import type { AuthProvider, VerifiedActor } from '@mbh/provider-interfaces';
-import { smtpPassword, smtpUser } from './secrets.js';
 
 // The server composition root: the ONE place the concrete cloud providers are
 // chosen and injected. Everything above depends on interfaces. Built lazily
@@ -56,12 +55,25 @@ let cachedDrain: DrainDeps | null = null;
 // A plain env read (not a defineString param) so the emulator never prompts.
 const osrmBaseUrl = process.env.OSRM_BASE_URL ?? 'https://router.project-osrm.org';
 
-// SMTP connection details — not secret (a host/port/from address, same
-// security model as OSRM_BASE_URL): a plain env var applied via
-// functions/.env at deploy. The user/pass ARE secrets — see secrets.ts.
+// SMTP connection details. Host/port/from are plain env vars (not secret),
+// same as OSRM_BASE_URL. User/pass are genuinely secret — TEMPORARILY also a
+// plain env var (functions/.env, written from a GitHub Actions repository
+// SECRET at deploy — encrypted at rest, never committed, never in chat) —
+// NOT firebase-functions' defineSecret()/Secret Manager. That's deliberate:
+// this project tried Secret Manager first, but ANY defineSecret() call
+// anywhere in the bundle makes `firebase deploy` resolve it against Secret
+// Manager during analysis, for every function, regardless of whether a
+// function's own `secrets: [...]` references it — so a not-yet-provisioned
+// secret broke the ENTIRE deploy (functions+hosting+firestore are one
+// command), twice, before this was found. See docs/HANDOFF.md's "Invoice
+// email on delivery" section for the incident and the real Secret-Manager
+// migration this env-var path is a stopgap for (infrastructure/environments/
+// production/smtp.tf already has that path ready, just not wired up yet).
 const smtpHost = process.env.SMTP_HOST ?? '';
 const smtpPort = Number(process.env.SMTP_PORT ?? '587');
 const smtpFrom = process.env.SMTP_FROM ?? 'invoices@mybackhaul.app';
+const smtpUserEnv = process.env.SMTP_USER ?? '';
+const smtpPasswordEnv = process.env.SMTP_PASSWORD ?? '';
 
 // The drain's providers: the real HTTP adapters. postcodes.io is keyless.
 export function getDrainDeps(): DrainDeps {
@@ -75,14 +87,8 @@ export function getDrainDeps(): DrainDeps {
       from: smtpFrom,
       host: smtpHost,
       port: smtpPort,
-      // Lazy: .value() throws if the secret isn't provisioned/bound yet —
-      // deferred to the first actual send attempt (see NodemailerMailer),
-      // so a not-yet-provisioned secret fails one outbox task, not the
-      // whole drain tick (and, before that, not the deploy itself — see
-      // drain.ts, which doesn't declare these in `secrets: [...]` until
-      // the founder has provisioned them).
-      user: () => smtpUser.value(),
-      pass: () => smtpPassword.value(),
+      user: () => smtpUserEnv,
+      pass: () => smtpPasswordEnv,
     }),
     now: isoNow,
     newId: prefixedId,

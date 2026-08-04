@@ -9,16 +9,14 @@ import { getDrainDeps } from './composition.js';
 // outcome as a system-sourced action in the same transaction as its evidence.
 // It is a thin adapter — the fully-tested logic is runDrainOnce in @mbh/actions.
 //
-// NOT YET declaring `secrets: [smtpUser, smtpPassword]` (see composition.ts +
-// secrets.ts) here: Firebase resolves a function's declared secrets against
-// Secret Manager AT DEPLOY TIME, so declaring a secret that doesn't exist yet
-// fails the deploy outright — not just for this function, for the whole
-// deploy (functions/hosting/firestore are one deploy command). Re-add this
-// once the founder has provisioned the secrets (see HANDOFF.md's "Invoice
-// email on delivery" section) and confirmed a deploy succeeds with it. Until
-// then, sendInvoiceEmail outbox tasks fail cleanly (NodemailerMailer's lazy
-// secret resolution throws only on an actual send attempt, caught by the
-// drain's existing retry/settle path) — nothing else is affected.
+// SMTP auth (for the invoice email — see composition.ts) is read as a plain
+// env var, NOT firebase-functions' defineSecret()/Secret Manager — see the
+// comment on composition.ts's smtpUserEnv for why: merely calling
+// defineSecret() anywhere in the bundle makes deploy resolve it against
+// Secret Manager for every function, so a not-yet-provisioned secret broke
+// the entire deploy (functions+hosting+firestore, one command) even after
+// removing it from this function's own `secrets: [...]`. Migrating to real
+// Secret Manager is tracked in docs/HANDOFF.md.
 export const drain = onSchedule(
   {
     region: 'europe-west2',
