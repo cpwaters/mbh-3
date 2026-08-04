@@ -60,6 +60,9 @@ composition root.
 - pnpm lint — eslint (layer boundaries are errors)
 - pnpm test — vitest, Firebase-free, mocks only; includes the DataStore
   contract suite against InMemoryDataStore
+- pnpm test:web — vitest + Testing Library, jsdom; component-level tests for
+  the React islands in apps/web (separate project: different runtime from
+  the Firebase-free packages/** suite)
 - pnpm seed — walking skeleton (domain + store + atomic CAS claim)
 - Later (as layers land): test:rules, test:contract, test:e2e, smoke:prod,
   docs:shots

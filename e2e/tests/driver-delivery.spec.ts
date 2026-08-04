@@ -279,6 +279,110 @@ test('the founder completes a job, returning its load to Available Loads', async
   await expect.poll(() => getLoadStatus(E2E.founderLoadId), { timeout: 15_000 }).toBe('available');
 });
 
+test('the map offers to share location, and "Not Now" dismisses it', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
+  await page.getByRole('button', { name: 'View Route' }).click();
+  await expect(page.getByRole('heading', { name: 'Route Map' })).toBeVisible();
+
+  await expect(page.getByRole('button', { name: 'Start Navigation' })).toBeVisible();
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.getByRole('button', { name: 'Start Navigation' }).click(),
+  ]);
+  await popup.close();
+  await expect(page.getByText('Share your location?')).toBeVisible();
+  await page.getByRole('button', { name: 'Not Now' }).click();
+  await expect(page.getByText('Share your location?')).toHaveCount(0);
+});
+
+test('the map skips the location prompt once permission is already granted', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
+  await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
+  await page.getByRole('button', { name: 'View Route' }).click();
+  // Tracking already resumed from the granted permission, so the button
+  // shows "Open Navigation" straight away and the consent modal never opens.
+  await expect(page.getByRole('button', { name: 'Open Navigation' })).toBeVisible();
+
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.getByRole('button', { name: 'Open Navigation' }).click(),
+  ]);
+  await popup.close();
+  await expect(page.getByText('Share your location?')).toHaveCount(0);
+});
+
+// Seeds a queue item directly in IndexedDB the way SyncQueue.drain() leaves one
+// after a permanent failure, so the "Needs attention" UI (pages.tsx) can be
+// exercised without needing a real failure to occur first. recordRoutePoint on
+// the driver's own in-transit job is a legitimate, idempotent replay, so "Try
+// again" can genuinely succeed against the emulator, not just flip state.
+async function seedFailedQueueItem(page: Page, requestId: string, jobId: string): Promise<void> {
+  await page.evaluate(
+    async ({ requestId, jobId }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open('mbh-offline', 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains('queue')) {
+            req.result.createObjectStore('queue', { keyPath: 'requestId' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('queue', 'readwrite');
+        tx.objectStore('queue').put({
+          requestId,
+          type: 'recordRoutePoint',
+          payload: { carrierTenantId: 'carrier-e2e', jobId, location: { lat: 55.9758, lng: -3.1706 } },
+          status: 'failed',
+          attempts: 1,
+          enqueuedAt: new Date().toISOString(),
+          lastError: 'Simulated failure for e2e',
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    },
+    { requestId, jobId }
+  );
+}
+
+test('a failed offline record can be discarded', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await seedFailedQueueItem(page, 'e2e-failed-discard', E2E.jobId);
+  // The queue's React state is only read from storage on mount/interval; a
+  // reload picks up the item just written directly to IndexedDB.
+  await page.reload();
+  await goToActiveJobs(page);
+
+  await expect(page.getByText('Waiting to send')).toBeVisible();
+  await expect(page.getByText('Needs attention')).toBeVisible();
+  await expect(page.getByText('Simulated failure for e2e')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Discard' }).click();
+  await expect(page.getByText('Needs attention')).toHaveCount(0);
+});
+
+test('a failed offline record can be retried and delivered', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await seedFailedQueueItem(page, 'e2e-failed-retry', E2E.jobId);
+  // The queue's React state is only read from storage on mount/interval; a
+  // reload picks up the item just written directly to IndexedDB.
+  await page.reload();
+  await goToActiveJobs(page);
+
+  await expect(page.getByText('Needs attention')).toBeVisible();
+  await page.getByRole('button', { name: 'Try again' }).click();
+
+  // A genuinely valid replay succeeds against the emulator, so the item
+  // clears from the queue entirely rather than reappearing as failed.
+  await expect(page.getByText('Waiting to send')).toHaveCount(0, { timeout: 15_000 });
+});
+
 // Runs LAST — it delivers the seeded job (terminal), so it must not precede the
 // tests that need the job still active.
 test('the 30-second moment closes the loop to Firestore', async ({ page }) => {

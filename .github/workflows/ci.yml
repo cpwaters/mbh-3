@@ -32,6 +32,7 @@ jobs:
       - run: pnpm check:web
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:web
       - run: pnpm test:rules
       - run: pnpm test:contract
       - run: pnpm test:functions
