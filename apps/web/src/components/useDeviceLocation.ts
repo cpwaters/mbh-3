@@ -15,6 +15,13 @@ export interface DeviceLocationView {
 
 const POLL_MS = 60_000;
 
+// A GPS fix is typically accurate to single-digit/low-tens of metres. A
+// reading this coarse is the device falling back to WiFi/cell-tower
+// positioning (common right after a cold GPS start, or briefly indoors/under
+// cover at a loading bay) — accurate as a position, just not for THIS device's
+// location. Reject it rather than jump the pin to a wrong spot.
+const MAX_ACCURACY_METERS = 100;
+
 export function useDeviceLocation(): DeviceLocationView {
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [tracking, setTracking] = useState(false);
@@ -27,6 +34,11 @@ export function useDeviceLocation(): DeviceLocationView {
   const poll = useCallback(() => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        if (position.coords.accuracy > MAX_ACCURACY_METERS) {
+          // Keep showing the last good fix (or none yet) — honest silence,
+          // not a wrong pin. The next minute's poll is likely a real GPS lock.
+          return;
+        }
         setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
         setTracking(true);
         setError(null);
