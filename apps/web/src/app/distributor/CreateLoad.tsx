@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapPin, Box, Building, Truck, CreditCard, PoundSterling } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { dispatchAction } from '../../lib/dispatch';
+import LiveLocationMap from '../LiveLocationMap';
+import { geocodePostcode, type GeoPoint } from '../../lib/geocode';
+import { getDrivingDistanceMiles, getDrivingRoute } from '../../lib/routing';
 
 const INPUT = 'block w-full px-3 py-2 border border-gray-300 rounded-lg';
 
@@ -31,6 +34,60 @@ export default function CreateLoad() {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [originPin, setOriginPin] = useState<GeoPoint | null>(null);
+  const [destinationPin, setDestinationPin] = useState<GeoPoint | null>(null);
+  const [routeGeometry, setRouteGeometry] = useState<GeoPoint[] | null>(null);
+  const [estimating, setEstimating] = useState(false);
+
+  // Live route preview + an auto-estimated mileage, once both postcodes look
+  // complete — debounced so it doesn't hit postcodes.io/OSRM on every
+  // keystroke. Replaces asking the shipper to type a distance from memory;
+  // the map updates as soon as they finish typing either postcode (this is
+  // the fix for "the map view was not updated when adding a new load" — there
+  // was no map here at all before).
+  useEffect(() => {
+    const originPc = f.source_postcode.trim();
+    const destPc = f.destination_postcode.trim();
+    if (originPc.length < 5 || destPc.length < 5) {
+      setOriginPin(null);
+      setDestinationPin(null);
+      setRouteGeometry(null);
+      setEstimating(false);
+      return;
+    }
+
+    let cancelled = false;
+    setEstimating(true);
+    const timer = window.setTimeout(() => {
+      geocodePostcode(originPc).then((o) => {
+        if (cancelled) return;
+        setOriginPin(o);
+        geocodePostcode(destPc).then((d) => {
+          if (cancelled) return;
+          setDestinationPin(d);
+          if (o === null || d === null) {
+            setRouteGeometry(null);
+            setEstimating(false);
+            return;
+          }
+          Promise.all([getDrivingRoute(o, d), getDrivingDistanceMiles(o, d)]).then(([geometry, miles]) => {
+            if (cancelled) return;
+            setRouteGeometry(geometry);
+            if (miles !== null) {
+              setF((prev) => ({ ...prev, distance: String(Math.round(miles)) }));
+            }
+            setEstimating(false);
+          });
+        });
+      });
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [f.source_postcode, f.destination_postcode]);
 
   const set = (k: keyof Form) => (e: { target: { value: string } }) => {
     setF((prev) => ({ ...prev, [k]: e.target.value }));
@@ -194,6 +251,28 @@ export default function CreateLoad() {
           </div>
         </div>
 
+        {(originPin !== null || destinationPin !== null || estimating) && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <MapPin className="w-5 h-5" />
+              Route preview
+            </h2>
+            <div className="h-72 rounded-lg overflow-hidden border border-gray-200">
+              {originPin !== null || destinationPin !== null ? (
+                <LiveLocationMap
+                  origin={originPin !== null ? { ...originPin, label: 'Collection' } : undefined}
+                  destination={destinationPin !== null ? { ...destinationPin, label: 'Delivery' } : undefined}
+                  routeGeometry={routeGeometry ?? undefined}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-gray-50 text-gray-500 text-sm">
+                  Looking up postcodes…
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Box className="w-5 h-5" />
@@ -245,7 +324,16 @@ export default function CreateLoad() {
               </div>
             </div>
           </div>
-          <div className="mt-4">{text('distance', 'Distance (miles)', false, 'number', '208')}</div>
+          <div className="mt-4">
+            {text('distance', 'Distance (miles)', false, 'number', '208')}
+            <p className="mt-1 text-xs text-gray-500">
+              {estimating
+                ? 'Estimating driving distance…'
+                : f.distance
+                  ? 'Estimated automatically from a driving route — adjust if needed.'
+                  : 'Fills in automatically once both postcodes are entered.'}
+            </p>
+          </div>
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">Special Instructions</label>
             <textarea

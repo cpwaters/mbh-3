@@ -13,7 +13,11 @@ export interface ShipperLoad {
   loadId: string;
   origin: string; // "city, postcode"
   destination: string;
-  distanceMiles: number;
+  // The drain's authoritative driving distance (Load.route), converted to
+  // miles. Null until the drain has enriched the load (never the shipper's
+  // typed create-load estimate — that number is honest-labelled and kept
+  // separate; see distributor/CreateLoad.tsx).
+  distanceMiles: number | null;
   weightKg: number;
   palletCount: number;
   priceGbpPence: number;

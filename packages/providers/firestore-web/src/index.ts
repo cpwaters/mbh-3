@@ -19,6 +19,7 @@ import {
   type Listing,
   type Load,
   type LoadRoute,
+  metersToMiles,
   type Role,
   type TenantCapability,
   type UserProfile,
@@ -168,7 +169,9 @@ export class FirestoreReader
         loadId: load.loadId,
         origin: `${load.origin.town}, ${load.origin.postcode}`,
         destination: `${load.destination.town}, ${load.destination.postcode}`,
-        distanceMiles: load.postingDetails?.distanceMiles ?? 0,
+        // The drain's driving route, not the shipper's create-load estimate
+        // (postingDetails.distanceMiles) — null until it's enriched.
+        distanceMiles: load.route !== undefined ? Math.round(metersToMiles(load.route.distanceMeters)) : null,
         weightKg: load.consignment.weightKg,
         palletCount: load.consignment.palletCount,
         priceGbpPence: load.priceGbpPence,
