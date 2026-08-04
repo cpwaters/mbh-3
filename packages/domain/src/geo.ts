@@ -23,6 +23,12 @@ export interface LoadRoute {
   enrichedAt: string; // ISO-8601 UTC
 }
 
+const METRES_PER_MILE = 1609.344;
+
+export function metersToMiles(meters: number): number {
+  return meters / METRES_PER_MILE;
+}
+
 const MAX_ABS_LAT = 90;
 const MAX_ABS_LNG = 180;
 

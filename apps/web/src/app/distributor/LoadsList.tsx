@@ -151,7 +151,9 @@ export default function LoadsList() {
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <div className="text-xs text-gray-500">Distance</div>
-                  <div className="font-medium text-gray-900">{load.distanceMiles} miles</div>
+                  <div className="font-medium text-gray-900">
+                    {load.distanceMiles !== null ? `${load.distanceMiles} miles` : 'Calculating…'}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Weight className="w-4 h-4 text-gray-500" />
