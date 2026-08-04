@@ -53,4 +53,38 @@ describe('NodemailerMailer', () => {
     expect(new MailerError('x').recoverable).toBe(true);
     expect(new MailerError('x', false).recoverable).toBe(false);
   });
+
+  it('a throwing credential getter (e.g. an unbound Firebase secret) fails the send cleanly, not the constructor', () => {
+    // Regression test: NodemailerMailerOptions.user/pass are getters
+    // specifically so a not-yet-provisioned secret's .value() throw is
+    // deferred to send time. Constructing the mailer must never throw —
+    // getDrainDeps() builds one every drain tick regardless of whether
+    // there's an invoice to send.
+    expect(
+      () =>
+        new NodemailerMailer({
+          from: 'billing@mybackhaul.app',
+          host: 'smtp.example.test',
+          port: 587,
+          user: () => {
+            throw new Error('Secret SMTP_USER is not available — bind it to the function first');
+          },
+          pass: () => 'unused',
+        })
+    ).not.toThrow();
+  });
+
+  it('and that same throwing getter rejects sendInvoice as a MailerError instead of crashing', async () => {
+    const mailer = new NodemailerMailer({
+      from: 'billing@mybackhaul.app',
+      host: 'smtp.example.test',
+      port: 587,
+      user: () => {
+        throw new Error('Secret SMTP_USER is not available — bind it to the function first');
+      },
+      pass: () => 'unused',
+    });
+
+    await expect(mailer.sendInvoice(invoice)).rejects.toMatchObject({ name: 'MailerError' });
+  });
 });

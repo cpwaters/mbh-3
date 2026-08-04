@@ -75,8 +75,14 @@ export function getDrainDeps(): DrainDeps {
       from: smtpFrom,
       host: smtpHost,
       port: smtpPort,
-      user: smtpUser.value(),
-      pass: smtpPassword.value(),
+      // Lazy: .value() throws if the secret isn't provisioned/bound yet —
+      // deferred to the first actual send attempt (see NodemailerMailer),
+      // so a not-yet-provisioned secret fails one outbox task, not the
+      // whole drain tick (and, before that, not the deploy itself — see
+      // drain.ts, which doesn't declare these in `secrets: [...]` until
+      // the founder has provisioned them).
+      user: () => smtpUser.value(),
+      pass: () => smtpPassword.value(),
     }),
     now: isoNow,
     newId: prefixedId,
