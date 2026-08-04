@@ -27,8 +27,12 @@ export interface NodemailerMailerOptions {
   // SMTP connection details — only needed when `transport` isn't injected.
   host?: string;
   port?: number;
-  user?: string;
-  pass?: string;
+  // A getter, not a plain value: lets the caller defer resolving a secret
+  // (e.g. Firebase's defineSecret().value(), which throws if the secret
+  // isn't provisioned/bound) until a send is actually attempted, rather
+  // than at construction time — see composition.ts.
+  user?: () => string;
+  pass?: () => string;
 }
 
 // The ONLY place SMTP is spoken. Builds the invoice's HTML body + PDF
@@ -36,18 +40,30 @@ export interface NodemailerMailerOptions {
 // happens from the scheduled drain (never a user request) — see drain.ts.
 export class NodemailerMailer implements Mailer {
   private readonly from: string;
-  private readonly transport: MailTransport;
+  private readonly options: NodemailerMailerOptions;
+  private transport: MailTransport | null;
 
   constructor(options: NodemailerMailerOptions) {
     this.from = options.from;
-    this.transport =
-      options.transport ??
-      (nodemailer.createTransport({
-        host: options.host,
-        port: options.port,
-        secure: options.port === 465,
-        auth: options.user !== undefined ? { user: options.user, pass: options.pass } : undefined,
-      }) as unknown as MailTransport);
+    this.options = options;
+    this.transport = options.transport ?? null;
+  }
+
+  // Built lazily, on the first send — not the constructor — so a
+  // not-yet-provisioned secret (or disabled Secret Manager API) only ever
+  // fails an actual send attempt, which the drain already retries/settles
+  // gracefully, rather than breaking every drain tick regardless of whether
+  // there's an invoice to send.
+  private getTransport(): MailTransport {
+    if (this.transport !== null) return this.transport;
+    const { host, port, user, pass } = this.options;
+    this.transport = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: user !== undefined ? { user: user(), pass: pass?.() } : undefined,
+    }) as unknown as MailTransport;
+    return this.transport;
   }
 
   async sendInvoice(invoice: InvoiceData): Promise<void> {
@@ -61,7 +77,8 @@ export class NodemailerMailer implements Mailer {
     }
 
     try {
-      await this.transport.sendMail({
+      const transport = this.getTransport();
+      await transport.sendMail({
         from: this.from,
         to: invoice.recipientEmail,
         subject: `Invoice ${invoice.invoiceNumber} from ${invoice.carrierCompanyName}`,
