@@ -8,12 +8,15 @@ import 'leaflet/dist/leaflet.css';
 
 // Ported from the mbh-2 prototype (client/src/components/LiveLocationMap.tsx).
 // Vite doesn't resolve Leaflet's default marker icon URLs, so point them at the
-// bundled assets directly.
+// bundled assets directly. Astro's asset pipeline returns imported images as
+// {src, width, height, format} metadata, not a plain URL string (mbh-2's plain
+// Vite setup returned a string, which is why this was missed on the port) —
+// Leaflet needs the string, or it renders a broken "[object Object]" src.
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
+  iconRetinaUrl: markerIcon2x.src,
+  iconUrl: markerIcon.src,
+  shadowUrl: markerShadow.src,
 });
 
 function coloredDotIcon(color: string) {
