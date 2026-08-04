@@ -8,19 +8,22 @@ export interface DeviceLocationView {
   location: GeoPoint | null;
   tracking: boolean;
   error: string | null;
-  // Ask for location permission (if not already tracking) and start polling.
+  // Ask for location permission (if not already tracking) and start watching.
   // Wired to the Active Job "View Route" button and the map's consent modal.
   requestLocation: () => void;
 }
 
-// A compromise between battery life and freshness: a native maps app tracks
-// continuously with sensor fusion (accelerometer/gyroscope dead-reckoning
-// between GPS fixes), which the browser Geolocation API can't do — the best
-// we can offer is a fresh fix often enough that a moving vehicle doesn't
-// visibly outrun the last one. 60s (the original interval) meant the pin
-// could lag up to a minute of travel behind reality; this trades some of
-// the battery saving back for much less staleness.
-const POLL_MS = 15_000;
+// Continuous tracking: a fix every time the device's GPS chip reports one
+// (typically every 1-5s while moving), not a fixed-interval poll — the
+// closest a browser can get to how a native maps app tracks. Note what this
+// can't do: a native app also fuses accelerometer/gyroscope dead-reckoning
+// between GPS fixes for a smoothly-updating position, which the browser
+// Geolocation API has no access to — and no software layer changes what the
+// device's GPS chip itself can resolve to (commonly 5-20m under open sky,
+// worse under a vehicle roof or between buildings). This is the ceiling of
+// what's achievable from a web app; watchPosition is that ceiling.
+// Costs real battery — the GPS radio runs continuously for the length of a
+// job, a deliberate trade accepted in favour of freshness/accuracy.
 
 // A GPS fix is typically accurate to single-digit/low-tens of metres. A
 // reading this coarse is the device falling back to WiFi/cell-tower
@@ -40,16 +43,18 @@ export function useDeviceLocation(): DeviceLocationView {
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pollIdRef = useRef<number | null>(null);
+  const watchIdRef = useRef<number | null>(null);
   const hasLocationRef = useRef(false);
   const coarseStreakRef = useRef(0);
 
-  // A fresh fix every POLL_MS, not a continuous watch — the GPS radio isn't
-  // kept running between samples (still a battery win over watchPosition on
-  // a multi-hour job, just a smaller one now), and maximumAge: 0 means each
-  // sample is a live read, not a cached one.
-  const poll = useCallback(() => {
-    navigator.geolocation.getCurrentPosition(
+  const start = useCallback(() => {
+    if (watchIdRef.current !== null) return; // already watching
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setError('Location tracking is not supported on this device.');
+      return;
+    }
+    setError(null);
+    const id = navigator.geolocation.watchPosition(
       (position) => {
         const isCoarse = position.coords.accuracy > MAX_ACCURACY_METERS;
         if (isCoarse && hasLocationRef.current && coarseStreakRef.current < MAX_CONSECUTIVE_COARSE_FIXES) {
@@ -71,36 +76,24 @@ export function useDeviceLocation(): DeviceLocationView {
             'Location access was denied. Enable location for this site in your browser/device settings to track your delivery.'
           );
           setTracking(false);
-          if (pollIdRef.current !== null) {
-            window.clearInterval(pollIdRef.current);
-            pollIdRef.current = null;
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
           }
           return;
         }
-        // A transient failure (no fix yet, timeout) — keep polling, the next
-        // attempt may succeed.
+        // A transient failure (no fix yet, timeout) — the watch stays open,
+        // the next update from the GPS chip may succeed.
         setError('Could not get your location. Check location permissions and try again.');
       },
-      // A shorter timeout than POLL_MS so a slow fix can't still be pending
-      // when the next poll fires — no overlapping/out-of-order requests.
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10_000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 }
     );
+    watchIdRef.current = id;
   }, []);
-
-  const start = useCallback(() => {
-    if (pollIdRef.current !== null) return; // already polling
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError('Location tracking is not supported on this device.');
-      return;
-    }
-    setError(null);
-    poll(); // an immediate first fix, then every POLL_MS
-    pollIdRef.current = window.setInterval(poll, POLL_MS);
-  }, [poll]);
 
   const requestLocation = useCallback(() => start(), [start]);
 
-  // If the user has already granted geolocation permission, resume polling on
+  // If the user has already granted geolocation permission, resume tracking on
   // load without re-prompting — so progress keeps working across reloads.
   useEffect(() => {
     let cancelled = false;
@@ -119,12 +112,12 @@ export function useDeviceLocation(): DeviceLocationView {
     };
   }, [start]);
 
-  // Stop polling when the app unmounts.
+  // Release the watch when the app unmounts.
   useEffect(() => {
     return () => {
-      if (pollIdRef.current !== null) {
-        window.clearInterval(pollIdRef.current);
-        pollIdRef.current = null;
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
       }
     };
   }, []);
