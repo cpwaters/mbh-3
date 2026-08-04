@@ -83,6 +83,7 @@ export function Dashboard() {
         driverLocation={app.location}
         tracking={app.tracking}
         onEnableLocation={app.requestLocation}
+        locationError={app.locationError}
       />
     );
   }

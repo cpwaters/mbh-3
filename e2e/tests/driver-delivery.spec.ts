@@ -31,6 +31,34 @@ async function arriveAtDestination(page: Page, latitude: number, longitude: numb
   await page.context().grantPermissions(['geolocation']);
   await page.context().setGeolocation({ latitude, longitude });
 }
+
+// Simulate a device where the driver has denied location access. Playwright's
+// default (ungranted) permission state is "prompt", not "denied" — a real
+// watchPosition() call just hangs forever under automation, since there's no
+// UI for headless Chromium to click "Block" on. So the only way to actually
+// reach the app's PERMISSION_DENIED path is to stub the API to behave the way
+// a real denial does.
+async function denyGeolocation(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.navigator.geolocation.watchPosition = (_success, error) => {
+      if (error) {
+        setTimeout(
+          () =>
+            error({
+              code: 1,
+              message: 'User denied Geolocation',
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+            } as GeolocationPositionError),
+          0
+        );
+      }
+      return 1;
+    };
+    window.navigator.geolocation.clearWatch = () => {};
+  });
+}
 // job-e2e (Trafford → Leith) and the browse job (Avonmouth → Cardiff) destinations.
 const LEITH = { latitude: 55.9758, longitude: -3.1706 };
 const CARDIFF = { latitude: 51.4816, longitude: -3.1791 };
@@ -95,6 +123,17 @@ test('a user in multiple tenants switches which they act as', async ({ page }) =
   await switcher.selectOption(E2E.carrierTenantId);
   await expect(page.getByRole('heading', { name: 'All Loads' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+});
+
+test('Available Loads explains why "Enable location" failed, instead of doing nothing', async ({ page }) => {
+  // Runs before the next test accepts the seeded browse load, so
+  // listings.length > 0 and the banner (and its "Enable location" button)
+  // actually renders.
+  await denyGeolocation(page);
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+  await page.getByRole('button', { name: 'Enable location' }).click();
+  await expect(page.getByText(/Location access was denied/)).toBeVisible();
 });
 
 test('a carrier browses available loads and accepts one', async ({ page }) => {

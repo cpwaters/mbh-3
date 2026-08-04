@@ -13,3 +13,5 @@ export type { AcceptLoadPayload, AcceptLoadResult } from './actions/accept-load.
 export { collectJobHandler, startTransitHandler } from './actions/progress-job.js';
 export { deliverJobHandler } from './actions/deliver-job.js';
 export type { DeliverJobPayload, DeliverJobResult } from './actions/deliver-job.js';
+export { recordRoutePointHandler } from './actions/record-route-point.js';
+export type { RecordRoutePointPayload, RecordRoutePointResult } from './actions/record-route-point.js';

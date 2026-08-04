@@ -128,15 +128,13 @@ export default function MapView() {
                   {app.progress === null && (
                     <div className="text-xs text-gray-400">Enable location for live progress</div>
                   )}
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Status</div>
-                  <div className="text-lg font-semibold text-gray-900 capitalize">{job.status.replace('_', ' ')}</div>
-                </div>
-                <div className="pt-4 border-t">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                     <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
                   </div>
+                </div>
+                <div className="pt-4 border-t">
+                  <div className="text-sm text-gray-500">Status</div>
+                  <div className="text-lg font-semibold text-gray-900 capitalize">{job.status.replace('_', ' ')}</div>
                 </div>
               </div>
 

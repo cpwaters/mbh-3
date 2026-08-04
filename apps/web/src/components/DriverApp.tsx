@@ -9,6 +9,7 @@ import { useListings } from './useListings';
 import { useDeviceLocation } from './useDeviceLocation';
 import { useJobEndpoints } from './useJobEndpoints';
 import { useJobProgressSync } from './useJobProgressSync';
+import { useRouteTracking } from './useRouteTracking';
 import { haversineMeters, journeyProgress } from '../lib/progress';
 import Login from '../app/Login';
 import SignUp from '../app/SignUp';
@@ -86,6 +87,10 @@ export default function DriverApp() {
   // GPS progress advances the real job status (accepted → collected →
   // in_transit) so a delivery is a legal transition when it's recorded.
   useJobProgressSync(job, progress, auth.getIdToken, reloadJob);
+
+  // Breadcrumbs the full laden route at ~1-mile intervals, through the same
+  // offline queue a delivery capture uses.
+  useRouteTracking(job, device.location, queue.enqueue);
 
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);

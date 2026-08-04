@@ -28,6 +28,7 @@ export function AvailableLoads({
   driverLocation = null,
   tracking = false,
   onEnableLocation,
+  locationError = null,
 }: {
   carrierTenantId: string | null;
   listings: Listing[];
@@ -39,6 +40,9 @@ export function AvailableLoads({
   driverLocation?: GeoPoint | null;
   tracking?: boolean;
   onEnableLocation?: () => void;
+  // Why "Enable location" didn't work (permission denied, no GPS, etc.) —
+  // without this the button looks broken with no explanation when it fails.
+  locationError?: string | null;
 }) {
   const [expandedLoadId, setExpandedLoadId] = useState<string | null>(null);
   const [acceptingLoadId, setAcceptingLoadId] = useState<string | null>(null);
@@ -89,6 +93,13 @@ export function AvailableLoads({
           >
             Enable location
           </button>
+        </div>
+      )}
+
+      {!tracking && locationError && (
+        <div className="mb-6 flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{locationError}</span>
         </div>
       )}
 
