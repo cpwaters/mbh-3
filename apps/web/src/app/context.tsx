@@ -4,6 +4,7 @@ import type { Listing } from '@mbh/domain';
 import type { DriverJobView, Membership } from '@mbh/provider-interfaces';
 import type { AuthView } from '../components/useAuth';
 import type { QueueView } from '../components/useSyncQueue';
+import type { DrivingTimersView } from '../components/useDrivingTimers';
 import type { GeoPoint } from '../lib/geocode';
 
 // The shared app state, resolved once in the shell and read by every page.
@@ -30,6 +31,10 @@ export interface AppData {
   requestLocation: () => void;
   progress: number | null;
   distanceRemainingMeters: number | null;
+  // The HGV driving-hours/break countdown timers — owned once here so they
+  // keep running and their state survives navigating away from the Driving
+  // Time page and back.
+  drivingTimers: DrivingTimersView;
 }
 
 const Ctx = createContext<AppData | null>(null);

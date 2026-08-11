@@ -194,6 +194,33 @@ test('the active job is read from Firestore and shows its route', async ({ page 
   await expect(page.getByText('Asda Leith')).toBeVisible();
 });
 
+test('driving-time timers keep running when navigating away and back', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await page.getByRole('link', { name: 'Driving Time' }).click();
+  await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+
+  const firstCard = page.locator('.bg-white.rounded-lg.shadow-md.p-6.border').first();
+  await expect(firstCard.getByRole('button', { name: 'Start' })).toBeVisible();
+  await firstCard.getByRole('button', { name: 'Start' }).click();
+  await expect(firstCard.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await page.waitForTimeout(1500); // let it tick at least once before navigating away
+
+  // Navigate away — this page's component unmounts (React Router), so the
+  // countdown must be owned above the page, not in local component state,
+  // or it would reset to the default on remount.
+  await goToActiveJobs(page);
+  await page.waitForTimeout(2000);
+  await page.getByRole('link', { name: 'Driving Time' }).click();
+  await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+
+  const firstCardAfter = page.locator('.bg-white.rounded-lg.shadow-md.p-6.border').first();
+  // Still running (not reset to a fresh "Start"), and the displayed time is
+  // not back at the untouched default — it kept counting down in the
+  // background while the page was unmounted.
+  await expect(firstCardAfter.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(firstCardAfter.locator('.text-5xl')).not.toHaveText('04:30:00');
+});
+
 test('capture refuses to submit without the required proof', async ({ page }) => {
   await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
