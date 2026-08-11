@@ -67,6 +67,51 @@ describe('runDrainOnce — enrichLoadRoute', () => {
     expect(audits[0]?.data).toMatchObject({ action: 'enrichLoadRoute', actorId: 'system', loadId: 'load-1' });
   });
 
+  it('backfills the route onto a job accepted before enrichment finished (the accept-vs-drain race)', async () => {
+    const harness = await makeHarness();
+    await seedLoad(harness);
+
+    // Accept immediately — before the drain has had a chance to run. This is
+    // exactly the reported bug: acceptLoad only denormalizes load.route onto
+    // the job if the load was ALREADY enriched by acceptance time, and
+    // nothing else ever revisits the job — so without this backfill, a job
+    // accepted inside the drain's ~1-minute window never shows a route.
+    const { jobId } = (await harness.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId: 'load-1' },
+      requestId: 'r-accept-race',
+    })) as { jobId: string };
+    expect(await harness.store.getDoc(`jobs/${jobId}`).then((j) => j?.route)).toBeUndefined();
+
+    const summary = await runDrainOnce(drainDeps(harness));
+    expect(summary).toMatchObject({ enriched: 1 });
+
+    const job = await harness.store.getDoc(`jobs/${jobId}`);
+    expect(job?.route).toMatchObject({ origin: TRAFFORD, destination: LEITH });
+    expect((job?.route as { distanceMeters: number }).distanceMeters).toBeGreaterThan(0);
+  });
+
+  it('leaves an already-routed job alone (does not clobber it on a later re-enrichment)', async () => {
+    const harness = await makeHarness();
+    await seedLoad(harness);
+    await runDrainOnce(drainDeps(harness)); // enriches the load before acceptance this time
+
+    const { jobId } = (await harness.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId: 'load-1' },
+      requestId: 'r-accept-normal',
+    })) as { jobId: string };
+    const jobBefore = await harness.store.getDoc(`jobs/${jobId}`);
+    expect(jobBefore?.route).toBeDefined(); // denormalized at acceptance, as normal
+
+    // Nothing left pending, so this run is a no-op — the job's route is
+    // untouched (not that this scenario currently re-triggers enrichment,
+    // but the backfill's own guard is the thing under test here).
+    await runDrainOnce(drainDeps(harness));
+    const jobAfter = await harness.store.getDoc(`jobs/${jobId}`);
+    expect(jobAfter?.route).toEqual(jobBefore?.route);
+  });
+
   it('is a no-op once the task is done (nothing left pending)', async () => {
     const harness = await makeHarness();
     await seedLoad(harness);
