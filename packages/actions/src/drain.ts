@@ -16,6 +16,7 @@ import {
   auditDoc,
   jobDoc,
   jobEventDoc,
+  jobsCollection,
   listingDoc,
   loadDoc,
   membersCollection,
@@ -192,6 +193,20 @@ async function recordEnrichment(
         path: listingDoc(loadId),
         data: { route: { distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds } },
       });
+    }
+    // acceptLoad only denormalizes the route onto the Job if the load was
+    // ALREADY enriched by acceptance time — a carrier accepting within the
+    // same ~1-minute window as the drain's next run would otherwise get a
+    // job that never shows a route on the map, since nothing else ever
+    // revisits it. Backfill it here too, so the map always catches up once
+    // enrichment lands, regardless of how the two raced.
+    const jobs = await tx.query({
+      collection: jobsCollection(),
+      filters: [{ field: 'loadId', op: '==', value: loadId }],
+    });
+    for (const jobRow of jobs) {
+      if (jobRow.data.route !== undefined) continue; // already has one
+      tx.write({ kind: 'update', path: jobRow.path, data: { route: { ...route } } });
     }
     tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
     tx.write(
