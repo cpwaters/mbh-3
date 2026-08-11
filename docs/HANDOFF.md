@@ -445,29 +445,36 @@ Secret-Manager-backed path is still real infrastructure
 to the code right now, and applying or not applying it has no effect on
 deploys either way (see the comment at the top of that file).
 
-FOUNDER ACTION NEEDED — nothing sends real email yet:
-1. Provision an SMTP mailbox for outbound invoices (any provider works; the
-   integration is plain SMTP, not vendor-specific).
-2. Set two GitHub Actions repository SECRETS (Settings → Secrets and
-   variables → Actions → Secrets, NOT Variables): `SMTP_USER`,
-   `SMTP_PASSWORD` — never paste these into chat or a commit.
-3. Set the GitHub Actions repo VARIABLES `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`
-   (non-secret connection details — same pattern as OSRM_BASE_URL).
-4. Confirm the next deploy succeeds and an invoice actually sends (check the
-   drain's logs / the job's `job.invoiceSent` event).
+Founder action so far:
+1. ~~Provision an SMTP mailbox for outbound invoices~~ — done: a Microsoft
+   365 mailbox (Authenticated SMTP enabled on the mailbox; confirm tenant
+   Conditional Access/Security Defaults isn't still blocking basic auth if
+   sends start failing with `535 5.7.139`).
+2. ~~Set the SMTP_USER/SMTP_PASSWORD repo SECRETS~~ — done
+   (Settings → Secrets and variables → Actions → Secrets).
+3. ~~Set the SMTP_HOST/SMTP_PORT/SMTP_FROM repo VARIABLES~~ — done
+   (same page, Variables tab).
+4. **Pending verification**: confirm the next deploy's `.env`-write step
+   actually picks these up (its own step name, e.g. `if [ -n "${{ vars.
+   SMTP_HOST }}" ]`, reveals — non-secretly — whether the value resolved
+   non-empty) and that a real send-test-invoice-email from the founder
+   toolbar actually lands in the mailbox, not just marks its outbox task
+   `done`. `firebase functions:log` scoped to `drain` in the Firebase console
+   is the fastest way to see the SMTP failure/success itself.
 5. Optional, later: migrate to real Secret Manager — enable the Secret
    Manager API, `terraform apply` smtp.tf, then reintroduce
    `defineSecret()`/`secrets: [...]` in a dedicated, deploy-tested change
-   (not assumed to work from reading the docs, given this incident).
+   (not assumed to work from reading the docs, given the incident below).
 
-Until step 4, `SMTP_USER`/`SMTP_PASSWORD` are empty strings, so the drain's
-`sendInvoiceEmail` tasks fail cleanly (the SMTP connection attempt fails
-inside sendInvoice's existing try/catch, wrapped as a recoverable
-MailerError, retried a few times then permanently failed — no different
-from any other Mailer failure) — everything else (evidence, delivery
-status, the job event trail) is unaffected; billing is additive, not
-load-bearing for the delivery flow, and — critically, after this incident —
-it being unconfigured no longer blocks deploying anything else either.
+Before step 1-3, `SMTP_USER`/`SMTP_PASSWORD` were empty strings, so the
+drain's `sendInvoiceEmail`/`sendTestInvoiceEmail` tasks failed cleanly (the
+SMTP connection attempt fails inside sendInvoice's existing try/catch,
+wrapped as a recoverable MailerError, retried a few times then permanently
+failed — no different from any other Mailer failure) — everything else
+(evidence, delivery status, the job event trail) was unaffected; billing is
+additive, not load-bearing for the delivery flow, and — critically, after
+this incident — it being unconfigured never blocked deploying anything else
+either.
 
 Verified: 194 unit tests green (drain claim/retry/failure paths, invoice
 HTML/PDF rendering, NodemailerMailer with an injected fake transport — no
@@ -482,12 +489,12 @@ founder should run both before applying.
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
   OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
-- Founder: provision an SMTP mailbox, set the SMTP_USER/SMTP_PASSWORD repo
-  SECRETS and the SMTP_HOST/SMTP_PORT/SMTP_FROM repo VARIABLES — see
-  "Invoice email on delivery" above. Until then, invoice emails fail
-  permanently (harmlessly — delivery itself is unaffected). Migrating to
-  real Secret Manager (infrastructure/environments/production/smtp.tf) is
-  optional, later work, not blocking.
+- SMTP secrets/variables are now set (Microsoft 365 mailbox) — next deploy
+  needs to confirm they actually land a real email (see "Invoice email on
+  delivery" step 4 above); watch for the M365 basic-auth-disabled failure
+  mode specifically if it doesn't. Migrating to real Secret Manager
+  (infrastructure/environments/production/smtp.tf) is optional, later work,
+  not blocking.
 
 ## Known deferred items
 
