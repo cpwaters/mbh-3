@@ -20,6 +20,7 @@ export interface OutboxTask {
   loadId?: string; // enrichLoadRoute: the load this task enriches
   jobId?: string; // sendInvoiceEmail: the job this task invoices
   recipientEmail?: string; // sendTestInvoiceEmail: where to send the test (the requester's own profile email, captured at enqueue time)
+  actorId?: string; // sendTestInvoiceEmail: who requested it — the ONLY outbox task type a client may ever read back (its own), so the founder toolbar can show whether the send actually succeeded instead of a permanent "Queued" with no outcome
   attempts: number;
   createdAt: string;
   claimedAt?: string;

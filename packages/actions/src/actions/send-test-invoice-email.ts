@@ -52,6 +52,7 @@ export const sendTestInvoiceEmailHandler: ActionHandler<
       status: 'pending',
       tenantId: payload.tenantId,
       recipientEmail,
+      actorId: ctx.actorId,
       attempts: 0,
       createdAt: ctx.now,
     };
