@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { InvoiceData } from '@mbh/domain';
-import { type Mailer, MailerError } from '@mbh/provider-interfaces';
+import { type MailAttachment, type Mailer, MailerError } from '@mbh/provider-interfaces';
 import { invoiceHtml, invoiceText } from './invoice-html.js';
 import { invoicePdfBuffer } from './invoice-pdf.js';
 
@@ -66,7 +66,7 @@ export class NodemailerMailer implements Mailer {
     return this.transport;
   }
 
-  async sendInvoice(invoice: InvoiceData): Promise<void> {
+  async sendInvoice(invoice: InvoiceData, attachments: MailAttachment[] = []): Promise<void> {
     let pdf: Buffer;
     try {
       pdf = await invoicePdfBuffer(invoice);
@@ -90,6 +90,7 @@ export class NodemailerMailer implements Mailer {
             content: pdf,
             contentType: 'application/pdf',
           },
+          ...attachments,
         ],
       });
     } catch (cause) {

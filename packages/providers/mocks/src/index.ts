@@ -8,3 +8,5 @@ export * from './mock-carrier-readers.js';
 export * from './in-memory-geocoder.js';
 export * from './in-memory-route-provider.js';
 export * from './in-memory-mailer.js';
+export * from './in-memory-object-storage.js';
+export * from './in-memory-blob-store.js';
