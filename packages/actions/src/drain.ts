@@ -105,9 +105,9 @@ async function reclaimStale(deps: DrainDeps): Promise<number> {
 type ProcessOutcome = 'enriched' | 'invoiced' | 'retried' | 'failed' | 'skipped';
 
 function processTask(deps: DrainDeps, taskPath: string, type: OutboxTaskType): Promise<ProcessOutcome> {
-  return type === 'sendInvoiceEmail'
-    ? processSendInvoiceEmail(deps, taskPath)
-    : processEnrichLoadRoute(deps, taskPath);
+  if (type === 'sendInvoiceEmail') return processSendInvoiceEmail(deps, taskPath);
+  if (type === 'sendTestInvoiceEmail') return processSendTestInvoiceEmail(deps, taskPath);
+  return processEnrichLoadRoute(deps, taskPath);
 }
 
 async function processEnrichLoadRoute(deps: DrainDeps, taskPath: string): Promise<ProcessOutcome> {
@@ -266,6 +266,79 @@ async function processSendInvoiceEmail(deps: DrainDeps, taskPath: string): Promi
   }
 }
 
+// Debug tool: sends synthetic invoice content to the requesting actor's own
+// profile email (captured on the task at enqueue time by
+// sendTestInvoiceEmailHandler — never a client-supplied address at drain
+// time either). Proves the SMTP config + HTML/PDF rendering pipeline end to
+// end without a real delivered job. No JobEvent — there's no job to append
+// one to — just the system audit entry.
+async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): Promise<ProcessOutcome> {
+  const claim = await deps.store.runTransaction(async (tx) => {
+    const task = (await tx.get(taskPath)) as (OutboxTask & Record<string, unknown>) | null;
+    if (task === null || task.status !== 'pending') return null; // lost the race
+    tx.write({
+      kind: 'update',
+      path: taskPath,
+      data: { status: 'claimed', claimedAt: deps.now(), attempts: task.attempts + 1 },
+    });
+    return { task };
+  });
+
+  if (claim === null) return 'skipped';
+  const attempts = claim.task.attempts + 1;
+
+  const recipientEmail = claim.task.recipientEmail as string | undefined;
+  if (recipientEmail === undefined || recipientEmail === '') {
+    await settle(deps, taskPath, 'failed', 'no recipient email on the task');
+    return 'failed';
+  }
+
+  const now = deps.now();
+  const invoice: InvoiceData = {
+    invoiceNumber: `TEST-${deps.newId('test').toUpperCase()}`,
+    issuedAt: now,
+    dueAt: invoiceDueDate(now),
+    jobId: 'TEST',
+    carrierCompanyName: 'Test Carrier Ltd',
+    shipperCompanyName: 'Test Shipper Ltd',
+    recipientEmail,
+    lineItems: [{ description: 'Test invoice — MyBackHaul SMTP configuration check', amountGbpPence: 100 }],
+    totalGbpPence: 100,
+  };
+
+  try {
+    await deps.mailer.sendInvoice(invoice);
+    await recordTestInvoiceSent(deps, taskPath, invoice);
+    return 'invoiced';
+  } catch (error) {
+    const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
+    const message = error instanceof Error ? error.message : String(error);
+    if (recoverable && attempts < MAX_OUTBOX_ATTEMPTS) {
+      await settle(deps, taskPath, 'pending', message); // retried next run
+      return 'retried';
+    }
+    await settle(deps, taskPath, 'failed', message);
+    return 'failed';
+  }
+}
+
+// Record the outcome as a system-sourced action: the task done and a
+// source:'system' audit entry, in ONE transaction. No JobEvent — this isn't
+// tied to a real Job.
+async function recordTestInvoiceSent(deps: DrainDeps, taskPath: string, invoice: InvoiceData): Promise<void> {
+  await deps.store.runTransaction(async (tx) => {
+    const task = await tx.get(taskPath);
+    if (task === null || task.status !== 'claimed') return; // already settled elsewhere
+    tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
+    tx.write(
+      systemAuditOp(deps, 'sendTestInvoiceEmail', {
+        invoiceNumber: invoice.invoiceNumber,
+        recipientEmail: invoice.recipientEmail,
+      })
+    );
+  });
+}
+
 // The tenant's owner (falling back to a dispatcher) — invoicing and billing
 // are company-level concerns, so this reads whoever is positioned to speak
 // for the tenant rather than whichever member happened to post the load.
@@ -382,7 +455,12 @@ async function settle(
     tx.write({ kind: 'update', path: taskPath, data: { status, lastError } });
     if (status === 'failed') {
       const type = task.type as OutboxTaskType;
-      const detail = type === 'sendInvoiceEmail' ? { jobId: task.jobId, lastError } : { loadId: task.loadId, lastError };
+      const detail =
+        type === 'sendInvoiceEmail'
+          ? { jobId: task.jobId, lastError }
+          : type === 'sendTestInvoiceEmail'
+            ? { recipientEmail: task.recipientEmail, lastError }
+            : { loadId: task.loadId, lastError };
       tx.write(systemAuditOp(deps, `${type}.failed`, detail));
     }
   });

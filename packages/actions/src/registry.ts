@@ -9,6 +9,7 @@ import { updateProfileHandler } from './actions/update-profile.js';
 import { createTenantHandler } from './actions/create-tenant.js';
 import { cancelLoadHandler } from './actions/cancel-load.js';
 import { recordRoutePointHandler } from './actions/record-route-point.js';
+import { sendTestInvoiceEmailHandler } from './actions/send-test-invoice-email.js';
 
 // Every action the dispatch function can run. Adding an action means adding
 // it here — nothing else discovers handlers.
@@ -25,6 +26,7 @@ const HANDLERS: readonly AnyHandler[] = [
   createTenantHandler,
   cancelLoadHandler,
   recordRoutePointHandler,
+  sendTestInvoiceEmailHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -54,6 +56,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'createTenant',
   'cancelLoad',
   'recordRoutePoint',
+  'sendTestInvoiceEmail',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

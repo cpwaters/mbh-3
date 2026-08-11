@@ -15,3 +15,8 @@ export { deliverJobHandler } from './actions/deliver-job.js';
 export type { DeliverJobPayload, DeliverJobResult } from './actions/deliver-job.js';
 export { recordRoutePointHandler } from './actions/record-route-point.js';
 export type { RecordRoutePointPayload, RecordRoutePointResult } from './actions/record-route-point.js';
+export { sendTestInvoiceEmailHandler } from './actions/send-test-invoice-email.js';
+export type {
+  SendTestInvoiceEmailPayload,
+  SendTestInvoiceEmailResult,
+} from './actions/send-test-invoice-email.js';
