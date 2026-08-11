@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.cjs --external:firebase-admin --external:firebase-functions"
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/index.cjs --external:firebase-admin --external:firebase-functions && node scripts/copy-pdfkit-fonts.mjs"
   },
   "dependencies": {
     "firebase-admin": "^13.0.2",
