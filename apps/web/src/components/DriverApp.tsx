@@ -10,6 +10,7 @@ import { useDeviceLocation } from './useDeviceLocation';
 import { useJobEndpoints } from './useJobEndpoints';
 import { useJobProgressSync } from './useJobProgressSync';
 import { useRouteTracking } from './useRouteTracking';
+import { useDrivingTimers } from './useDrivingTimers';
 import { haversineMeters, journeyProgress } from '../lib/progress';
 import Login from '../app/Login';
 import SignUp from '../app/SignUp';
@@ -92,6 +93,10 @@ export default function DriverApp() {
   // offline queue a delivery capture uses.
   useRouteTracking(job, device.location, queue.enqueue);
 
+  // HGV driving-hours/break countdowns — resolved once here (like device
+  // location) so they survive navigating away from the Driving Time page.
+  const drivingTimers = useDrivingTimers();
+
   async function commit(requestId: string, payload: DeliverCapture) {
     await queue.enqueue('deliverJob', payload, requestId);
   }
@@ -121,6 +126,7 @@ export default function DriverApp() {
     requestLocation: device.requestLocation,
     progress,
     distanceRemainingMeters,
+    drivingTimers,
   };
 
   if (!auth.ready) {

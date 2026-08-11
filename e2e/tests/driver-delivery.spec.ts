@@ -157,6 +157,29 @@ test('a carrier browses available loads and accepts one', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Mark delivered' })).toBeVisible();
 });
 
+test('a shipper cancels an available load and views a matched one\'s route', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'All Loads' }).click();
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+
+  // Cancel the still-available load posted earlier in the suite.
+  const availableRow = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Trafford' }).first();
+  await expect(availableRow).toBeVisible();
+  await availableRow.getByRole('button', { name: 'Cancel Load' }).click();
+  await expect(availableRow.getByText('Cancelled', { exact: true })).toBeVisible();
+  await expect(availableRow.getByRole('button', { name: 'Cancel Load' })).toBeDisabled();
+
+  // "View Route"/"Hide Route" only offers on a trackable (post-available)
+  // load — the browse load the carrier just accepted is now 'matched'.
+  const matchedRow = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
+  await expect(matchedRow).toBeVisible();
+  await expect(matchedRow.getByRole('button', { name: 'View Route' })).toBeVisible();
+  await matchedRow.getByRole('button', { name: 'View Route' }).click();
+  await expect(matchedRow.getByRole('button', { name: 'Hide Route' })).toBeVisible();
+  await matchedRow.getByRole('button', { name: 'Hide Route' }).click();
+  await expect(matchedRow.getByRole('button', { name: 'View Route' })).toBeVisible();
+});
+
 test('the active job is read from Firestore and shows its route', async ({ page }) => {
   await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
@@ -169,6 +192,33 @@ test('the active job is read from Firestore and shows its route', async ({ page 
   await expect(page.getByText('Tesco Distribution')).toBeVisible();
   await expect(page.getByText('10 Distribution Way, Trafford, M17 1WS')).toBeVisible();
   await expect(page.getByText('Asda Leith')).toBeVisible();
+});
+
+test('driving-time timers keep running when navigating away and back', async ({ page }) => {
+  await signIn(page, E2E.email, E2E.password);
+  await page.getByRole('link', { name: 'Driving Time' }).click();
+  await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+
+  const firstCard = page.locator('.bg-white.rounded-lg.shadow-md.p-6.border').first();
+  await expect(firstCard.getByRole('button', { name: 'Start' })).toBeVisible();
+  await firstCard.getByRole('button', { name: 'Start' }).click();
+  await expect(firstCard.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await page.waitForTimeout(1500); // let it tick at least once before navigating away
+
+  // Navigate away — this page's component unmounts (React Router), so the
+  // countdown must be owned above the page, not in local component state,
+  // or it would reset to the default on remount.
+  await goToActiveJobs(page);
+  await page.waitForTimeout(2000);
+  await page.getByRole('link', { name: 'Driving Time' }).click();
+  await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+
+  const firstCardAfter = page.locator('.bg-white.rounded-lg.shadow-md.p-6.border').first();
+  // Still running (not reset to a fresh "Start"), and the displayed time is
+  // not back at the untouched default — it kept counting down in the
+  // background while the page was unmounted.
+  await expect(firstCardAfter.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(firstCardAfter.locator('.text-5xl')).not.toHaveText('04:30:00');
 });
 
 test('capture refuses to submit without the required proof', async ({ page }) => {

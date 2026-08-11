@@ -1,140 +1,36 @@
-import { useState, useEffect, useRef } from 'react';
 import { Clock, Play, Pause, RotateCcw } from 'lucide-react';
+import { useApp } from './context';
+import type { Timer } from '../components/useDrivingTimers';
 
-// Ported verbatim from the mbh-2 prototype (client/src/pages/DrivingTime.tsx):
+// Ported from the mbh-2 prototype (client/src/pages/DrivingTime.tsx):
 // self-contained HGV driving-hours + break countdown timers. No backend.
+// The timer state itself lives in useDrivingTimers, owned once at the app
+// root (DriverApp) so it survives navigating away from this page and back —
+// this component is purely the view.
 
-interface Timer {
-  id: string;
-  title: string;
-  initialSeconds: number;
-  remainingSeconds: number;
-  isRunning: boolean;
-  isCustomizable?: boolean;
-  minHours?: number;
-  maxHours?: number;
+function formatTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function getTimerColor(timer: Timer): string {
+  const percentage = (timer.remainingSeconds / timer.initialSeconds) * 100;
+  if (percentage > 50) return 'text-green-600';
+  if (percentage > 25) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+function getProgressColor(timer: Timer): string {
+  const percentage = (timer.remainingSeconds / timer.initialSeconds) * 100;
+  if (percentage > 50) return 'bg-green-600';
+  if (percentage > 25) return 'bg-yellow-600';
+  return 'bg-red-600';
 }
 
 export default function DrivingTime() {
-  const [timers, setTimers] = useState<Timer[]>([
-    {
-      id: 'driving',
-      title: 'Driving Time',
-      initialSeconds: 4 * 3600 + 30 * 60, // 4h 30m
-      remainingSeconds: 4 * 3600 + 30 * 60,
-      isRunning: false,
-    },
-    {
-      id: 'break15',
-      title: 'Break 15 mins',
-      initialSeconds: 15 * 60,
-      remainingSeconds: 15 * 60,
-      isRunning: false,
-    },
-    {
-      id: 'break30',
-      title: 'Break 30 mins',
-      initialSeconds: 30 * 60,
-      remainingSeconds: 30 * 60,
-      isRunning: false,
-    },
-    {
-      id: 'break45',
-      title: 'Break 45 mins',
-      initialSeconds: 45 * 60,
-      remainingSeconds: 45 * 60,
-      isRunning: false,
-    },
-    {
-      id: 'dailyRest',
-      title: 'Daily Rest',
-      initialSeconds: 9 * 3600, // 9 hours default
-      remainingSeconds: 9 * 3600,
-      isRunning: false,
-      isCustomizable: true,
-      minHours: 9,
-      maxHours: 12,
-    },
-  ]);
-
-  const [dailyRestHours, setDailyRestHours] = useState(9);
-  const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (timers.some((t) => t.isRunning)) {
-      intervalRef.current = window.setInterval(() => {
-        setTimers((prevTimers) =>
-          prevTimers.map((timer) => {
-            if (timer.isRunning && timer.remainingSeconds > 0) {
-              return { ...timer, remainingSeconds: timer.remainingSeconds - 1 };
-            }
-            if (timer.isRunning && timer.remainingSeconds === 0) {
-              return { ...timer, isRunning: false };
-            }
-            return timer;
-          })
-        );
-      }, 1000);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [timers]);
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
-  const toggleTimer = (id: string) => {
-    setTimers((prevTimers) =>
-      prevTimers.map((timer) => (timer.id === id ? { ...timer, isRunning: !timer.isRunning } : timer))
-    );
-  };
-
-  const resetTimer = (id: string) => {
-    setTimers((prevTimers) =>
-      prevTimers.map((timer) =>
-        timer.id === id ? { ...timer, remainingSeconds: timer.initialSeconds, isRunning: false } : timer
-      )
-    );
-  };
-
-  const updateDailyRestHours = (hours: number) => {
-    setDailyRestHours(hours);
-    const newSeconds = hours * 3600;
-    setTimers((prevTimers) =>
-      prevTimers.map((timer) =>
-        timer.id === 'dailyRest'
-          ? { ...timer, initialSeconds: newSeconds, remainingSeconds: newSeconds, isRunning: false }
-          : timer
-      )
-    );
-  };
-
-  const getTimerColor = (timer: Timer) => {
-    const percentage = (timer.remainingSeconds / timer.initialSeconds) * 100;
-    if (percentage > 50) return 'text-green-600';
-    if (percentage > 25) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getProgressColor = (timer: Timer) => {
-    const percentage = (timer.remainingSeconds / timer.initialSeconds) * 100;
-    if (percentage > 50) return 'bg-green-600';
-    if (percentage > 25) return 'bg-yellow-600';
-    return 'bg-red-600';
-  };
+  const { timers, dailyRestHours, toggleTimer, resetTimer, updateDailyRestHours } = useApp().drivingTimers;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
