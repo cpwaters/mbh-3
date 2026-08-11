@@ -9,6 +9,7 @@ export * from './vehicle-reader.js';
 export * from './profile-reader.js';
 export * from './listing-reader.js';
 export * from './membership-reader.js';
+export * from './outbox-task-reader.js';
 export * from './geocoder.js';
 export * from './route-provider.js';
 export * from './mailer.js';

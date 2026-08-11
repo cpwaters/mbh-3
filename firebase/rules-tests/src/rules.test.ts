@@ -53,6 +53,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'audit/audit-1'), { auditId: 'audit-1', action: 'acceptLoad', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
     await setDoc(doc(db, 'outbox/task-1'), { taskId: 'task-1', type: 'enrichLoadRoute', status: 'pending', tenantId: 'shipper-1', loadId: 'load-1' });
+    await setDoc(doc(db, 'outbox/test-email-1'), { taskId: 'test-email-1', type: 'sendTestInvoiceEmail', status: 'done', tenantId: 'shipper-1', recipientEmail: 'owner@acme.test', actorId: SHIP_OWNER });
     await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
     await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
   });
@@ -222,14 +223,26 @@ describe('audit + request markers (never client-readable)', () => {
   });
 });
 
-describe('outbox (drain work — never client-accessible)', () => {
-  it('no one reads outbox tasks', async () => {
+describe('outbox (drain work — internal, except the founder test-email readback)', () => {
+  it('no one reads a non-test-email outbox task, not even its own tenant owner', async () => {
     await assertFails(getDoc(doc(db(SHIP_OWNER), 'outbox/task-1')));
     await assertFails(getDoc(doc(db(CAR_DRIVER), 'outbox/task-1')));
   });
 
-  it('no client can enqueue or tamper with outbox work', async () => {
+  it('the requester reads back their own sendTestInvoiceEmail task', async () => {
+    await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'outbox/test-email-1')));
+  });
+
+  it("no one else reads another actor's sendTestInvoiceEmail task", async () => {
+    await assertFails(getDoc(doc(db(CAR_DRIVER), 'outbox/test-email-1')));
+    await assertFails(getDoc(doc(db(OUTSIDER), 'outbox/test-email-1')));
+  });
+
+  it('no client can enqueue, tamper with, or forge outbox work — not even their own test-email task', async () => {
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'outbox/task-x'), { type: 'enrichLoadRoute', status: 'pending' }));
+    await assertFails(
+      setDoc(doc(db(SHIP_OWNER), 'outbox/test-email-1'), { type: 'sendTestInvoiceEmail', status: 'done', actorId: SHIP_OWNER })
+    );
   });
 });
 

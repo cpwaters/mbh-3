@@ -30,6 +30,7 @@ import {
   listingsCollection,
   loadsCollection,
   MEMBERS_SUBCOLLECTION,
+  outboxTaskDoc,
   tenantDoc,
   userProfileDoc,
   vehiclesCollection,
@@ -41,9 +42,11 @@ import type {
   ListingReader,
   Membership,
   MembershipReader,
+  OutboxTaskReader,
   ProfileReader,
   ShipperLoad,
   ShipperLoadReader,
+  TestEmailTaskView,
   VehicleReader,
 } from '@mbh/provider-interfaces';
 
@@ -78,7 +81,14 @@ interface JobDoc {
 }
 
 export class FirestoreReader
-  implements JobReader, ListingReader, MembershipReader, VehicleReader, ProfileReader, ShipperLoadReader
+  implements
+    JobReader,
+    ListingReader,
+    MembershipReader,
+    VehicleReader,
+    ProfileReader,
+    ShipperLoadReader,
+    OutboxTaskReader
 {
   private readonly db: Firestore;
 
@@ -200,5 +210,15 @@ export class FirestoreReader
         return { tenantId: data.tenantId, name, role: data.role, capabilities };
       })
     );
+  }
+
+  async testEmailTaskStatus(taskId: string): Promise<TestEmailTaskView | null> {
+    // Rules authorize this read only for the task's own requester
+    // (resource.data.actorId == uid) and only for type 'sendTestInvoiceEmail'
+    // — every other outbox task type stays server-internal.
+    const snap = await getDoc(doc(this.db, outboxTaskDoc(taskId)));
+    if (!snap.exists()) return null;
+    const data = snap.data() as { status: TestEmailTaskView['status']; lastError?: string };
+    return { status: data.status, ...(data.lastError !== undefined ? { lastError: data.lastError } : {}) };
   }
 }

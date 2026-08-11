@@ -105,9 +105,17 @@ service cloud.firestore {
     }
 
     // Outbox: pending outbound work for the scheduled drain. Internal only —
-    // never client-readable or writable.
+    // never client-writable, and never client-readable EXCEPT the narrow
+    // carve-out below: the founder toolbar's "send test email" debug button
+    // needs to show whether the drain's send actually succeeded, or its
+    // "Queued" message is a permanent, meaningless dead end. A requester may
+    // read back ONLY their own sendTestInvoiceEmail task (never any other
+    // task type, never anyone else's) — status + lastError only, nothing
+    // else outbox tasks carry is sensitive.
     match /outbox/{taskId} {
-      allow read, write: if false;
+      allow read: if resource.data.type == 'sendTestInvoiceEmail'
+        && resource.data.actorId == request.auth.uid;
+      allow write: if false;
     }
 
     // A user may read their OWN member docs across all tenants (to discover

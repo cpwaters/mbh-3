@@ -21,6 +21,7 @@ describe('sendTestInvoiceEmail — founder debug tool', () => {
       status: 'pending',
       tenantId: 'shipper-1',
       recipientEmail: 'founder@mybackhaul.test',
+      actorId: 'ship-owner',
     });
   });
 
