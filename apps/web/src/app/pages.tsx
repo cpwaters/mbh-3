@@ -82,6 +82,7 @@ export function Dashboard() {
         hasActiveJob={app.job !== null}
         driverLocation={app.location}
         tracking={app.tracking}
+        watchingLocation={app.watchingLocation}
         onEnableLocation={app.requestLocation}
         locationError={app.locationError}
       />
@@ -174,7 +175,12 @@ export function ActiveJobsPage() {
           <MapPin className="w-5 h-5 text-gray-400" />
           Delivery locked
         </h2>
-        {!app.tracking ? (
+        {!app.tracking && app.watchingLocation && !app.locationError ? (
+          <p className="text-gray-600 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+            Waiting for a GPS signal so we can tell when you reach {job.destination.town}…
+          </p>
+        ) : !app.tracking ? (
           <>
             <p className="text-gray-600 mb-4">
               Turn on location so we can tell when you reach {job.destination.town}. The delivery form

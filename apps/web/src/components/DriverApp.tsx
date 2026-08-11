@@ -122,6 +122,7 @@ export default function DriverApp() {
     onAccepted,
     location: device.location,
     tracking: device.tracking,
+    watchingLocation: device.watching,
     locationError: device.error,
     requestLocation: device.requestLocation,
     progress,

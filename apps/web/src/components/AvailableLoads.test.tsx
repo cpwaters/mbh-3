@@ -63,3 +63,64 @@ describe('AvailableLoads — View Details toggle', () => {
     expect(screen.queryByText('Weight')).not.toBeInTheDocument();
   });
 });
+
+describe('AvailableLoads — "Enable location" vs. a watch already open', () => {
+  it('offers "Enable location" when nothing has been requested yet', () => {
+    render(
+      <AvailableLoads
+        carrierTenantId="carrier-1"
+        listings={[listing]}
+        getIdToken={async () => 'token'}
+        onAccepted={vi.fn()}
+        onChanged={vi.fn()}
+        hasActiveJob={false}
+        onEnableLocation={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Enable location' })).toBeInTheDocument();
+  });
+
+  // Regression: a returning user whose permission was already granted gets a
+  // watch opened silently on mount (see useDeviceLocation's auto-resume
+  // effect). Before a fix lands, `tracking` is still false — if the banner
+  // only checked that, it would keep offering "Enable location", and
+  // clicking it would silently do nothing (the watch is already open). The
+  // watchingLocation flag must swap it for an honest waiting state instead.
+  it('shows a waiting state instead of a dead "Enable location" button once a watch is already open', () => {
+    render(
+      <AvailableLoads
+        carrierTenantId="carrier-1"
+        listings={[listing]}
+        getIdToken={async () => 'token'}
+        onAccepted={vi.fn()}
+        onChanged={vi.fn()}
+        hasActiveJob={false}
+        onEnableLocation={vi.fn()}
+        watchingLocation={true}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Enable location' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Waiting for a GPS signal/)).toBeInTheDocument();
+  });
+
+  it('prefers the location error message over the waiting state once one arrives', () => {
+    render(
+      <AvailableLoads
+        carrierTenantId="carrier-1"
+        listings={[listing]}
+        getIdToken={async () => 'token'}
+        onAccepted={vi.fn()}
+        onChanged={vi.fn()}
+        hasActiveJob={false}
+        onEnableLocation={vi.fn()}
+        watchingLocation={true}
+        locationError="Could not get your location. Check location permissions and try again."
+      />
+    );
+
+    expect(screen.queryByText(/Waiting for a GPS signal/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Could not get your location/)).toBeInTheDocument();
+  });
+});

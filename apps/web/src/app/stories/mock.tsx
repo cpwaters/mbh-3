@@ -42,6 +42,7 @@ export function makeMockApp(over: Partial<AppData> = {}): AppData {
     onAccepted: () => {},
     location: null,
     tracking: false,
+    watchingLocation: false,
     locationError: null,
     requestLocation: () => {},
     progress: null,

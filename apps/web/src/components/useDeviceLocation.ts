@@ -7,6 +7,20 @@ import type { GeoPoint } from '../lib/geocode';
 export interface DeviceLocationView {
   location: GeoPoint | null;
   tracking: boolean;
+  // Permission was CONFIRMED already granted before anything on this page
+  // asked for it — i.e. the mount-time auto-resume (a returning user from an
+  // earlier session) — so a watch is silently open even though no fix has
+  // landed yet. Deliberately NOT set just because requestLocation() was
+  // called: a fresh request against 'prompt' permission leaves the decision
+  // pending (a real permission dialog, or in test automation a request that
+  // never resolves either way) and must still be treated as "nothing
+  // confirmed yet", so callers still get the explanatory "Enable location" /
+  // consent-modal UI rather than it being silently skipped. Without this
+  // distinction, a returning user whose permission was already granted sees
+  // an "Enable location" button that looks unclicked forever, and clicking it
+  // does nothing (the watch is already open; see the early return in
+  // start()).
+  watching: boolean;
   error: string | null;
   // Ask for location permission (if not already tracking) and start watching.
   // Wired to the Active Job "View Route" button and the map's consent modal.
@@ -42,6 +56,7 @@ const MAX_CONSECUTIVE_COARSE_FIXES = 2;
 export function useDeviceLocation(): DeviceLocationView {
   const [location, setLocation] = useState<GeoPoint | null>(null);
   const [tracking, setTracking] = useState(false);
+  const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const hasLocationRef = useRef(false);
@@ -76,6 +91,7 @@ export function useDeviceLocation(): DeviceLocationView {
             'Location access was denied. Enable location for this site in your browser/device settings to track your delivery.'
           );
           setTracking(false);
+          setWatching(false);
           if (watchIdRef.current !== null) {
             navigator.geolocation.clearWatch(watchIdRef.current);
             watchIdRef.current = null;
@@ -101,7 +117,10 @@ export function useDeviceLocation(): DeviceLocationView {
       navigator.permissions
         .query({ name: 'geolocation' as PermissionName })
         .then((status) => {
-          if (!cancelled && status.state === 'granted') start();
+          if (!cancelled && status.state === 'granted') {
+            setWatching(true);
+            start();
+          }
         })
         .catch(() => {
           /* permissions API unavailable — wait for an explicit request */
@@ -122,5 +141,5 @@ export function useDeviceLocation(): DeviceLocationView {
     };
   }, []);
 
-  return { location, tracking, error, requestLocation };
+  return { location, tracking, watching, error, requestLocation };
 }
