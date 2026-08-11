@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// PoD photo uploads only. Write-only for the assigned driver, scoped to
+// their own job; never client-readable — the drain (admin SDK, bypasses
+// these rules entirely) is the only reader, to attach photos to the
+// invoice email. Mirrors firestore.rules' job-driver idiom
+// (`jobs/{jobId}.driverActorId == request.auth.uid`), just cross-service
+// via firestore.get() since Storage rules can't read Storage-side state to
+// authorize against.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /pod/{jobId}/{requestId}/{fileName} {
+      allow write: if request.auth != null
+        && firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.driverActorId == request.auth.uid
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow read: if false;
+    }
+
+    // Deny everything not explicitly allowed above.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
