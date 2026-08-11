@@ -446,25 +446,54 @@ to the code right now, and applying or not applying it has no effect on
 deploys either way (see the comment at the top of that file).
 
 Founder action so far:
-1. ~~Provision an SMTP mailbox for outbound invoices~~ — done: a Microsoft
-   365 mailbox (Authenticated SMTP enabled on the mailbox; confirm tenant
-   Conditional Access/Security Defaults isn't still blocking basic auth if
-   sends start failing with `535 5.7.139`).
+1. ~~Provision an SMTP mailbox for outbound invoices~~ — done: a mailbox on
+   mybackhaul.app hosted via IONOS (Microsoft 365 reseller) —
+   `smtp.ionos.co.uk`.
 2. ~~Set the SMTP_USER/SMTP_PASSWORD repo SECRETS~~ — done
    (Settings → Secrets and variables → Actions → Secrets).
 3. ~~Set the SMTP_HOST/SMTP_PORT/SMTP_FROM repo VARIABLES~~ — done
-   (same page, Variables tab).
-4. **Pending verification**: confirm the next deploy's `.env`-write step
-   actually picks these up (its own step name, e.g. `if [ -n "${{ vars.
-   SMTP_HOST }}" ]`, reveals — non-secretly — whether the value resolved
-   non-empty) and that a real send-test-invoice-email from the founder
-   toolbar actually lands in the mailbox, not just marks its outbox task
-   `done`. `firebase functions:log` scoped to `drain` in the Firebase console
-   is the fastest way to see the SMTP failure/success itself.
+   (same page, Variables tab). Confirmed via the deploy job's own step name,
+   which echoes the (non-secret) resolved value — `if [ -n
+   "smtp.ionos.co.uk" ]; then`.
+4. ~~Confirm a real send-test-invoice-email lands~~ — the founder toolbar's
+   status readback (see below) surfaced a REAL, unrelated failure on the
+   first live attempt: `invoice PDF rendering failed: Error: ENOENT: no such
+   file or directory, open '/workspace/dist/data/Helvetica.afm'`. Root cause
+   + fix in the incident round below — SMTP config itself was never the
+   problem by this point.
 5. Optional, later: migrate to real Secret Manager — enable the Secret
    Manager API, `terraform apply` smtp.tf, then reintroduce
    `defineSecret()`/`secrets: [...]` in a dedicated, deploy-tested change
-   (not assumed to work from reading the docs, given the incident below).
+   (not assumed to work from reading the docs, given the incidents below).
+
+**INCIDENT round 3 (self-inflicted, caught via the founder toolbar's
+send-test-invoice-email status readback — it polls its own outbox task and
+shows the drain's real outcome, rather than a permanent "Queued"):**
+pdfkit (used for the invoice PDF attachment) reads its standard font metrics
+(Helvetica etc.) from disk at runtime, relative to its own `__dirname` —
+`fs.readFileSync(__dirname + '/data/Helvetica.afm')`. esbuild bundles
+pdfkit's CODE into `functions/dist/index.cjs`, but can't bundle a file read
+at runtime, and `firebase.json`'s functions `ignore` list excludes
+`node_modules` from the deploy entirely. So the deployed function had
+pdfkit's logic but none of its font data — every invoice PDF render (real
+or test) threw `ENOENT ... dist/data/Helvetica.afm` from the moment
+`sendTestInvoiceEmail`/`sendInvoiceEmail` first exercised it, invisibly,
+since nothing surfaced the failure until the toolbar's status readback
+existed to show it. Passed every unit test because dev/CI always run
+against the real `node_modules/pdfkit/js/data/*.afm` — never bundled,
+never deployed, never missing there. Fixed by
+`functions/scripts/copy-pdfkit-fonts.mjs` (wired into `functions/package.
+json`'s `build` script): resolves pdfkit via `@mbh/provider-nodemailer`
+(pnpm's strict, non-hoisted node_modules means pdfkit isn't reachable
+directly from `functions/` — only from the package that actually declares
+it as a dependency) and copies its `data/*.afm` directory to `functions/
+dist/data/`, the exact path the bundled `__dirname` resolves to once
+deployed. Verified by reproducing the exact failure AND the fix in an
+isolated environment (a bare temp directory, cleared `NODE_PATH`, no repo
+node_modules reachable) before shipping — not just inferred from reading
+the code. New regression test: `functions/integration/pdfkit-fonts.
+integration.test.ts` asserts every standard-font `.afm` file lands in
+`dist/data` after a real build.
 
 Before step 1-3, `SMTP_USER`/`SMTP_PASSWORD` were empty strings, so the
 drain's `sendInvoiceEmail`/`sendTestInvoiceEmail` tasks failed cleanly (the
@@ -489,12 +518,12 @@ founder should run both before applying.
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
   OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
-- SMTP secrets/variables are now set (Microsoft 365 mailbox) — next deploy
-  needs to confirm they actually land a real email (see "Invoice email on
-  delivery" step 4 above); watch for the M365 basic-auth-disabled failure
-  mode specifically if it doesn't. Migrating to real Secret Manager
-  (infrastructure/environments/production/smtp.tf) is optional, later work,
-  not blocking.
+- SMTP secrets/variables are set and confirmed reaching the deployed
+  function (IONOS-hosted mailbox); the pdfkit font-data deploy bug that was
+  blocking every invoice PDF (round 3 above) is fixed — next real send-test-
+  invoice-email from the founder toolbar should confirm end to end. Migrating
+  to real Secret Manager (infrastructure/environments/production/smtp.tf) is
+  optional, later work, not blocking.
 
 ## Known deferred items
 
