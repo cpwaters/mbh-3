@@ -80,8 +80,10 @@ export default function MapView() {
     }
     openNativeNavigation(originPin, destinationPin);
     // Make sure our own live tracking is running too (drives the progress bar
-    // and the delivery gate). Prompt via the explainer if not yet granted.
-    if (!app.tracking) {
+    // and the delivery gate). Prompt via the explainer if not yet granted —
+    // but not if a watch is already open (permission granted, just no fix
+    // yet): "Allow Location Access" would be a no-op then, so don't offer it.
+    if (!app.tracking && !app.watchingLocation) {
       setShowLocationConsent(true);
     }
   }

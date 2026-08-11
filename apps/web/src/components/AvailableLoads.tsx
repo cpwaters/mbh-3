@@ -27,6 +27,7 @@ export function AvailableLoads({
   hasActiveJob,
   driverLocation = null,
   tracking = false,
+  watchingLocation = false,
   onEnableLocation,
   locationError = null,
 }: {
@@ -39,6 +40,11 @@ export function AvailableLoads({
   // Live driver position — sorts loads by nearest pickup when present.
   driverLocation?: GeoPoint | null;
   tracking?: boolean;
+  // A location watch is already open (permission granted, this session or an
+  // earlier one) but no fix has landed yet. Gates the "Enable location"
+  // button off — clicking it while a watch is already running is a no-op,
+  // so offering it would just look broken; show a waiting state instead.
+  watchingLocation?: boolean;
   onEnableLocation?: () => void;
   // Why "Enable location" didn't work (permission denied, no GPS, etc.) —
   // without this the button looks broken with no explanation when it fails.
@@ -81,7 +87,7 @@ export function AvailableLoads({
         </p>
       </div>
 
-      {!tracking && onEnableLocation && listings.length > 0 && (
+      {!tracking && !watchingLocation && onEnableLocation && listings.length > 0 && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <p className="text-sm text-blue-800 flex-1">
@@ -93,6 +99,20 @@ export function AvailableLoads({
           >
             Enable location
           </button>
+        </div>
+      )}
+
+      {/* Permission was already granted (this session or an earlier one) and
+          a watch is open, but no fix has landed yet — a click on "Enable
+          location" here would be a no-op, so this replaces it rather than
+          showing a dead button. */}
+      {!tracking && watchingLocation && !locationError && listings.length > 0 && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+          <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0 animate-pulse" />
+          <p className="text-sm text-blue-800">
+            Waiting for a GPS signal to sort loads by nearest pickup — this can take a few seconds outdoors, longer
+            indoors.
+          </p>
         </div>
       )}
 

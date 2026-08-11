@@ -27,6 +27,11 @@ export interface AppData {
   // until there's a fix and known endpoints; the map marker reads `location`.
   location: GeoPoint | null;
   tracking: boolean;
+  // A location watch is open (permission granted, this session or a prior
+  // one) but no fix has landed yet — distinct from `tracking`, so the UI can
+  // show "waiting for a GPS signal" instead of an "Enable location" button
+  // that would do nothing if clicked (the watch is already running).
+  watchingLocation: boolean;
   locationError: string | null;
   requestLocation: () => void;
   progress: number | null;
