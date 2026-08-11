@@ -4,7 +4,7 @@
 // work as records (not fire-and-forget calls in the request path) is what makes
 // external effects retriable, auditable, and offline-safe.
 
-export type OutboxTaskType = 'enrichLoadRoute' | 'sendInvoiceEmail';
+export type OutboxTaskType = 'enrichLoadRoute' | 'sendInvoiceEmail' | 'sendTestInvoiceEmail';
 
 // pending  -> eligible for the drain to claim
 // claimed  -> a drain run holds it (crash-safe: reclaimed if the claim goes stale)
@@ -19,6 +19,7 @@ export interface OutboxTask {
   tenantId: string; // denormalized owning tenant
   loadId?: string; // enrichLoadRoute: the load this task enriches
   jobId?: string; // sendInvoiceEmail: the job this task invoices
+  recipientEmail?: string; // sendTestInvoiceEmail: where to send the test (the requester's own profile email, captured at enqueue time)
   attempts: number;
   createdAt: string;
   claimedAt?: string;

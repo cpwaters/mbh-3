@@ -295,3 +295,70 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     expect(mailer.sent).toHaveLength(1);
   });
 });
+
+describe('runDrainOnce — sendTestInvoiceEmail', () => {
+  it('sends synthetic invoice content to the recipient captured on the task, and records the outcome', async () => {
+    const harness = await makeHarness();
+    await harness.store.runBatch([
+      { kind: 'create', path: 'userProfiles/ship-owner', data: { actorId: 'ship-owner', email: 'founder@mybackhaul.test' } },
+    ]);
+    await harness.run('ship-owner', {
+      type: 'sendTestInvoiceEmail',
+      payload: { tenantId: 'shipper-1' },
+      requestId: 'r-test-1',
+    });
+
+    const mailer = new InMemoryMailer();
+    const summary = await runDrainOnce(drainDeps(harness, { mailer }));
+    expect(summary).toMatchObject({ invoiced: 1, failed: 0, retried: 0 });
+
+    expect(mailer.sent).toHaveLength(1);
+    expect(mailer.sent[0]).toMatchObject({
+      jobId: 'TEST',
+      recipientEmail: 'founder@mybackhaul.test',
+      carrierCompanyName: 'Test Carrier Ltd',
+      shipperCompanyName: 'Test Shipper Ltd',
+    });
+    expect(mailer.sent[0]?.invoiceNumber.startsWith('TEST-')).toBe(true);
+
+    const task = await harness.store.getDoc('outbox/task-1');
+    expect(task?.status).toBe('done');
+
+    // Two audit entries share the action name 'sendTestInvoiceEmail' by
+    // design: one from the client dispatch that enqueued the task, one from
+    // the drain completing it — distinguished by source, not action.
+    const audits = await harness.store.query({
+      collection: 'audit',
+      filters: [
+        { field: 'action', op: '==', value: 'sendTestInvoiceEmail' },
+        { field: 'source', op: '==', value: 'system' },
+      ],
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.data).toMatchObject({ actorId: 'system', source: 'system', recipientEmail: 'founder@mybackhaul.test' });
+
+    // No job exists for a test send, so there's no JobEvent to check —
+    // just confirming the drain didn't try to write one.
+    expect(await harness.store.getDoc('jobs/job-1')).toBeNull();
+  });
+
+  it('retries a recoverable mailer failure, then sends on the next run', async () => {
+    const harness = await makeHarness();
+    await harness.store.runBatch([
+      { kind: 'create', path: 'userProfiles/ship-owner', data: { actorId: 'ship-owner', email: 'founder@mybackhaul.test' } },
+    ]);
+    await harness.run('ship-owner', {
+      type: 'sendTestInvoiceEmail',
+      payload: { tenantId: 'shipper-1' },
+      requestId: 'r-test-2',
+    });
+
+    const mailer = new InMemoryMailer().failOnce();
+    const first = await runDrainOnce(drainDeps(harness, { mailer }));
+    expect(first).toMatchObject({ retried: 1, invoiced: 0 });
+
+    const second = await runDrainOnce(drainDeps(harness, { mailer }));
+    expect(second).toMatchObject({ invoiced: 1 });
+    expect(mailer.sent).toHaveLength(1);
+  });
+});
