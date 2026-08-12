@@ -175,9 +175,20 @@ export class FirestoreReader
 
   async loadsForShipper(shipperTenantId: string): Promise<ShipperLoad[]> {
     // Rules authorize this list via the `tenantId == the member's tenant` match.
-    const snap = await getDocs(
-      query(collection(this.db, loadsCollection()), where('tenantId', '==', shipperTenantId))
-    );
+    const [snap, stuckJobsSnap] = await Promise.all([
+      getDocs(query(collection(this.db, loadsCollection()), where('tenantId', '==', shipperTenantId))),
+      // Jobs stuck at 'delivered' with no closeJob task to move them on —
+      // authorized by the same `shipperTenantId` field match as the driver-
+      // home query (see firestore.rules's comment on /jobs/{jobId}).
+      getDocs(
+        query(
+          collection(this.db, jobsCollection()),
+          where('shipperTenantId', '==', shipperTenantId),
+          where('status', '==', 'delivered')
+        )
+      ),
+    ]);
+    const stuckLoadIds = new Set(stuckJobsSnap.docs.map((d) => (d.data() as { loadId: string }).loadId));
     return snap.docs
       .map((d) => d.data() as Load)
       .map((load) => ({
@@ -190,6 +201,7 @@ export class FirestoreReader
         destinationCompanyName: load.postingDetails?.destinationCompanyName ?? '',
         sourceContact: load.postingDetails?.sourceContact ?? emptyContact,
         destinationContact: load.postingDetails?.destinationContact ?? emptyContact,
+        needsClosureBackfill: stuckLoadIds.has(load.loadId),
         // The drain's driving route, not the shipper's create-load estimate
         // (postingDetails.distanceMiles) — null until it's enriched.
         distanceMiles: load.route !== undefined ? Math.round(metersToMiles(load.route.distanceMeters)) : null,

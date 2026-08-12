@@ -37,6 +37,12 @@ export interface ShipperLoad {
   deliverBy: string;
   deliveryTime: string;
   status: LoadStatus;
+  // True when this load's job reached 'delivered' but has no closeJob task
+  // to move it on to 'closed'/'fulfilled' — a job delivered before that
+  // mechanism existed. Drives the "mark this load fulfilled" repair button
+  // on an individual load (see distributor/LoadsList.tsx). Always false once
+  // the job is genuinely closed, or for a load with no such job at all.
+  needsClosureBackfill: boolean;
 }
 
 export interface ShipperLoadReader {

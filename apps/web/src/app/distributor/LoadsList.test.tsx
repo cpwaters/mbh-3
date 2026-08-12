@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
@@ -31,6 +31,7 @@ const fulfilledLoad: ShipperLoad = {
   deliverBy: '2026-08-03',
   deliveryTime: '17:00',
   status: 'fulfilled',
+  needsClosureBackfill: false,
 };
 
 // Stands in for CreateLoad at /create — just surfaces the router state it
@@ -101,5 +102,49 @@ describe('LoadsList — reuse a fulfilled load', () => {
 
     await waitFor(() => expect(screen.getByText('Trafford, M17 1WS')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /reuse this load/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('LoadsList — mark a stuck matched load as fulfilled', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows "Mark as fulfilled" only when needsClosureBackfill is true, and dispatches backfillCloseJobs scoped to just this load', async () => {
+    loadsForShipper.mockResolvedValue([{ ...fulfilledLoad, status: 'matched' as const, needsClosureBackfill: true }]);
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { jobIds: ['job-1'] } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderLoadsList();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /mark as fulfilled/i })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /mark as fulfilled/i }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/dispatch',
+        expect.objectContaining({ body: expect.stringContaining('"type":"backfillCloseJobs"') })
+      )
+    );
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      payload: { tenantId: string; loadId: string };
+    };
+    expect(body.payload).toEqual({ tenantId: 'carrier-sb', loadId: 'load-1' });
+  });
+
+  it('does not show the button for a matched load that does not need it', async () => {
+    loadsForShipper.mockResolvedValue([{ ...fulfilledLoad, status: 'matched' as const, needsClosureBackfill: false }]);
+    renderLoadsList();
+
+    await waitFor(() => expect(screen.getByText('Trafford, M17 1WS')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /mark as fulfilled/i })).not.toBeInTheDocument();
+  });
+
+  it('does not show the button for an already-fulfilled load, even if the flag were somehow still true', async () => {
+    loadsForShipper.mockResolvedValue([{ ...fulfilledLoad, status: 'fulfilled' as const, needsClosureBackfill: true }]);
+    renderLoadsList();
+
+    await waitFor(() => expect(screen.getByText('Trafford, M17 1WS')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /mark as fulfilled/i })).not.toBeInTheDocument();
   });
 });

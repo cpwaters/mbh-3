@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Home, Truck, Package, LayoutDashboard, Mail, Loader2, Check, X, Wrench } from 'lucide-react';
+import { ShieldCheck, Home, Truck, Package, LayoutDashboard, Mail, Loader2, Check, X } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import { dispatchAction } from '../lib/dispatch';
@@ -13,12 +13,6 @@ type SendState =
   | { kind: 'sent' }
   | { kind: 'failed'; lastError?: string }
   | { kind: 'timeout' }
-  | { kind: 'error'; message: string };
-
-type BackfillState =
-  | { kind: 'idle' }
-  | { kind: 'sending' }
-  | { kind: 'done'; count: number }
   | { kind: 'error'; message: string };
 
 // The drain runs every ~1 minute and retries a recoverable SMTP failure up to
@@ -35,7 +29,6 @@ const POLL_TIMEOUT_MS = 6 * 60 * 1000;
 export function FounderBar() {
   const app = useApp();
   const [state, setState] = useState<SendState>({ kind: 'idle' });
-  const [backfill, setBackfill] = useState<BackfillState>({ kind: 'idle' });
   const cancelledRef = useRef(false);
   const link =
     'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium text-indigo-100 hover:bg-white/10 transition-colors whitespace-nowrap';
@@ -82,29 +75,7 @@ export function FounderBar() {
     void pollTask(taskId, Date.now() + POLL_TIMEOUT_MS);
   }
 
-  // One-off repair: a job delivered before the closeJob mechanism existed
-  // never got one enqueued, so its load is stuck at 'matched' forever. Finds
-  // the selected tenant's own delivered-but-not-closed jobs and queues one —
-  // the drain closes them within its next ~1-minute tick, same as a fresh
-  // delivery. Safe to click more than once (see backfill-close-jobs.ts).
-  async function backfillClosures() {
-    const tenantId = app.selected?.tenantId;
-    if (tenantId === undefined) {
-      setBackfill({ kind: 'error', message: 'Select a company first.' });
-      return;
-    }
-    setBackfill({ kind: 'sending' });
-    const res = await dispatchAction(app.auth.getIdToken, 'backfillCloseJobs', { tenantId }, genRequestId());
-    if (!res.ok) {
-      setBackfill({ kind: 'error', message: res.error.message });
-      return;
-    }
-    const jobIds = res.result.jobIds as string[];
-    setBackfill({ kind: 'done', count: jobIds.length });
-  }
-
   const busy = state.kind === 'sending' || state.kind === 'waiting';
-  const backfillBusy = backfill.kind === 'sending';
 
   return (
     <div className="bg-indigo-950 text-white">
@@ -157,24 +128,6 @@ export function FounderBar() {
           <span className="inline-flex items-center gap-1 text-xs text-rose-300 whitespace-nowrap">
             <X className="w-3.5 h-3.5" />
             {state.message}
-          </span>
-        )}
-        <button type="button" onClick={backfillClosures} disabled={backfillBusy} className={link}>
-          {backfillBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
-          Backfill closures
-        </button>
-        {backfill.kind === 'done' && (
-          <span className="inline-flex items-center gap-1 text-xs text-emerald-300 whitespace-nowrap">
-            <Check className="w-3.5 h-3.5" />
-            {backfill.count === 0
-              ? 'Nothing stuck — all caught up'
-              : `Queued ${backfill.count} job(s) — closes within ~1 minute`}
-          </span>
-        )}
-        {backfill.kind === 'error' && (
-          <span className="inline-flex items-center gap-1 text-xs text-rose-300 whitespace-nowrap">
-            <X className="w-3.5 h-3.5" />
-            {backfill.message}
           </span>
         )}
         <Link to="/" className={`${link} ml-auto`}>
