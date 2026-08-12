@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 // Admin access to the EMULATORS (FIRESTORE_EMULATOR_HOST +
 // FIREBASE_AUTH_EMULATOR_HOST are exported by `firebase emulators:exec`). The
@@ -48,8 +49,14 @@ export const E2E = {
   founderLoadId: 'load-founder-e2e',
 } as const;
 
+// Must match apps/web/src/lib/firebase-config.ts's storageBucket — the web
+// client uploads to that bucket name regardless of which project id the
+// emulator-flavoured bundle points at, so the admin SDK has to agree on the
+// same bucket to read back what the client wrote.
+const STORAGE_BUCKET = 'mybackhaul-app.firebasestorage.app';
+
 function app() {
-  if (getApps().length === 0) initializeApp({ projectId: PROJECT_ID });
+  if (getApps().length === 0) initializeApp({ projectId: PROJECT_ID, storageBucket: STORAGE_BUCKET });
 }
 
 async function ensureUser(uid: string, email: string, password: string): Promise<void> {
@@ -231,4 +238,21 @@ export async function getLoadStatus(loadId: string): Promise<string | undefined>
   app();
   const snap = await getFirestore().doc(`loads/${loadId}`).get();
   return snap.data()?.status as string | undefined;
+}
+
+// The delivery evidence record's photoRefs, once the sync queue has drained
+// and rewritten any local-blob: refs to real Storage paths.
+export async function getDeliveryPhotoRefs(jobId: string): Promise<string[] | undefined> {
+  app();
+  const snap = await getFirestore().collection(`jobs/${jobId}/evidence`).where('kind', '==', 'delivery').get();
+  return (snap.docs[0]?.data()?.photoRefs as string[] | undefined) ?? undefined;
+}
+
+// Confirms the uploaded photo actually exists in the Storage emulator at the
+// given ref — proves the client's upload, not just that Firestore holds a
+// path-shaped string.
+export async function storageObjectExists(ref: string): Promise<boolean> {
+  app();
+  const [exists] = await getStorage().bucket().file(ref).exists();
+  return exists;
 }

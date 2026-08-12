@@ -10,6 +10,17 @@ export interface SyncQueueOptions {
   // The action types that are safe to queue (the idempotent set). Injected,
   // not imported — the engine stays decoupled from the action registry.
   allowedTypes: readonly string[];
+  // Optional last-second transform of a payload before it's actually sent —
+  // e.g. uploading a locally-held photo blob and rewriting its ref to a real
+  // Storage path. Runs on every drain attempt, not just the first, so it
+  // must be safe to redo (a previously-uploaded blob is uploaded again to
+  // the same deterministic path — an overwrite, not a duplicate). The
+  // STORED payload (in `storage`) is never rewritten — only what gets
+  // handed to `transport.send` for this one attempt — so a failure here
+  // leaves the original item untouched for the next drain to retry against.
+  // Kept fully generic (opaque payload in, opaque payload out) so this pure
+  // engine never needs to know what a "photo" or "blob" is.
+  resolvePayload?(type: string, payload: unknown, requestId: string): Promise<unknown>;
 }
 
 export class NonQueueableActionError extends Error {
@@ -108,13 +119,17 @@ export class SyncQueue {
 
         let outcome;
         try {
+          const payload = this.opts.resolvePayload
+            ? await this.opts.resolvePayload(item.type, item.payload, item.requestId)
+            : item.payload;
           outcome = await this.transport.send({
             type: item.type,
-            payload: item.payload,
+            payload,
             requestId: item.requestId,
           });
         } catch (err) {
-          // A thrown transport (unexpected) is treated as transient.
+          // A thrown transport OR a thrown resolvePayload (e.g. a blob
+          // upload failing) is treated as transient.
           outcome = { outcome: 'retry' as const, error: err instanceof Error ? err.message : 'send failed' };
         }
 

@@ -12,7 +12,7 @@ echo "== building functions bundle =="
 pnpm --filter @mbh/functions build || exit 1
 
 echo "== running E2E against the emulator stack =="
-firebase emulators:exec --only auth,firestore,functions,hosting --project demo-mbh \
+firebase emulators:exec --only auth,firestore,functions,hosting,storage --project demo-mbh \
   'pnpm --filter @mbh/e2e test'
 rc=$?
 
