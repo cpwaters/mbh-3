@@ -108,3 +108,47 @@ describe('FounderBar — send test email', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('FounderBar — backfill closures', () => {
+  it('dispatches backfillCloseJobs for the selected tenant and reports how many jobs were queued', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: async () => ({ ok: true, result: { jobIds: ['job-1', 'job-2'] } }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderFounderBar();
+
+    await user.click(screen.getByRole('button', { name: /backfill closures/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/dispatch',
+      expect.objectContaining({ body: expect.stringContaining('"type":"backfillCloseJobs"') })
+    );
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as { payload: { tenantId: string } };
+    expect(body.payload).toEqual({ tenantId: 'carrier-sb' });
+
+    await waitFor(() => expect(screen.getByText(/queued 2 job\(s\)/i)).toBeInTheDocument());
+  });
+
+  it('reports nothing stuck when no jobs were found', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { jobIds: [] } }) }));
+    const user = userEvent.setup();
+    renderFounderBar();
+
+    await user.click(screen.getByRole('button', { name: /backfill closures/i }));
+
+    await waitFor(() => expect(screen.getByText(/nothing stuck/i)).toBeInTheDocument());
+  });
+
+  it('refuses without a selected tenant, without making a network call', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderFounderBar({ selected: null });
+
+    await user.click(screen.getByRole('button', { name: /backfill closures/i }));
+
+    await waitFor(() => expect(screen.getByText('Select a company first.')).toBeInTheDocument());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
