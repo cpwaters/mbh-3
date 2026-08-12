@@ -18,6 +18,8 @@
     { "path": "packages/providers/nodemailer" },
     { "path": "packages/providers/firebase-auth-web" },
     { "path": "packages/providers/firestore-web" },
+    { "path": "packages/providers/firebase-storage-admin" },
+    { "path": "packages/providers/firebase-storage-web" },
     { "path": "labs" },
     { "path": "scripts" }
   ]

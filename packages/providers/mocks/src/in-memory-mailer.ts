@@ -1,5 +1,5 @@
 import type { InvoiceData } from '@mbh/domain';
-import { type Mailer, MailerError } from '@mbh/provider-interfaces';
+import { type MailAttachment, type Mailer, MailerError } from '@mbh/provider-interfaces';
 
 // Scriptable in-memory Mailer — the CI default. Records every invoice it was
 // asked to send, so a test can assert on recipient/content without a real
@@ -7,6 +7,8 @@ import { type Mailer, MailerError } from '@mbh/provider-interfaces';
 // path is testable without a network.
 export class InMemoryMailer implements Mailer {
   readonly sent: InvoiceData[] = [];
+  // Index-aligned with `sent` — the attachments passed alongside each send.
+  readonly sentAttachments: MailAttachment[][] = [];
   private failNext = false;
 
   failOnce(): this {
@@ -14,11 +16,12 @@ export class InMemoryMailer implements Mailer {
     return this;
   }
 
-  async sendInvoice(invoice: InvoiceData): Promise<void> {
+  async sendInvoice(invoice: InvoiceData, attachments: MailAttachment[] = []): Promise<void> {
     if (this.failNext) {
       this.failNext = false;
       throw new MailerError('scripted mailer failure');
     }
     this.sent.push(invoice);
+    this.sentAttachments.push(attachments);
   }
 }

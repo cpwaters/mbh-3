@@ -514,16 +514,81 @@ a captured invoice end-to-end against the in-memory mock. Could NOT run
 `terraform fmt`/`validate` (no terraform binary in this sandbox) — the
 founder should run both before applying.
 
+## PoD photo upload + invoice attachments (in progress; founder provisions Storage)
+
+Building toward: attach the PoD photo(s), the recipient's signature, and
+their name to the invoice email. Landing in slices (small increments, each
+independently green):
+
+1. **Done** — domain + interfaces: `ObjectStorageUploader` (client, Blob),
+   `ObjectStorageReader` (server, Buffer) — split rather than combined
+   since client/server never interchange, mirroring the AuthClient/
+   AuthProvider split. `BlobStore` for local (offline) blob holding.
+   `Mailer.sendInvoice` gains an optional `MailAttachment[]` second
+   parameter. In-memory mocks + unit tests for all of it. Nothing calls any
+   of this yet.
+2. **Done** — real providers + rules: `@mbh/provider-firebase-storage-admin`
+   (server download, `firebase-admin/storage`) and
+   `@mbh/provider-firebase-storage-web` (client upload, `firebase/storage`).
+   `firebase/storage.rules`: write-only, scoped to the job's assigned
+   driver (`jobs/{jobId}.driverActorId == uid`, checked cross-service via
+   `firestore.get()`), max 10MB, must be an image — never client-readable,
+   only the drain (admin SDK, bypasses rules) ever downloads. Uses the
+   project's **default** Firebase-managed bucket — no dedicated Terraform
+   bucket resource (would fight Firebase's own bucket lifecycle).
+   `pnpm test:rules` now covers both firestore + storage.
+
+   **FOUNDER ACTION NEEDED, and CI deliberately does NOT deploy
+   `storage.rules` yet** — learned the hard way already once this session
+   (see the SMTP/Secret-Manager incident above: a not-yet-provisioned
+   dependency for ONE target broke the entire combined deploy command,
+   functions+hosting+firestore included, twice, before the fix). The same
+   risk applies here: `firebase deploy --only storage` against a project
+   where Cloud Storage was never enabled could fail the same way. So:
+   1. Founder enables Cloud Storage for Firebase via the console
+      (Build → Storage → Get started) — a one-time click, no code involved.
+   2. Founder (or a verified-safe CI change afterwards) runs
+      `firebase deploy --only storage --project mybackhaul-app` ONCE,
+      manually, to confirm it succeeds against the now-enabled service.
+   3. Only THEN does `.github/workflows/ci.yml`'s deploy step gain
+      `storage` in its `--only` list (currently
+      `--only functions,hosting,firestore`) — a small, deliberate,
+      separately-verified change, not bundled into this slice.
+   Until all three steps happen, `firebase/storage.rules` exists in the
+   repo but is NOT live — uploads would be denied by Storage's own
+   secure-by-default rules (equivalent to firestore.rules' deny-by-default,
+   just not yet pushed). Nothing depends on this yet regardless (the
+   reader/uploader aren't wired into the drain or the capture UI until the
+   slices below land) — but it needs doing before slice 3-4 go live.
+3. Not started — real photo capture: today `MarkDelivered.tsx`'s
+   `addPhotos()` only fakes a ref string (`capture://name:size`); the real
+   `File` is discarded. This slice makes it real: local IndexedDB blob
+   holding (offline-safe, zero signal needed to capture), uploaded by the
+   sync queue once online, before the `deliverJob` dispatch — a new
+   optional `resolvePayload` hook on `SyncQueue`. The signature stays
+   exactly as it is today (an inline base64 PNG data URL) — a photo can be
+   1-5MB and would blow Firestore's 1MiB document cap stored the same way;
+   a signature is a few KB and is already fine.
+4. Not started — the drain reads the job's PoD evidence and attaches the
+   photo(s) + decoded signature to the invoice email, best-effort (a
+   missing/unresolvable attachment never blocks the invoice itself
+   sending — matches the existing "billing is additive" precedent).
+5. Not started — a `resendInvoiceEmail` action + founder toolbar UI (reuses
+   the send-test-invoice-email status-readback pattern) so an
+   already-delivered job's invoice can be resent on demand — necessary
+   because the automatic send only fires once, at delivery time.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
   OSRM_BASE_URL repo variable. Migrate the prototype's real accounts at cutover.
 - SMTP secrets/variables are set and confirmed reaching the deployed
   function (IONOS-hosted mailbox); the pdfkit font-data deploy bug that was
-  blocking every invoice PDF (round 3 above) is fixed — next real send-test-
-  invoice-email from the founder toolbar should confirm end to end. Migrating
-  to real Secret Manager (infrastructure/environments/production/smtp.tf) is
+  blocking every invoice PDF (round 3 above) is fixed. Migrating to real
+  Secret Manager (infrastructure/environments/production/smtp.tf) is
   optional, later work, not blocking.
+- Founder: enable Cloud Storage for Firebase (see "PoD photo upload" above)
+  before the photo-capture/invoice-attachment slices land.
 
 ## Known deferred items
 

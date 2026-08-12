@@ -39,6 +39,23 @@ describe('NodemailerMailer', () => {
     expect(Buffer.isBuffer(call.attachments[0].content)).toBe(true);
   });
 
+  it('appends extra attachments (PoD photos, signature) after the invoice PDF', async () => {
+    const { transport, sendMail } = stubTransport();
+    const mailer = new NodemailerMailer({ from: 'billing@mybackhaul.app', transport });
+
+    await mailer.sendInvoice(invoice, [
+      { filename: 'signature.png', content: Buffer.from('sig'), contentType: 'image/png' },
+      { filename: 'photo-1.jpg', content: Buffer.from('photo'), contentType: 'image/jpeg' },
+    ]);
+
+    const call = sendMail.mock.calls.at(0)?.[0];
+    if (call === undefined) throw new Error('sendMail was not called with any arguments');
+    expect(call.attachments).toHaveLength(3);
+    expect(call.attachments[0].filename).toBe('INV-JOB-E2E.pdf'); // PDF always first
+    expect(call.attachments[1].filename).toBe('signature.png');
+    expect(call.attachments[2].filename).toBe('photo-1.jpg');
+  });
+
   it('wraps an SMTP failure as a recoverable MailerError', async () => {
     const transport: MailTransport = { sendMail: vi.fn().mockRejectedValue(new Error('connection refused')) };
     const mailer = new NodemailerMailer({ from: 'billing@mybackhaul.app', transport });

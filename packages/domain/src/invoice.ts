@@ -16,6 +16,9 @@ export interface InvoiceData {
   carrierVatNumber?: string;
   shipperCompanyName: string;
   recipientEmail: string;
+  // Who signed for delivery, from the job's PoD evidence — absent when
+  // there's none on file (e.g. the founder's synthetic test invoice).
+  recipientName?: string;
   lineItems: InvoiceLineItem[];
   totalGbpPence: number;
 }

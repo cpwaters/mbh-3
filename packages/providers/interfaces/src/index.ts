@@ -13,3 +13,6 @@ export * from './outbox-task-reader.js';
 export * from './geocoder.js';
 export * from './route-provider.js';
 export * from './mailer.js';
+export * from './object-storage-uploader.js';
+export * from './object-storage-reader.js';
+export * from './blob-store.js';

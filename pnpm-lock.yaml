@@ -279,6 +279,28 @@ importers:
         specifier: ^11.3.0
         version: 11.10.0
 
+  packages/providers/firebase-storage-admin:
+    dependencies:
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
+      firebase-admin:
+        specifier: ^13.0.2
+        version: 13.10.0
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.32.0)
+
+  packages/providers/firebase-storage-web:
+    dependencies:
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
+      firebase:
+        specifier: ^11.3.0
+        version: 11.10.0
+
   packages/providers/firestore:
     dependencies:
       '@mbh/provider-interfaces':
