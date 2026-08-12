@@ -79,11 +79,28 @@ export const deliverJobHandler: ActionHandler<DeliverJobPayload, DeliverJobResul
       createdAt: ctx.now,
     };
 
-    // One batch: evidence + status + event + the invoice task.
+    // Also enqueue the job's closure (delivered -> closed, load: matched ->
+    // fulfilled — see drain.ts's processCloseJob) as its own independent
+    // task, not bundled into sendInvoiceEmail: a bounced/misconfigured
+    // billing email is a separate concern from "did the delivery happen,"
+    // and shouldn't leave the load stuck un-reusable.
+    const closeTaskId = ctx.newId('task');
+    const closeTask: OutboxTask = {
+      taskId: closeTaskId,
+      type: 'closeJob',
+      status: 'pending',
+      tenantId: job.shipperTenantId,
+      jobId: job.jobId,
+      attempts: 0,
+      createdAt: ctx.now,
+    };
+
+    // One batch: evidence + status + event + the invoice task + the close task.
     tx.write({ kind: 'create', path: jobEvidenceDoc(job.jobId, evidenceId), data: { ...evidence } });
     tx.write({ kind: 'update', path: jobDoc(job.jobId), data: { status: 'delivered', deliveredAt: ctx.now } });
     tx.write({ kind: 'create', path: jobEventDoc(job.jobId, eventId), data: { ...event } });
     tx.write({ kind: 'create', path: outboxTaskDoc(taskId), data: { ...task } });
+    tx.write({ kind: 'create', path: outboxTaskDoc(closeTaskId), data: { ...closeTask } });
 
     return {
       result: { jobId: job.jobId, evidenceId },

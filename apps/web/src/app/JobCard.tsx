@@ -16,6 +16,7 @@ const statusColors: Record<string, string> = {
   closed: 'bg-gray-100 text-gray-800',
   paid: 'bg-emerald-100 text-emerald-800',
   cancelled: 'bg-red-100 text-red-800',
+  fulfilled: 'bg-emerald-100 text-emerald-800',
 };
 
 export function JobCard({ children }: { children: ReactNode }) {

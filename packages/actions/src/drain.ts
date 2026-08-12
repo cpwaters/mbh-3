@@ -1,11 +1,16 @@
 import {
   buildInvoiceNumber,
+  canTransitionJob,
+  canTransitionLoad,
   invoiceDueDate,
   MAX_OUTBOX_ATTEMPTS,
   type Address,
   type InvoiceData,
   type Job,
+  type JobEvidence,
+  type JobStatus,
   type LoadRoute,
+  type LoadStatus,
   type Member,
   type OutboxTask,
   type OutboxTaskType,
@@ -16,6 +21,7 @@ import {
   auditDoc,
   jobDoc,
   jobEventDoc,
+  jobEvidenceCollection,
   jobsCollection,
   listingDoc,
   loadDoc,
@@ -24,7 +30,7 @@ import {
   tenantDoc,
   userProfileDoc,
 } from '@mbh/paths';
-import type { DataStore, Geocoder, Mailer, RouteProvider } from '@mbh/provider-interfaces';
+import type { DataStore, Geocoder, Mailer, MailAttachment, ObjectStorageReader, RouteProvider } from '@mbh/provider-interfaces';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
 // runs against the in-memory providers in CI and against Firestore + the real
@@ -36,6 +42,7 @@ export interface DrainDeps {
   geocoder: Geocoder;
   routeProvider: RouteProvider;
   mailer: Mailer;
+  objectStorage: ObjectStorageReader;
   now(): string; // ISO-8601 UTC
   newId(prefix: string): string;
 }
@@ -44,6 +51,7 @@ export interface DrainSummary {
   reclaimed: number; // stale claims reset to pending
   enriched: number; // route recorded
   invoiced: number; // invoice email sent
+  closed: number; // job closed + its load freed for reuse
   retried: number; // recoverable failure, left pending for the next run
   failed: number; // permanently gave up
   skipped: number; // lost the claim race / nothing to do
@@ -55,7 +63,15 @@ const MAX_PER_RUN = 10;
 const STALE_CLAIM_MS = 5 * 60 * 1000;
 
 export async function runDrainOnce(deps: DrainDeps): Promise<DrainSummary> {
-  const summary: DrainSummary = { reclaimed: 0, enriched: 0, invoiced: 0, retried: 0, failed: 0, skipped: 0 };
+  const summary: DrainSummary = {
+    reclaimed: 0,
+    enriched: 0,
+    invoiced: 0,
+    closed: 0,
+    retried: 0,
+    failed: 0,
+    skipped: 0,
+  };
 
   summary.reclaimed = await reclaimStale(deps);
 
@@ -102,11 +118,12 @@ async function reclaimStale(deps: DrainDeps): Promise<number> {
   return reclaimed;
 }
 
-type ProcessOutcome = 'enriched' | 'invoiced' | 'retried' | 'failed' | 'skipped';
+type ProcessOutcome = 'enriched' | 'invoiced' | 'closed' | 'retried' | 'failed' | 'skipped';
 
 function processTask(deps: DrainDeps, taskPath: string, type: OutboxTaskType): Promise<ProcessOutcome> {
   if (type === 'sendInvoiceEmail') return processSendInvoiceEmail(deps, taskPath);
   if (type === 'sendTestInvoiceEmail') return processSendTestInvoiceEmail(deps, taskPath);
+  if (type === 'closeJob') return processCloseJob(deps, taskPath);
   return processEnrichLoadRoute(deps, taskPath);
 }
 
@@ -245,15 +262,60 @@ async function processSendInvoiceEmail(deps: DrainDeps, taskPath: string): Promi
   const job = claim.job as unknown as Job;
 
   try {
-    const invoice = await buildInvoice(deps, job);
+    const evidence = await loadDeliveryEvidence(deps, job.jobId);
+    const invoice = await buildInvoice(deps, job, evidence);
     if (invoice === null) {
       await settle(deps, taskPath, 'failed', 'no billing email on file for the shipper');
       return 'failed';
     }
 
-    await deps.mailer.sendInvoice(invoice);
+    const attachments = evidence !== null ? await buildAttachments(deps, evidence) : [];
+    await deps.mailer.sendInvoice(invoice, attachments);
     await recordInvoiceSent(deps, taskPath, job, invoice);
     return 'invoiced';
+  } catch (error) {
+    const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
+    const message = error instanceof Error ? error.message : String(error);
+    if (recoverable && attempts < MAX_OUTBOX_ATTEMPTS) {
+      await settle(deps, taskPath, 'pending', message); // retried next run
+      return 'retried';
+    }
+    await settle(deps, taskPath, 'failed', message);
+    return 'failed';
+  }
+}
+
+// Closes the loop: once a job has been delivered, mark it fully wrapped up
+// (Job: delivered -> closed) and free its load for reuse (Load: matched ->
+// fulfilled). Enqueued atomically by deliverJob alongside sendInvoiceEmail,
+// but processed independently — a bounced/misconfigured invoice email is a
+// billing hiccup, not a reason to leave the job/load stuck open.
+async function processCloseJob(deps: DrainDeps, taskPath: string): Promise<ProcessOutcome> {
+  const claim = await deps.store.runTransaction(async (tx) => {
+    const task = (await tx.get(taskPath)) as (OutboxTask & Record<string, unknown>) | null;
+    if (task === null || task.status !== 'pending') return null; // lost the race
+    const job = task.jobId !== undefined ? await tx.get(jobDoc(task.jobId)) : null;
+    tx.write({
+      kind: 'update',
+      path: taskPath,
+      data: { status: 'claimed', claimedAt: deps.now(), attempts: task.attempts + 1 },
+    });
+    return { task, job };
+  });
+
+  if (claim === null) return 'skipped';
+  const attempts = claim.task.attempts + 1;
+
+  if (claim.job === null) {
+    await settle(deps, taskPath, 'failed', 'job not found');
+    return 'failed';
+  }
+
+  const job = claim.job as unknown as Job;
+
+  try {
+    await recordJobClosed(deps, taskPath, job);
+    return 'closed';
   } catch (error) {
     const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
     const message = error instanceof Error ? error.message : String(error);
@@ -370,11 +432,67 @@ async function resolveOwnerProfile(deps: DrainDeps, tenantId: string): Promise<U
   return profile === null ? null : (profile as unknown as UserProfile);
 }
 
+// The PoD evidence recorded atomically by deliverJob — null only for jobs
+// that somehow reached 'delivered' without one (shouldn't happen; deliverJob
+// always writes evidence + status in the same batch).
+async function loadDeliveryEvidence(deps: DrainDeps, jobId: string): Promise<JobEvidence | null> {
+  const rows = await deps.store.query({
+    collection: jobEvidenceCollection(jobId),
+    filters: [{ field: 'kind', op: '==', value: 'delivery' }],
+    limit: 1,
+  });
+  return rows[0] === undefined ? null : (rows[0].data as unknown as JobEvidence);
+}
+
+// A signature is captured as an inline base64 data URL (see SignaturePad.tsx)
+// — decode it directly, no Storage round-trip. Falls back to a real Storage
+// download if it's ever not a data URL (e.g. a future migration), so this
+// stays correct rather than silently dropping the attachment.
+function decodeDataUrl(value: string): { content: Buffer; contentType: string } | null {
+  const match = /^data:([^;]+);base64,(.+)$/s.exec(value);
+  if (match === null) return null;
+  // Two capturing groups in the pattern above guarantee both are present
+  // whenever match is non-null — noUncheckedIndexedAccess can't see that.
+  return { content: Buffer.from(match[2]!, 'base64'), contentType: match[1]! };
+}
+
+// Best-effort: a photo/signature that fails to resolve (a legacy placeholder
+// ref, a transient Storage error) is silently skipped, never fails the whole
+// invoice send — billing is additive, not load-bearing on evidence bytes.
+async function buildAttachments(deps: DrainDeps, evidence: JobEvidence): Promise<MailAttachment[]> {
+  const attachments: MailAttachment[] = [];
+
+  if (evidence.signatureRef !== undefined && evidence.signatureRef !== '') {
+    const inline = decodeDataUrl(evidence.signatureRef);
+    if (inline !== null) {
+      attachments.push({ filename: 'signature.png', content: inline.content, contentType: inline.contentType });
+    } else {
+      try {
+        const content = await deps.objectStorage.download(evidence.signatureRef);
+        attachments.push({ filename: 'signature.png', content, contentType: 'image/png' });
+      } catch {
+        // unresolvable — skip
+      }
+    }
+  }
+
+  for (const [index, ref] of evidence.photoRefs.entries()) {
+    try {
+      const content = await deps.objectStorage.download(ref);
+      attachments.push({ filename: `delivery-photo-${index + 1}.jpg`, content, contentType: 'image/jpeg' });
+    } catch {
+      // legacy/unresolvable ref — skip
+    }
+  }
+
+  return attachments;
+}
+
 // Builds the invoice from the job + the two tenants' own records. Returns
 // null when there's no billing email to send to at all (a hard failure —
 // nothing else here is worth failing the whole invoice over, so the VAT
 // number and company names all degrade gracefully instead).
-async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | null> {
+async function buildInvoice(deps: DrainDeps, job: Job, evidence: JobEvidence | null): Promise<InvoiceData | null> {
   const [shipperTenant, carrierTenant, shipperOwnerProfile, carrierOwnerProfile] = await Promise.all([
     deps.store.getDoc(tenantDoc(job.shipperTenantId)),
     deps.store.getDoc(tenantDoc(job.carrierTenantId)),
@@ -388,6 +506,7 @@ async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | nu
   const shipperCompanyName = (shipperTenant as unknown as Tenant | null)?.name ?? 'Shipper';
   const carrierCompanyName = (carrierTenant as unknown as Tenant | null)?.name ?? 'Carrier';
   const carrierVatNumber = carrierOwnerProfile?.vatNumber?.trim();
+  const recipientName = evidence?.recipientName?.trim();
 
   const now = deps.now();
   const originLabel = `${job.origin.town}, ${job.origin.postcode}`;
@@ -402,6 +521,7 @@ async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | nu
     ...(carrierVatNumber ? { carrierVatNumber } : {}),
     shipperCompanyName,
     recipientEmail,
+    ...(recipientName ? { recipientName } : {}),
     lineItems: [{ description: `Haulage: ${originLabel} → ${destinationLabel}`, amountGbpPence: job.priceGbpPence }],
     totalGbpPence: job.priceGbpPence,
   };
@@ -443,6 +563,45 @@ async function recordInvoiceSent(deps: DrainDeps, taskPath: string, job: Job, in
   });
 }
 
+// Record the outcome as a system-sourced action: the job closed and its load
+// fulfilled (only if that transition is still legal — a replay from a
+// stale-claim reclaim finds the job already 'closed' and simply leaves it
+// alone, so this is safe to re-run), the task done, an append-only job
+// event, and a system audit entry — all in ONE transaction.
+async function recordJobClosed(deps: DrainDeps, taskPath: string, job: Job): Promise<void> {
+  await deps.store.runTransaction(async (tx) => {
+    const task = await tx.get(taskPath);
+    if (task === null || task.status !== 'claimed') return; // already settled elsewhere
+    tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
+
+    const currentJob = await tx.get(jobDoc(job.jobId));
+    if (currentJob === null || !canTransitionJob(currentJob.status as JobStatus, 'closed')) return;
+    tx.write({ kind: 'update', path: jobDoc(job.jobId), data: { status: 'closed' } });
+
+    const eventId = deps.newId('evt');
+    tx.write({
+      kind: 'create',
+      path: jobEventDoc(job.jobId, eventId),
+      data: {
+        eventId,
+        jobId: job.jobId,
+        type: 'job.closed',
+        at: deps.now(),
+        actorId: 'system',
+        source: 'system',
+        detail: { loadId: job.loadId },
+      },
+    });
+
+    const currentLoad = await tx.get(loadDoc(job.loadId));
+    if (currentLoad !== null && canTransitionLoad(currentLoad.status as LoadStatus, 'fulfilled')) {
+      tx.write({ kind: 'update', path: loadDoc(job.loadId), data: { status: 'fulfilled' } });
+    }
+
+    tx.write(systemAuditOp(deps, 'closeJob', { jobId: job.jobId, loadId: job.loadId }));
+  });
+}
+
 async function settle(
   deps: DrainDeps,
   taskPath: string,
@@ -456,7 +615,7 @@ async function settle(
     if (status === 'failed') {
       const type = task.type as OutboxTaskType;
       const detail =
-        type === 'sendInvoiceEmail'
+        type === 'sendInvoiceEmail' || type === 'closeJob'
           ? { jobId: task.jobId, lastError }
           : type === 'sendTestInvoiceEmail'
             ? { recipientEmail: task.recipientEmail, lastError }

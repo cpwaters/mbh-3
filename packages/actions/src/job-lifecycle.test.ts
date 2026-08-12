@@ -237,6 +237,24 @@ describe('deliverJob — the atomic legal event', () => {
     expect(tasks[0]?.data).toMatchObject({ status: 'pending', jobId, tenantId: 'shipper-1', attempts: 0 });
   });
 
+  it('also enqueues a closeJob outbox task atomically with the delivery', async () => {
+    const h = await makeHarness();
+    const jobId = await jobInTransit(h);
+
+    await h.run('driver-1', {
+      type: 'deliverJob',
+      payload: { carrierTenantId: 'carrier-1', jobId, ...validPod },
+      requestId: 'r-close-task',
+    });
+
+    const tasks = await h.store.query({
+      collection: 'outbox',
+      filters: [{ field: 'type', op: '==', value: 'closeJob' }],
+    });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.data).toMatchObject({ status: 'pending', jobId, tenantId: 'shipper-1', attempts: 0 });
+  });
+
   it('refuses a PoD missing the signature (nothing is written)', async () => {
     const h = await makeHarness();
     const jobId = await jobInTransit(h);

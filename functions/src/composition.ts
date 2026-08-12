@@ -6,6 +6,7 @@ import { FirestoreDataStore } from '@mbh/provider-firestore';
 import { PostcodesIoGeocoder } from '@mbh/provider-postcodes-io';
 import { OsrmRouteProvider } from '@mbh/provider-osrm';
 import { NodemailerMailer } from '@mbh/provider-nodemailer';
+import { FirebaseStorageReader } from '@mbh/provider-firebase-storage-admin';
 import { buildRegistry, type DrainDeps, type HttpDispatchDeps } from '@mbh/actions';
 import type { AuthProvider, VerifiedActor } from '@mbh/provider-interfaces';
 
@@ -90,6 +91,7 @@ export function getDrainDeps(): DrainDeps {
       user: () => smtpUserEnv,
       pass: () => smtpPasswordEnv,
     }),
+    objectStorage: new FirebaseStorageReader(),
     now: isoNow,
     newId: prefixedId,
   };

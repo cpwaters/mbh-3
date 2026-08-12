@@ -10,6 +10,7 @@ import {
   InMemoryDataStore,
   InMemoryGeocoder,
   InMemoryMailer,
+  InMemoryObjectStorage,
   InMemoryRouteProvider,
   MockAuthProvider,
 } from '@mbh/provider-mocks';
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
     }),
     routeProvider: new InMemoryRouteProvider(),
     mailer,
+    objectStorage: new InMemoryObjectStorage(),
     now: () => new Date().toISOString(),
     newId: deps.newId, // shared counter -> no audit id collision
   });
@@ -118,6 +120,7 @@ async function main(): Promise<void> {
     geocoder: new InMemoryGeocoder(),
     routeProvider: new InMemoryRouteProvider(),
     mailer,
+    objectStorage: new InMemoryObjectStorage(),
     now: () => new Date().toISOString(),
     newId: deps.newId,
   });
