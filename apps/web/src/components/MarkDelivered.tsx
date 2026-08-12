@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, MapPin } from 'lucide-react';
 import { buildDeliverRequest, genRequestId, type DeliverCapture } from '@mbh/client';
 import { SignaturePad } from './SignaturePad';
+import { getBlobStore } from '../lib/blob-store';
 
 export interface ActiveJob {
   jobId: string;
@@ -9,6 +10,10 @@ export interface ActiveJob {
   origin: string;
   destination: string;
 }
+
+// A local Storage security rule caps uploads at the same size — reject here
+// too, so the driver finds out immediately rather than at sync time.
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
 // The 30-second moment. Capture photo(s) + signature + recipient, then commit
 // to the offline queue — succeeds instantly with no signal.
@@ -29,9 +34,24 @@ export function MarkDelivered({
   const [committed, setCommitted] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  function addPhotos(files: FileList | null) {
+  // Real capture: the file's bytes go into the local blob store immediately
+  // (durable, offline-safe — no network needed) under a generated key; only
+  // that key rides in the deliverJob payload as `photoRefs`. The sync queue
+  // uploads the real bytes to Storage and rewrites the ref once it's
+  // actually online (see apps/web/src/lib/queue.ts's resolvePayload).
+  async function addPhotos(files: FileList | null) {
     if (!files) return;
-    const refs = Array.from(files).map((f) => `capture://${f.name}:${f.size}`);
+    const blobStore = getBlobStore();
+    const refs: string[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_PHOTO_BYTES) {
+        setError({ field: 'photoRefs', message: `${file.name} is too large (max 10MB) — try a smaller photo.` });
+        continue;
+      }
+      const key = `local-blob:${globalThis.crypto.randomUUID()}`;
+      await blobStore.put(key, file);
+      refs.push(key);
+    }
     setPhotoRefs((prev) => [...prev, ...refs]);
   }
 

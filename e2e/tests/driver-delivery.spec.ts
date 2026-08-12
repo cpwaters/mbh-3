@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { E2E, getJobStatus, getLoadStatus } from '../support/admin.js';
+import { E2E, getDeliveryPhotoRefs, getJobStatus, getLoadStatus, storageObjectExists } from '../support/admin.js';
 
 // A minimal valid 1x1 PNG — the "photo of the delivered goods". Inline so
 // there is no binary fixture to maintain.
@@ -372,10 +372,15 @@ async function seedFailedQueueItem(page: Page, requestId: string, jobId: string)
   await page.evaluate(
     async ({ requestId, jobId }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const req = indexedDB.open('mbh-offline', 1);
+        // Version must track packages/providers/indexeddb/src/db.ts's DB_VERSION —
+        // opening below the version the app itself already created throws VersionError.
+        const req = indexedDB.open('mbh-offline', 2);
         req.onupgradeneeded = () => {
           if (!req.result.objectStoreNames.contains('queue')) {
             req.result.createObjectStore('queue', { keyPath: 'requestId' });
+          }
+          if (!req.result.objectStoreNames.contains('blobs')) {
+            req.result.createObjectStore('blobs');
           }
         };
         req.onsuccess = () => resolve(req.result);
@@ -461,4 +466,12 @@ test('the 30-second moment closes the loop to Firestore', async ({ page }) => {
   // The real proof: the authenticated dispatch reached Firestore through the
   // functions emulator and the job is now delivered.
   await expect.poll(() => getJobStatus(E2E.jobId), { timeout: 15_000 }).toBe('delivered');
+
+  // The photo captured offline was a local-blob: ref at submit time — proves
+  // the sync queue actually resolved it to a real Storage path (not a
+  // placeholder) before dispatch, and that the bytes really landed there.
+  const photoRefs = await getDeliveryPhotoRefs(E2E.jobId);
+  expect(photoRefs).toHaveLength(1);
+  expect(photoRefs![0]).toMatch(new RegExp(`^pod/${E2E.jobId}/.+/0\\.jpg$`));
+  await expect(storageObjectExists(photoRefs![0])).resolves.toBe(true);
 });

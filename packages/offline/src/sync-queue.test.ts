@@ -1,16 +1,17 @@
-import { describe, expect, it } from 'vitest';
-import { NonQueueableActionError, SyncQueue } from './sync-queue.js';
+import { describe, expect, it, vi } from 'vitest';
+import { NonQueueableActionError, SyncQueue, type SyncQueueOptions } from './sync-queue.js';
 import { InMemoryQueueStorage, ScriptableTransport } from './testing.js';
 
 const ALLOWED = ['deliverJob', 'acceptLoad'];
 
-function makeQueue() {
+function makeQueue(overrides: Partial<SyncQueueOptions> = {}) {
   const storage = new InMemoryQueueStorage();
   const transport = new ScriptableTransport();
   let clock = 0;
   const queue = new SyncQueue(storage, transport, {
     now: () => `2026-08-01T00:00:${String(clock++).padStart(2, '0')}.000Z`,
     allowedTypes: ALLOWED,
+    ...overrides,
   });
   return { queue, storage, transport };
 }
@@ -170,5 +171,50 @@ describe('retry and discard (failed-record recovery)', () => {
     await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');
     await queue.remove('req-1');
     expect(await queue.pendingCount()).toBe(0);
+  });
+});
+
+describe('resolvePayload (last-second transform before send — e.g. uploading a local photo blob)', () => {
+  it('sends the resolved payload, not the stored one', async () => {
+    const resolvePayload = vi.fn().mockResolvedValue({ jobId: 'j1', photoRefs: ['pod/j1/req-1/0.jpg'] });
+    const { queue, transport } = makeQueue({ resolvePayload });
+    await queue.enqueue('deliverJob', { jobId: 'j1', photoRefs: ['local-blob:1'] }, 'req-1');
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+
+    await queue.drain();
+
+    expect(resolvePayload).toHaveBeenCalledWith('deliverJob', { jobId: 'j1', photoRefs: ['local-blob:1'] }, 'req-1');
+    expect(transport.sends[0]?.payload).toEqual({ jobId: 'j1', photoRefs: ['pod/j1/req-1/0.jpg'] });
+  });
+
+  it('never rewrites the STORED payload — a thrown resolvePayload (e.g. upload failure) leaves the original local refs for the next attempt', async () => {
+    let attempt = 0;
+    const resolvePayload = vi.fn().mockImplementation(async () => {
+      attempt += 1;
+      if (attempt === 1) throw new Error('upload failed');
+      return { jobId: 'j1', photoRefs: ['pod/j1/req-1/0.jpg'] };
+    });
+    const { queue, storage, transport } = makeQueue({ resolvePayload });
+    await queue.enqueue('deliverJob', { jobId: 'j1', photoRefs: ['local-blob:1'] }, 'req-1');
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+
+    const first = await queue.drain();
+    expect(first).toMatchObject({ retrying: 1 });
+    // The stored item still carries the original local-blob ref — resolvePayload
+    // will get another chance to upload the SAME blob on the next drain.
+    expect((await storage.get('req-1'))?.payload).toEqual({ jobId: 'j1', photoRefs: ['local-blob:1'] });
+
+    const second = await queue.drain();
+    expect(second).toMatchObject({ delivered: 1 });
+    expect(transport.sends.at(-1)?.payload).toEqual({ jobId: 'j1', photoRefs: ['pod/j1/req-1/0.jpg'] });
+  });
+
+  it('is a no-op when not provided — the stored payload is sent as-is', async () => {
+    const { queue, transport } = makeQueue(); // no resolvePayload
+    await queue.enqueue('deliverJob', { jobId: 'j1' }, 'req-1');
+    transport.setOutcome('req-1', { outcome: 'ok', result: {} });
+
+    await queue.drain();
+    expect(transport.sends[0]?.payload).toEqual({ jobId: 'j1' });
   });
 });

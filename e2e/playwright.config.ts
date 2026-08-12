@@ -1,9 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Browser journeys against the FULL emulator stack (auth + firestore +
-// functions + hosting). The Firebase Hosting emulator (port 5000) serves the
-// emulator-flavoured web bundle and rewrites /api/** + /health to the functions
-// emulator, so a signed-in capture closes the loop to real Firestore. The
+// functions + hosting + storage). The Firebase Hosting emulator (port 5000)
+// serves the emulator-flavoured web bundle and rewrites /api/** + /health to
+// the functions emulator, so a signed-in capture closes the loop to real
+// Firestore (and, for PoD photos, real Storage). The
 // stack is started by `scripts/run-e2e.sh` via `firebase emulators:exec`;
 // globalSetup seeds the auth user + job. Selectors are user-visible text only.
 export default defineConfig({

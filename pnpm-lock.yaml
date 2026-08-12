@@ -77,6 +77,9 @@ importers:
       '@mbh/provider-firebase-auth-web':
         specifier: workspace:*
         version: link:../../packages/providers/firebase-auth-web
+      '@mbh/provider-firebase-storage-web':
+        specifier: workspace:*
+        version: link:../../packages/providers/firebase-storage-web
       '@mbh/provider-firestore-web':
         specifier: workspace:*
         version: link:../../packages/providers/firestore-web
@@ -347,6 +350,9 @@ importers:
       '@mbh/offline':
         specifier: workspace:*
         version: link:../../offline
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
       idb:
         specifier: ^8.0.0
         version: 8.0.3

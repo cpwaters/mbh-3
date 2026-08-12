@@ -22,6 +22,7 @@
     "@mbh/domain": "workspace:*",
     "@mbh/offline": "workspace:*",
     "@mbh/provider-firebase-auth-web": "workspace:*",
+    "@mbh/provider-firebase-storage-web": "workspace:*",
     "@mbh/provider-firestore-web": "workspace:*",
     "@mbh/provider-http": "workspace:*",
     "@mbh/provider-indexeddb": "workspace:*",

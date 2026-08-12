@@ -34,7 +34,7 @@ export class InMemoryQueueStorage implements QueueStorage {
 export class ScriptableTransport implements DispatchTransport {
   private outcomes = new Map<string, SendOutcome>();
   private fallback: SendOutcome = { outcome: 'retry', error: 'offline' };
-  readonly sends: { requestId: string; type: string }[] = [];
+  readonly sends: { requestId: string; type: string; payload: unknown }[] = [];
 
   setOutcome(requestId: string, outcome: SendOutcome): void {
     this.outcomes.set(requestId, outcome);
@@ -43,7 +43,7 @@ export class ScriptableTransport implements DispatchTransport {
     this.fallback = outcome;
   }
   async send(request: { type: string; payload: unknown; requestId: string }): Promise<SendOutcome> {
-    this.sends.push({ requestId: request.requestId, type: request.type });
+    this.sends.push({ requestId: request.requestId, type: request.type, payload: request.payload });
     return this.outcomes.get(request.requestId) ?? this.fallback;
   }
 }
