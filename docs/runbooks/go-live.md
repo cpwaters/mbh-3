@@ -22,7 +22,7 @@ credentials.
       deploy` insists on enabling `firebaseextensions.googleapis.com` and the
       scheduled `drain` function needs Cloud Scheduler + Pub/Sub; enable them
       up front so the least-privileged deploy SA never has to (it can't):
-      `! gcloud services enable cloudbilling.googleapis.com billingbudgets.googleapis.com monitoring.googleapis.com iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com firestore.googleapis.com firebasehosting.googleapis.com firebaseextensions.googleapis.com firebaserules.googleapis.com cloudscheduler.googleapis.com pubsub.googleapis.com cloudresourcemanager.googleapis.com --project mybackhaul-app`
+      `! gcloud services enable cloudbilling.googleapis.com billingbudgets.googleapis.com monitoring.googleapis.com iam.googleapis.com iamcredentials.googleapis.com sts.googleapis.com cloudfunctions.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com run.googleapis.com eventarc.googleapis.com firestore.googleapis.com firebasehosting.googleapis.com firebaseextensions.googleapis.com firebaserules.googleapis.com firebasestorage.googleapis.com cloudscheduler.googleapis.com pubsub.googleapis.com cloudresourcemanager.googleapis.com --project mybackhaul-app`
 - [ ] Firestore database created in `europe-west2`:
       `! gcloud firestore databases create --location=europe-west2 --project mybackhaul-app`
 
