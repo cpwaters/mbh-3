@@ -119,7 +119,7 @@ describe('runDrainOnce — enrichLoadRoute', () => {
     await runDrainOnce(drainDeps(harness));
 
     const summary = await runDrainOnce(drainDeps(harness));
-    expect(summary).toEqual({ reclaimed: 0, enriched: 0, invoiced: 0, retried: 0, failed: 0, skipped: 0 });
+    expect(summary).toEqual({ reclaimed: 0, enriched: 0, invoiced: 0, closed: 0, retried: 0, failed: 0, skipped: 0 });
   });
 
   it('fails permanently when a postcode is unknown', async () => {
@@ -338,6 +338,50 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     const attachments = mailer.sentAttachments[0]!;
     expect(attachments).toHaveLength(1);
     expect(attachments[0]).toMatchObject({ filename: 'signature.png' });
+  });
+});
+
+describe('runDrainOnce — closeJob', () => {
+  it('closes the job and fulfills its load once delivered, recording the outcome', async () => {
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    const jobId = await deliveredJob(harness);
+    const job = await harness.store.getDoc(`jobs/${jobId}`);
+    const loadId = job?.loadId as string;
+
+    const summary = await runDrainOnce(drainDeps(harness));
+    expect(summary).toMatchObject({ closed: 1, failed: 0, retried: 0 });
+
+    expect(await harness.store.getDoc(`jobs/${jobId}`)).toMatchObject({ status: 'closed' });
+    expect(await harness.store.getDoc(`loads/${loadId}`)).toMatchObject({ status: 'fulfilled' });
+
+    const events = await harness.store.query({ collection: `jobs/${jobId}/events` });
+    expect(events.some((e) => e.data.type === 'job.closed')).toBe(true);
+
+    const audits = await harness.store.query({
+      collection: 'audit',
+      filters: [{ field: 'action', op: '==', value: 'closeJob' }],
+    });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]?.data).toMatchObject({ jobId, loadId, actorId: 'system', source: 'system' });
+
+    const tasks = await harness.store.query({
+      collection: 'outbox',
+      filters: [{ field: 'type', op: '==', value: 'closeJob' }],
+    });
+    expect(tasks[0]?.data).toMatchObject({ status: 'done' });
+  });
+
+  it('closes the job regardless of whether the invoice email succeeds', async () => {
+    const harness = await makeHarness();
+    // No billing profile seeded — sendInvoiceEmail fails permanently — but
+    // closure is a separate task, unaffected by billing configuration.
+    const jobId = await deliveredJob(harness);
+
+    const summary = await runDrainOnce(drainDeps(harness));
+    expect(summary).toMatchObject({ closed: 1, invoiced: 0, failed: 1 });
+
+    expect(await harness.store.getDoc(`jobs/${jobId}`)).toMatchObject({ status: 'closed' });
   });
 });
 

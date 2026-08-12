@@ -1,12 +1,16 @@
 import {
   buildInvoiceNumber,
+  canTransitionJob,
+  canTransitionLoad,
   invoiceDueDate,
   MAX_OUTBOX_ATTEMPTS,
   type Address,
   type InvoiceData,
   type Job,
   type JobEvidence,
+  type JobStatus,
   type LoadRoute,
+  type LoadStatus,
   type Member,
   type OutboxTask,
   type OutboxTaskType,
@@ -47,6 +51,7 @@ export interface DrainSummary {
   reclaimed: number; // stale claims reset to pending
   enriched: number; // route recorded
   invoiced: number; // invoice email sent
+  closed: number; // job closed + its load freed for reuse
   retried: number; // recoverable failure, left pending for the next run
   failed: number; // permanently gave up
   skipped: number; // lost the claim race / nothing to do
@@ -58,7 +63,15 @@ const MAX_PER_RUN = 10;
 const STALE_CLAIM_MS = 5 * 60 * 1000;
 
 export async function runDrainOnce(deps: DrainDeps): Promise<DrainSummary> {
-  const summary: DrainSummary = { reclaimed: 0, enriched: 0, invoiced: 0, retried: 0, failed: 0, skipped: 0 };
+  const summary: DrainSummary = {
+    reclaimed: 0,
+    enriched: 0,
+    invoiced: 0,
+    closed: 0,
+    retried: 0,
+    failed: 0,
+    skipped: 0,
+  };
 
   summary.reclaimed = await reclaimStale(deps);
 
@@ -105,11 +118,12 @@ async function reclaimStale(deps: DrainDeps): Promise<number> {
   return reclaimed;
 }
 
-type ProcessOutcome = 'enriched' | 'invoiced' | 'retried' | 'failed' | 'skipped';
+type ProcessOutcome = 'enriched' | 'invoiced' | 'closed' | 'retried' | 'failed' | 'skipped';
 
 function processTask(deps: DrainDeps, taskPath: string, type: OutboxTaskType): Promise<ProcessOutcome> {
   if (type === 'sendInvoiceEmail') return processSendInvoiceEmail(deps, taskPath);
   if (type === 'sendTestInvoiceEmail') return processSendTestInvoiceEmail(deps, taskPath);
+  if (type === 'closeJob') return processCloseJob(deps, taskPath);
   return processEnrichLoadRoute(deps, taskPath);
 }
 
@@ -259,6 +273,49 @@ async function processSendInvoiceEmail(deps: DrainDeps, taskPath: string): Promi
     await deps.mailer.sendInvoice(invoice, attachments);
     await recordInvoiceSent(deps, taskPath, job, invoice);
     return 'invoiced';
+  } catch (error) {
+    const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
+    const message = error instanceof Error ? error.message : String(error);
+    if (recoverable && attempts < MAX_OUTBOX_ATTEMPTS) {
+      await settle(deps, taskPath, 'pending', message); // retried next run
+      return 'retried';
+    }
+    await settle(deps, taskPath, 'failed', message);
+    return 'failed';
+  }
+}
+
+// Closes the loop: once a job has been delivered, mark it fully wrapped up
+// (Job: delivered -> closed) and free its load for reuse (Load: matched ->
+// fulfilled). Enqueued atomically by deliverJob alongside sendInvoiceEmail,
+// but processed independently — a bounced/misconfigured invoice email is a
+// billing hiccup, not a reason to leave the job/load stuck open.
+async function processCloseJob(deps: DrainDeps, taskPath: string): Promise<ProcessOutcome> {
+  const claim = await deps.store.runTransaction(async (tx) => {
+    const task = (await tx.get(taskPath)) as (OutboxTask & Record<string, unknown>) | null;
+    if (task === null || task.status !== 'pending') return null; // lost the race
+    const job = task.jobId !== undefined ? await tx.get(jobDoc(task.jobId)) : null;
+    tx.write({
+      kind: 'update',
+      path: taskPath,
+      data: { status: 'claimed', claimedAt: deps.now(), attempts: task.attempts + 1 },
+    });
+    return { task, job };
+  });
+
+  if (claim === null) return 'skipped';
+  const attempts = claim.task.attempts + 1;
+
+  if (claim.job === null) {
+    await settle(deps, taskPath, 'failed', 'job not found');
+    return 'failed';
+  }
+
+  const job = claim.job as unknown as Job;
+
+  try {
+    await recordJobClosed(deps, taskPath, job);
+    return 'closed';
   } catch (error) {
     const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
     const message = error instanceof Error ? error.message : String(error);
@@ -506,6 +563,45 @@ async function recordInvoiceSent(deps: DrainDeps, taskPath: string, job: Job, in
   });
 }
 
+// Record the outcome as a system-sourced action: the job closed and its load
+// fulfilled (only if that transition is still legal — a replay from a
+// stale-claim reclaim finds the job already 'closed' and simply leaves it
+// alone, so this is safe to re-run), the task done, an append-only job
+// event, and a system audit entry — all in ONE transaction.
+async function recordJobClosed(deps: DrainDeps, taskPath: string, job: Job): Promise<void> {
+  await deps.store.runTransaction(async (tx) => {
+    const task = await tx.get(taskPath);
+    if (task === null || task.status !== 'claimed') return; // already settled elsewhere
+    tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
+
+    const currentJob = await tx.get(jobDoc(job.jobId));
+    if (currentJob === null || !canTransitionJob(currentJob.status as JobStatus, 'closed')) return;
+    tx.write({ kind: 'update', path: jobDoc(job.jobId), data: { status: 'closed' } });
+
+    const eventId = deps.newId('evt');
+    tx.write({
+      kind: 'create',
+      path: jobEventDoc(job.jobId, eventId),
+      data: {
+        eventId,
+        jobId: job.jobId,
+        type: 'job.closed',
+        at: deps.now(),
+        actorId: 'system',
+        source: 'system',
+        detail: { loadId: job.loadId },
+      },
+    });
+
+    const currentLoad = await tx.get(loadDoc(job.loadId));
+    if (currentLoad !== null && canTransitionLoad(currentLoad.status as LoadStatus, 'fulfilled')) {
+      tx.write({ kind: 'update', path: loadDoc(job.loadId), data: { status: 'fulfilled' } });
+    }
+
+    tx.write(systemAuditOp(deps, 'closeJob', { jobId: job.jobId, loadId: job.loadId }));
+  });
+}
+
 async function settle(
   deps: DrainDeps,
   taskPath: string,
@@ -519,7 +615,7 @@ async function settle(
     if (status === 'failed') {
       const type = task.type as OutboxTaskType;
       const detail =
-        type === 'sendInvoiceEmail'
+        type === 'sendInvoiceEmail' || type === 'closeJob'
           ? { jobId: task.jobId, lastError }
           : type === 'sendTestInvoiceEmail'
             ? { recipientEmail: task.recipientEmail, lastError }
