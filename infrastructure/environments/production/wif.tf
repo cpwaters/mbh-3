@@ -59,6 +59,13 @@ locals {
     # Scheduled (onSchedule) functions like the drain deploy a Cloud Scheduler
     # job; the deployer must be able to create/update it.
     "roles/cloudscheduler.admin",
+    # firebase deploy --only storage first resolves the project's default
+    # Storage bucket (firebasestorage.defaultBucket.get) before it can push
+    # storage.rules — without this, the deploy fails during that pre-flight
+    # check and (since it's one combined `firebase deploy` command) aborts
+    # before touching hosting/functions/firestore too. Added 2026-08-12
+    # after exactly that outage; see docs/HANDOFF.md.
+    "roles/firebasestorage.admin",
   ]
 }
 
