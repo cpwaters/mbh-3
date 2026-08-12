@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GeoPoint } from '@mbh/domain';
-import { InMemoryGeocoder, InMemoryMailer, InMemoryRouteProvider } from '@mbh/provider-mocks';
+import { InMemoryGeocoder, InMemoryMailer, InMemoryObjectStorage, InMemoryRouteProvider } from '@mbh/provider-mocks';
 import { runDrainOnce, type DrainDeps } from './drain.js';
 import { makeHarness, validPostLoadPayload, type Harness } from './test-harness.js';
 
@@ -20,7 +20,7 @@ async function seedLoad(harness: Harness): Promise<void> {
 
 function drainDeps(
   harness: Harness,
-  overrides: Partial<Pick<DrainDeps, 'geocoder' | 'routeProvider' | 'mailer'>> = {}
+  overrides: Partial<Pick<DrainDeps, 'geocoder' | 'routeProvider' | 'mailer' | 'objectStorage'>> = {}
 ): DrainDeps {
   let n = 0;
   return {
@@ -30,6 +30,7 @@ function drainDeps(
       new InMemoryGeocoder({ [ORIGIN_PC]: TRAFFORD, [DEST_PC]: LEITH }),
     routeProvider: overrides.routeProvider ?? new InMemoryRouteProvider(),
     mailer: overrides.mailer ?? new InMemoryMailer(),
+    objectStorage: overrides.objectStorage ?? new InMemoryObjectStorage(),
     now: () => '2026-08-01T10:00:00.000Z',
     // Distinct from the harness's ids so the system audit never collides.
     newId: (prefix: string) => `${prefix}-drain-${++n}`,
@@ -181,7 +182,10 @@ async function seedShipperBillingProfile(harness: Harness, overrides: Record<str
 
 // Drives a fresh load all the way to 'delivered' for driver-1 — the trigger
 // for the sendInvoiceEmail outbox task.
-async function deliveredJob(harness: Harness): Promise<string> {
+async function deliveredJob(
+  harness: Harness,
+  evidence: { photoRefs?: string[]; signatureRef?: string } = {}
+): Promise<string> {
   const { loadId } = (await harness.run('ship-owner', {
     type: 'postLoad',
     payload: validPostLoadPayload(),
@@ -207,8 +211,8 @@ async function deliveredJob(harness: Harness): Promise<string> {
     payload: {
       carrierTenantId: 'carrier-1',
       jobId,
-      photoRefs: ['storage://pod/photo-1.jpg'],
-      signatureRef: 'storage://pod/sig-1.png',
+      photoRefs: evidence.photoRefs ?? ['storage://pod/photo-1.jpg'],
+      signatureRef: evidence.signatureRef ?? 'storage://pod/sig-1.png',
       recipientName: 'J. Smith',
     },
     requestId: `deliver-${jobId}`,
@@ -293,6 +297,47 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     const second = await runDrainOnce(drainDeps(harness, { mailer }));
     expect(second).toMatchObject({ invoiced: 1 });
     expect(mailer.sent).toHaveLength(1);
+  });
+
+  it('attaches the signature (inline data URL) and resolvable photos, and includes recipientName', async () => {
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    const objectStorage = new InMemoryObjectStorage();
+    const photoRef = 'pod/job-1/req-1/0.jpg';
+    await objectStorage.upload(photoRef, new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'image/jpeg');
+
+    await deliveredJob(harness, { photoRefs: [photoRef], signatureRef: 'data:image/png;base64,c2ln' });
+
+    const mailer = new InMemoryMailer();
+    const summary = await runDrainOnce(drainDeps(harness, { mailer, objectStorage }));
+    expect(summary).toMatchObject({ invoiced: 1, failed: 0 });
+
+    expect(mailer.sent[0]).toMatchObject({ recipientName: 'J. Smith' });
+    const attachments = mailer.sentAttachments[0]!;
+    expect(attachments).toHaveLength(2);
+    expect(attachments.find((a) => a.filename === 'signature.png')).toMatchObject({ contentType: 'image/png' });
+    expect(attachments.find((a) => a.filename === 'delivery-photo-1.jpg')).toMatchObject({
+      contentType: 'image/jpeg',
+    });
+  });
+
+  it('still sends when a photo ref cannot be resolved (a legacy placeholder), keeping the signature', async () => {
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    const objectStorage = new InMemoryObjectStorage(); // nothing uploaded — every ref is unresolvable
+
+    await deliveredJob(harness, {
+      photoRefs: ['capture://legacy-name:1024'],
+      signatureRef: 'data:image/png;base64,c2ln',
+    });
+
+    const mailer = new InMemoryMailer();
+    const summary = await runDrainOnce(drainDeps(harness, { mailer, objectStorage }));
+    expect(summary).toMatchObject({ invoiced: 1, failed: 0 });
+
+    const attachments = mailer.sentAttachments[0]!;
+    expect(attachments).toHaveLength(1);
+    expect(attachments[0]).toMatchObject({ filename: 'signature.png' });
   });
 });
 

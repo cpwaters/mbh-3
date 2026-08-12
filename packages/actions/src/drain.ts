@@ -5,6 +5,7 @@ import {
   type Address,
   type InvoiceData,
   type Job,
+  type JobEvidence,
   type LoadRoute,
   type Member,
   type OutboxTask,
@@ -16,6 +17,7 @@ import {
   auditDoc,
   jobDoc,
   jobEventDoc,
+  jobEvidenceCollection,
   jobsCollection,
   listingDoc,
   loadDoc,
@@ -24,7 +26,7 @@ import {
   tenantDoc,
   userProfileDoc,
 } from '@mbh/paths';
-import type { DataStore, Geocoder, Mailer, RouteProvider } from '@mbh/provider-interfaces';
+import type { DataStore, Geocoder, Mailer, MailAttachment, ObjectStorageReader, RouteProvider } from '@mbh/provider-interfaces';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
 // runs against the in-memory providers in CI and against Firestore + the real
@@ -36,6 +38,7 @@ export interface DrainDeps {
   geocoder: Geocoder;
   routeProvider: RouteProvider;
   mailer: Mailer;
+  objectStorage: ObjectStorageReader;
   now(): string; // ISO-8601 UTC
   newId(prefix: string): string;
 }
@@ -245,13 +248,15 @@ async function processSendInvoiceEmail(deps: DrainDeps, taskPath: string): Promi
   const job = claim.job as unknown as Job;
 
   try {
-    const invoice = await buildInvoice(deps, job);
+    const evidence = await loadDeliveryEvidence(deps, job.jobId);
+    const invoice = await buildInvoice(deps, job, evidence);
     if (invoice === null) {
       await settle(deps, taskPath, 'failed', 'no billing email on file for the shipper');
       return 'failed';
     }
 
-    await deps.mailer.sendInvoice(invoice);
+    const attachments = evidence !== null ? await buildAttachments(deps, evidence) : [];
+    await deps.mailer.sendInvoice(invoice, attachments);
     await recordInvoiceSent(deps, taskPath, job, invoice);
     return 'invoiced';
   } catch (error) {
@@ -370,11 +375,67 @@ async function resolveOwnerProfile(deps: DrainDeps, tenantId: string): Promise<U
   return profile === null ? null : (profile as unknown as UserProfile);
 }
 
+// The PoD evidence recorded atomically by deliverJob — null only for jobs
+// that somehow reached 'delivered' without one (shouldn't happen; deliverJob
+// always writes evidence + status in the same batch).
+async function loadDeliveryEvidence(deps: DrainDeps, jobId: string): Promise<JobEvidence | null> {
+  const rows = await deps.store.query({
+    collection: jobEvidenceCollection(jobId),
+    filters: [{ field: 'kind', op: '==', value: 'delivery' }],
+    limit: 1,
+  });
+  return rows[0] === undefined ? null : (rows[0].data as unknown as JobEvidence);
+}
+
+// A signature is captured as an inline base64 data URL (see SignaturePad.tsx)
+// — decode it directly, no Storage round-trip. Falls back to a real Storage
+// download if it's ever not a data URL (e.g. a future migration), so this
+// stays correct rather than silently dropping the attachment.
+function decodeDataUrl(value: string): { content: Buffer; contentType: string } | null {
+  const match = /^data:([^;]+);base64,(.+)$/s.exec(value);
+  if (match === null) return null;
+  // Two capturing groups in the pattern above guarantee both are present
+  // whenever match is non-null — noUncheckedIndexedAccess can't see that.
+  return { content: Buffer.from(match[2]!, 'base64'), contentType: match[1]! };
+}
+
+// Best-effort: a photo/signature that fails to resolve (a legacy placeholder
+// ref, a transient Storage error) is silently skipped, never fails the whole
+// invoice send — billing is additive, not load-bearing on evidence bytes.
+async function buildAttachments(deps: DrainDeps, evidence: JobEvidence): Promise<MailAttachment[]> {
+  const attachments: MailAttachment[] = [];
+
+  if (evidence.signatureRef !== undefined && evidence.signatureRef !== '') {
+    const inline = decodeDataUrl(evidence.signatureRef);
+    if (inline !== null) {
+      attachments.push({ filename: 'signature.png', content: inline.content, contentType: inline.contentType });
+    } else {
+      try {
+        const content = await deps.objectStorage.download(evidence.signatureRef);
+        attachments.push({ filename: 'signature.png', content, contentType: 'image/png' });
+      } catch {
+        // unresolvable — skip
+      }
+    }
+  }
+
+  for (const [index, ref] of evidence.photoRefs.entries()) {
+    try {
+      const content = await deps.objectStorage.download(ref);
+      attachments.push({ filename: `delivery-photo-${index + 1}.jpg`, content, contentType: 'image/jpeg' });
+    } catch {
+      // legacy/unresolvable ref — skip
+    }
+  }
+
+  return attachments;
+}
+
 // Builds the invoice from the job + the two tenants' own records. Returns
 // null when there's no billing email to send to at all (a hard failure —
 // nothing else here is worth failing the whole invoice over, so the VAT
 // number and company names all degrade gracefully instead).
-async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | null> {
+async function buildInvoice(deps: DrainDeps, job: Job, evidence: JobEvidence | null): Promise<InvoiceData | null> {
   const [shipperTenant, carrierTenant, shipperOwnerProfile, carrierOwnerProfile] = await Promise.all([
     deps.store.getDoc(tenantDoc(job.shipperTenantId)),
     deps.store.getDoc(tenantDoc(job.carrierTenantId)),
@@ -388,6 +449,7 @@ async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | nu
   const shipperCompanyName = (shipperTenant as unknown as Tenant | null)?.name ?? 'Shipper';
   const carrierCompanyName = (carrierTenant as unknown as Tenant | null)?.name ?? 'Carrier';
   const carrierVatNumber = carrierOwnerProfile?.vatNumber?.trim();
+  const recipientName = evidence?.recipientName?.trim();
 
   const now = deps.now();
   const originLabel = `${job.origin.town}, ${job.origin.postcode}`;
@@ -402,6 +464,7 @@ async function buildInvoice(deps: DrainDeps, job: Job): Promise<InvoiceData | nu
     ...(carrierVatNumber ? { carrierVatNumber } : {}),
     shipperCompanyName,
     recipientEmail,
+    ...(recipientName ? { recipientName } : {}),
     lineItems: [{ description: `Haulage: ${originLabel} → ${destinationLabel}`, amountGbpPence: job.priceGbpPence }],
     totalGbpPence: job.priceGbpPence,
   };

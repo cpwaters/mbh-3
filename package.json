@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@mbh/actions": "workspace:*",
+    "@mbh/provider-firebase-storage-admin": "workspace:*",
     "@mbh/provider-firestore": "workspace:*",
     "@mbh/provider-interfaces": "workspace:*",
     "@mbh/provider-nodemailer": "workspace:*",

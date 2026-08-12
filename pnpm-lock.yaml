@@ -11,6 +11,9 @@ importers:
       '@mbh/actions':
         specifier: workspace:*
         version: link:packages/actions
+      '@mbh/provider-firebase-storage-admin':
+        specifier: workspace:*
+        version: link:packages/providers/firebase-storage-admin
       '@mbh/provider-firestore':
         specifier: workspace:*
         version: link:packages/providers/firestore
