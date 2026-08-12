@@ -97,7 +97,7 @@ jobs:
             echo "SMTP_USER=${{ secrets.SMTP_USER }}" >> functions/.env
             echo "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}" >> functions/.env
           fi
-      - run: pnpm exec firebase deploy --only functions,hosting,firestore --project mybackhaul-app --non-interactive
+      - run: pnpm exec firebase deploy --only functions,hosting,firestore,storage --project mybackhaul-app --non-interactive
       - run: pnpm smoke:prod
         env:
           SMOKE_BASE_URL: https://mybackhaul-app.web.app
