@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Package, Weight, Box, Clock, Navigation, XCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Package, Weight, Box, Clock, Navigation, XCircle, Copy } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import type { ShipperLoad } from '@mbh/provider-interfaces';
@@ -9,6 +10,7 @@ import { dispatchAction } from '../../lib/dispatch';
 import LiveLocationMap from '../LiveLocationMap';
 import { extractPostcode, geocodePostcode, type GeoPoint } from '../../lib/geocode';
 import { getDrivingRoute } from '../../lib/routing';
+import type { Form } from './CreateLoad';
 import {
   JobCard,
   JobCardRoute,
@@ -19,6 +21,33 @@ import {
 } from '../JobCard';
 
 const TRACKABLE_STATUSES = ['matched', 'accepted', 'collected', 'in_transit'];
+
+// The addresses of a fulfilled load, carried into a fresh Create Load form —
+// weight, pallets, price, and schedule are deliberately left for the shipper
+// to fill in fresh (see CreateLoad.tsx's "reused" prefill).
+function reuseFieldsFrom(load: ShipperLoad): Partial<Form> {
+  return {
+    source_company_name: load.sourceCompanyName,
+    source_street: load.originAddress.line1,
+    source_town: load.originAddress.town,
+    // No separate "city" is stored on the domain Address — town is the
+    // closest available value, and it's editable if the shipper wants to
+    // be more precise.
+    source_city: load.originAddress.town,
+    source_postcode: load.originAddress.postcode,
+    source_contact_name: load.sourceContact.name,
+    source_contact_email: load.sourceContact.email,
+    source_contact_phone: load.sourceContact.phone,
+    destination_company_name: load.destinationCompanyName,
+    destination_street: load.destinationAddress.line1,
+    destination_town: load.destinationAddress.town,
+    destination_city: load.destinationAddress.town,
+    destination_postcode: load.destinationAddress.postcode,
+    destination_contact_name: load.destinationContact.name,
+    destination_contact_email: load.destinationContact.email,
+    destination_contact_phone: load.destinationContact.phone,
+  };
+}
 
 // A small map for one load: geocodes its origin/destination strings and draws
 // the road-following route. (mbh-3 has no server-side live GPS, so no driver
@@ -91,6 +120,7 @@ function SummaryCard({ label, value, tint, text }: { label: string; value: numbe
 // LoadsList.tsx). Wired to mbh-3's loadsForShipper + the cancelLoad dispatch.
 export default function LoadsList() {
   const app = useApp();
+  const navigate = useNavigate();
   const shipperTenantId = app.selected?.tenantId ?? null;
   const { loading, loads, reload } = useShipperLoads(shipperTenantId);
   const [trackedLoadId, setTrackedLoadId] = useState<string | null>(null);
@@ -135,9 +165,10 @@ export default function LoadsList() {
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">{error}</div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
         <SummaryCard label="Available" value={count('available')} tint="bg-green-100" text="text-green-600" />
         <SummaryCard label="Matched" value={count('matched')} tint="bg-blue-100" text="text-blue-600" />
+        <SummaryCard label="Fulfilled" value={count('fulfilled')} tint="bg-emerald-100" text="text-emerald-600" />
         <SummaryCard label="Cancelled" value={count('cancelled')} tint="bg-yellow-100" text="text-yellow-600" />
         <SummaryCard label="Total Loads" value={loads.length} tint="bg-gray-100" text="text-gray-900" />
       </div>
@@ -196,6 +227,16 @@ export default function LoadsList() {
                 >
                   <Navigation className="w-4 h-4" />
                   {trackedLoadId === load.loadId ? 'Hide Route' : 'View Route'}
+                </button>
+              )}
+              {load.status === 'fulfilled' && (
+                <button
+                  onClick={() => navigate('/create', { state: { reuseFrom: reuseFieldsFrom(load) } })}
+                  className="w-full sm:w-auto px-4 py-2 border border-blue-300 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                  title="Start a new load with this one's addresses filled in"
+                >
+                  <Copy className="w-4 h-4" />
+                  Reuse this load
                 </button>
               )}
               <button

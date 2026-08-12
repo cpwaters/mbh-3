@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { MapPin, Box, Building, Truck, CreditCard, PoundSterling } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { MapPin, Box, Building, Truck, CreditCard, PoundSterling, Info } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { dispatchAction } from '../../lib/dispatch';
@@ -21,7 +22,7 @@ const empty = {
   refrigerated: false, box: false, flat_bed: false, low_loader: false, skeleton: false, tanker: false,
   invoiced: false, instant_payment: false,
 };
-type Form = typeof empty;
+export type Form = typeof empty;
 
 // Ported from the mbh-2 distributor prototype (distributor/src/pages/
 // CreateLoad.tsx). Wired to mbh-3's postLoad — the core (origin/destination/
@@ -29,8 +30,18 @@ type Form = typeof empty;
 // posting details. A price field is added (mbh-3 requires it).
 export default function CreateLoad() {
   const app = useApp();
+  const location = useLocation();
   const shipperTenantId = app.selected?.tenantId ?? null;
-  const [f, setF] = useState<Form>(empty);
+  // "Reuse this load" (LoadsList.tsx) navigates here with the addresses of a
+  // fulfilled load pre-filled via router state — weight/pallets/dates are
+  // deliberately left blank for the shipper to fill in fresh. Read once at
+  // mount (router state is available synchronously, unlike EditProfile's
+  // async-fetched prefill, so no seeding effect is needed).
+  const [f, setF] = useState<Form>(() => {
+    const reuseFrom = (location.state as { reuseFrom?: Partial<Form> } | null)?.reuseFrom;
+    return reuseFrom ? { ...empty, ...reuseFrom } : empty;
+  });
+  const [reused] = useState(() => (location.state as { reuseFrom?: Partial<Form> } | null)?.reuseFrom !== undefined);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -203,6 +214,14 @@ export default function CreateLoad() {
         <p className="text-gray-600">Fill in all required fields to create a new load</p>
       </div>
 
+      {reused && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-blue-800">
+            Addresses carried over from a previous load — update the weight, pallets, and schedule below.
+          </p>
+        </div>
+      )}
       {successMessage && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm text-green-800">{successMessage}</p>

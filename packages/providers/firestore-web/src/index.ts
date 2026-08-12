@@ -20,6 +20,7 @@ import {
   type Load,
   type LoadRoute,
   metersToMiles,
+  type ProfileContact,
   type Role,
   type TenantCapability,
   type UserProfile,
@@ -66,6 +67,10 @@ export interface FirestoreWebOptions {
   config: FirestoreWebConfig;
   emulator?: { host: string; port: number };
 }
+
+// A load with no postingDetails carries no contact info at all — this is the
+// fallback for loadsForShipper's ShipperLoad projection.
+const emptyContact: ProfileContact = { name: '', email: '', phone: '' };
 
 interface JobDoc {
   jobId: string;
@@ -179,6 +184,12 @@ export class FirestoreReader
         loadId: load.loadId,
         origin: `${load.origin.town}, ${load.origin.postcode}`,
         destination: `${load.destination.town}, ${load.destination.postcode}`,
+        originAddress: load.origin,
+        destinationAddress: load.destination,
+        sourceCompanyName: load.postingDetails?.sourceCompanyName ?? '',
+        destinationCompanyName: load.postingDetails?.destinationCompanyName ?? '',
+        sourceContact: load.postingDetails?.sourceContact ?? emptyContact,
+        destinationContact: load.postingDetails?.destinationContact ?? emptyContact,
         // The drain's driving route, not the shipper's create-load estimate
         // (postingDetails.distanceMiles) — null until it's enriched.
         distanceMiles: load.route !== undefined ? Math.round(metersToMiles(load.route.distanceMeters)) : null,
