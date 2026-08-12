@@ -93,6 +93,26 @@ describe('backfillCloseJobs — one-off repair for jobs stuck at delivered', () 
     expect(result.jobIds).toEqual(['job-old-2']);
   });
 
+  it('scopes to one specific load when loadId is given (the per-load "Mark as fulfilled" button)', async () => {
+    const h = await makeHarness();
+    await seedDeliveredJob(h, 'job-old-6');
+    await seedDeliveredJob(h, 'job-old-7');
+
+    const result = (await h.run('ship-owner', {
+      type: 'backfillCloseJobs',
+      payload: { tenantId: 'shipper-1', loadId: 'load-job-old-6' },
+      requestId: 'r-backfill-scoped',
+    })) as { jobIds: string[] };
+
+    expect(result.jobIds).toEqual(['job-old-6']);
+    const tasks = await h.store.query({
+      collection: 'outbox',
+      filters: [{ field: 'type', op: '==', value: 'closeJob' }],
+    });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]?.data).toMatchObject({ jobId: 'job-old-6' });
+  });
+
   it('ignores jobs not currently at delivered (already closed, or still in flight)', async () => {
     const h = await makeHarness();
     await seedDeliveredJob(h, 'job-closed', { status: 'closed' });

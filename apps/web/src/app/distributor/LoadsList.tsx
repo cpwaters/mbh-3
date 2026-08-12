@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Weight, Box, Clock, Navigation, XCircle, Copy } from 'lucide-react';
+import { Package, Weight, Box, Clock, Navigation, XCircle, Copy, Wrench } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import type { ShipperLoad } from '@mbh/provider-interfaces';
@@ -125,6 +125,7 @@ export default function LoadsList() {
   const { loading, loads, reload } = useShipperLoads(shipperTenantId);
   const [trackedLoadId, setTrackedLoadId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [backfillingId, setBackfillingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCancel(load: ShipperLoad): Promise<void> {
@@ -140,6 +141,25 @@ export default function LoadsList() {
     if (res.ok) reload();
     else setError(res.error.message);
     setCancellingId(null);
+  }
+
+  // Repair: this load's job reached 'delivered' before the closeJob
+  // mechanism existed, so it never got queued to close — see
+  // needsClosureBackfill's doc comment. Queues it now for THIS load only;
+  // the drain closes it within its next ~1-minute tick.
+  async function handleBackfillClosure(load: ShipperLoad): Promise<void> {
+    if (shipperTenantId === null) return;
+    setBackfillingId(load.loadId);
+    setError(null);
+    const res = await dispatchAction(
+      app.auth.getIdToken,
+      'backfillCloseJobs',
+      { tenantId: shipperTenantId, loadId: load.loadId },
+      genRequestId()
+    );
+    if (res.ok) reload();
+    else setError(res.error.message);
+    setBackfillingId(null);
   }
 
   const count = (status: string) => loads.filter((l) => l.status === status).length;
@@ -237,6 +257,17 @@ export default function LoadsList() {
                 >
                   <Copy className="w-4 h-4" />
                   Reuse this load
+                </button>
+              )}
+              {load.status === 'matched' && load.needsClosureBackfill && (
+                <button
+                  onClick={() => void handleBackfillClosure(load)}
+                  disabled={backfillingId === load.loadId}
+                  className="w-full sm:w-auto px-4 py-2 border border-emerald-300 text-emerald-700 rounded-lg font-medium hover:bg-emerald-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  title="This load's job was delivered but never marked fulfilled — fix it"
+                >
+                  <Wrench className="w-4 h-4" />
+                  {backfillingId === load.loadId ? 'Fixing…' : 'Mark as fulfilled'}
                 </button>
               )}
               <button

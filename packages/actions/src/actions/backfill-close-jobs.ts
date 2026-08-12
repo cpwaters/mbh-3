@@ -6,16 +6,21 @@ import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
 import { zodParse } from '../parse.js';
 
-// A one-off repair tool: closeJob is enqueued by deliverJob going forward,
-// but any job that reached 'delivered' BEFORE that existed has no such task
-// and is stuck there forever (its load stuck at 'matched', never reusable).
-// Finds the tenant's own jobs still sitting at 'delivered' — on either side,
+// A repair tool: closeJob is enqueued by deliverJob going forward, but any
+// job that reached 'delivered' BEFORE that existed has no such task and is
+// stuck there forever (its load stuck at 'matched', never reusable). Finds
+// the tenant's own jobs still sitting at 'delivered' — on either side,
 // shipper or carrier — and enqueues a closeJob task for each, so the next
 // drain tick closes them through the exact same tested path as a fresh
 // delivery. Naturally safe to re-run: a job already closed by a prior run
 // no longer matches the 'delivered' filter, so it's never re-queued.
+//
+// `loadId` scopes this to one specific load (the "reuse"/"fulfilled" button
+// on an individual load in All Loads) — omit it to sweep every stuck job on
+// the tenant at once.
 const backfillCloseJobsSchema = z.object({
   tenantId: z.string().min(1),
+  loadId: z.string().min(1).optional(),
 });
 
 export type BackfillCloseJobsPayload = z.infer<typeof backfillCloseJobsSchema>;
@@ -53,6 +58,7 @@ export const backfillCloseJobsHandler: ActionHandler<BackfillCloseJobsPayload, B
     for (const row of [...asShipper, ...asCarrier]) {
       const job = row.data as unknown as Job;
       if (seen.has(job.jobId)) continue;
+      if (payload.loadId !== undefined && job.loadId !== payload.loadId) continue;
       seen.add(job.jobId);
       jobIds.push(job.jobId);
 
