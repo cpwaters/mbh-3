@@ -289,6 +289,34 @@ test('a shipper keeps its own fleet, and a trailer is known by its number', asyn
   await expect(page.getByText('Curtain Sider')).toBeVisible();
 });
 
+test('a shipper imports a fleet from a CSV', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'Fleet' }).click();
+  await page.getByRole('button', { name: 'Import' }).click();
+  await expect(page.getByRole('heading', { name: 'Import fleet' })).toBeVisible();
+
+  // One good row of each shape, and one that cannot be imported.
+  const csv = [
+    'vehicleType,vehicleConfiguration,registration,trailerNumber,make,model,year',
+    'rigid,box,GH78 IJK,,DAF,LF,2022',
+    'trailer,flatbed,,TR-220,,,',
+    'trailer,flatbed,,,,,',
+  ].join('\n');
+  await page.setInputFiles('#fleet_file', { name: 'fleet.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+
+  // Everything is checked before anything is sent.
+  await expect(page.getByText('2 ready to import, 1 to fix')).toBeVisible();
+  await expect(page.getByText(/Trailer number is missing/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Import 2 vehicles' }).click();
+
+  // Back on the fleet, with both new records really in Firestore.
+  await expect(page.getByRole('heading', { name: 'Fleet' })).toBeVisible();
+  await expect(page.getByText('2 vehicles imported.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'TR-220' })).toBeVisible();
+  await expect(page.getByText('GH78 IJK')).toBeVisible();
+});
+
 test('a user edits their account profile', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   await page.getByRole('link', { name: 'Profile' }).click();

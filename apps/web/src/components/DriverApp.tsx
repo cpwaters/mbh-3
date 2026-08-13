@@ -28,6 +28,7 @@ import LoadsList from '../app/distributor/LoadsList';
 import CreateLoad from '../app/distributor/CreateLoad';
 import AddressBook from '../app/distributor/AddressBook';
 import Fleet from '../app/distributor/Fleet';
+import FleetImport from '../app/distributor/FleetImport';
 import { FounderBar } from '../app/FounderBar';
 import { isFounder } from '../lib/founder';
 
@@ -176,6 +177,7 @@ export default function DriverApp() {
                       <Route path="/create" element={<CreateLoad />} />
                       <Route path="/addresses" element={<AddressBook />} />
                       <Route path="/vehicles" element={<Fleet />} />
+                      <Route path="/vehicles/import" element={<FleetImport />} />
                       <Route path="/vehicles/add" element={<AddVehicle />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
