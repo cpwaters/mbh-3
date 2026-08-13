@@ -7,6 +7,12 @@
 //
 // Generated PNGs, inlined as base64 so this package stays dependency- and
 // filesystem-free (it runs inside the bundled Cloud Function).
+//
+// Decoded lazily inside functions, NEVER at module scope: this package's
+// barrel is imported by apps/web, so anything that runs on import also runs
+// in the browser — where `Buffer` is undefined. A top-level Buffer.from()
+// here threw on load and took the whole web app down with it (caught by
+// e2e, since Node-based unit tests have Buffer and never noticed).
 
 const SIGNATURE_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAPAAAABaCAIAAAAJsExNAAACcklEQVR42u3d21HDMBBA0e2CCuiI/luBApgJxJbkfZw7/BIs" +
@@ -31,5 +37,10 @@ const PHOTO_PNG_BASE64 =
   "DqRg0lEw6SiYdBxIwaSjYNJRMOk4kIJJR8Gko2DScSAFk46CSUfBpOOCCiYdBZOOgklHQcGko2DSUTDpKCiYdBRMOgomHQUF" +
   "k46CSUfhLwsfyHlbQQQvUAMAAAAASUVORK5CYII=";
 
-export const SAMPLE_SIGNATURE_PNG = Buffer.from(SIGNATURE_PNG_BASE64, 'base64');
-export const SAMPLE_PHOTO_PNG = Buffer.from(PHOTO_PNG_BASE64, 'base64');
+export function sampleSignaturePng(): Buffer {
+  return Buffer.from(SIGNATURE_PNG_BASE64, 'base64');
+}
+
+export function samplePhotoPng(): Buffer {
+  return Buffer.from(PHOTO_PNG_BASE64, 'base64');
+}

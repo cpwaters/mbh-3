@@ -31,7 +31,7 @@ import {
   userProfileDoc,
 } from '@mbh/paths';
 import type { DataStore, Geocoder, Mailer, MailAttachment, ObjectStorageReader, RouteProvider } from '@mbh/provider-interfaces';
-import { SAMPLE_PHOTO_PNG, SAMPLE_SIGNATURE_PNG } from './sample-pod-images.js';
+import { samplePhotoPng, sampleSignaturePng } from './sample-pod-images.js';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
 // runs against the in-memory providers in CI and against Firestore + the real
@@ -375,8 +375,8 @@ async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): P
   // section rather than silently skipping it (which would make a passing
   // test email prove less about the pipeline than it appears to).
   const attachments: MailAttachment[] = [
-    { filename: 'signature.png', content: SAMPLE_SIGNATURE_PNG, contentType: 'image/png', cid: 'signature' },
-    { filename: 'delivery-photo-1.png', content: SAMPLE_PHOTO_PNG, contentType: 'image/png', cid: 'photo-1' },
+    { filename: 'signature.png', content: sampleSignaturePng(), contentType: 'image/png', cid: 'signature' },
+    { filename: 'delivery-photo-1.png', content: samplePhotoPng(), contentType: 'image/png', cid: 'photo-1' },
   ];
 
   try {
