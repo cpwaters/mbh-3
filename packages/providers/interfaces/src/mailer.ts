@@ -7,6 +7,10 @@ export interface MailAttachment {
   filename: string;
   content: Buffer;
   contentType: string;
+  // Set to embed this attachment inline in the HTML body (referenced there
+  // as `cid:${cid}`) instead of only listing it as a plain download — used
+  // for the PoD signature/photos so they show directly in the invoice email.
+  cid?: string;
 }
 
 // Send an invoice email to a shipper. One purpose-built method (not a generic

@@ -459,17 +459,25 @@ function decodeDataUrl(value: string): { content: Buffer; contentType: string } 
 // Best-effort: a photo/signature that fails to resolve (a legacy placeholder
 // ref, a transient Storage error) is silently skipped, never fails the whole
 // invoice send — billing is additive, not load-bearing on evidence bytes.
+// Each resolved image gets a `cid` — invoiceHtml() embeds them directly in
+// the email body (the "Proof of delivery" section) using these exact ids;
+// 'signature' and 'photo-N' are a contract between here and invoiceHtml().
 async function buildAttachments(deps: DrainDeps, evidence: JobEvidence): Promise<MailAttachment[]> {
   const attachments: MailAttachment[] = [];
 
   if (evidence.signatureRef !== undefined && evidence.signatureRef !== '') {
     const inline = decodeDataUrl(evidence.signatureRef);
     if (inline !== null) {
-      attachments.push({ filename: 'signature.png', content: inline.content, contentType: inline.contentType });
+      attachments.push({
+        filename: 'signature.png',
+        content: inline.content,
+        contentType: inline.contentType,
+        cid: 'signature',
+      });
     } else {
       try {
         const content = await deps.objectStorage.download(evidence.signatureRef);
-        attachments.push({ filename: 'signature.png', content, contentType: 'image/png' });
+        attachments.push({ filename: 'signature.png', content, contentType: 'image/png', cid: 'signature' });
       } catch {
         // unresolvable — skip
       }
@@ -479,7 +487,12 @@ async function buildAttachments(deps: DrainDeps, evidence: JobEvidence): Promise
   for (const [index, ref] of evidence.photoRefs.entries()) {
     try {
       const content = await deps.objectStorage.download(ref);
-      attachments.push({ filename: `delivery-photo-${index + 1}.jpg`, content, contentType: 'image/jpeg' });
+      attachments.push({
+        filename: `delivery-photo-${index + 1}.jpg`,
+        content,
+        contentType: 'image/jpeg',
+        cid: `photo-${index + 1}`,
+      });
     } catch {
       // legacy/unresolvable ref — skip
     }

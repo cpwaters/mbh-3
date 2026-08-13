@@ -17,7 +17,13 @@ export interface MailTransport {
     subject: string;
     html: string;
     text: string;
-    attachments: { filename: string; content: Buffer; contentType: string }[];
+    attachments: {
+      filename: string;
+      content: Buffer;
+      contentType: string;
+      cid?: string;
+      contentDisposition?: 'attachment' | 'inline';
+    }[];
   }): Promise<unknown>;
 }
 
@@ -82,7 +88,7 @@ export class NodemailerMailer implements Mailer {
         from: this.from,
         to: invoice.recipientEmail,
         subject: `Invoice ${invoice.invoiceNumber} from ${invoice.carrierCompanyName}`,
-        html: invoiceHtml(invoice),
+        html: invoiceHtml(invoice, attachments),
         text: invoiceText(invoice),
         attachments: [
           {
@@ -90,7 +96,11 @@ export class NodemailerMailer implements Mailer {
             content: pdf,
             contentType: 'application/pdf',
           },
-          ...attachments,
+          // A cid'd attachment is embedded inline in the HTML above (see
+          // invoiceHtml's "Proof of delivery" section) — mark it 'inline' so
+          // clients that respect contentDisposition don't also list it as a
+          // separate download.
+          ...attachments.map((a) => ({ ...a, ...(a.cid !== undefined ? { contentDisposition: 'inline' as const } : {}) })),
         ],
       });
     } catch (cause) {
