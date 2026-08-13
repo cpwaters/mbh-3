@@ -42,10 +42,10 @@ function LocationProbe() {
   return <div data-testid="probe">{JSON.stringify(location.state)}</div>;
 }
 
-function renderLoadsList() {
+function renderLoadsList(state?: { flash?: string; warning?: string | null }) {
   return render(
     <AppProvider value={makeMockApp({ isShipper: true, isCarrier: false })}>
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={[{ pathname: '/', state }]}>
         <Routes>
           <Route path="/" element={<LoadsList />} />
           <Route path="/create" element={<LocationProbe />} />
@@ -54,6 +54,33 @@ function renderLoadsList() {
     </AppProvider>
   );
 }
+
+describe('LoadsList — confirming a load Create Load just posted', () => {
+  it('shows the confirmation it was navigated with', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad]);
+    renderLoadsList({ flash: 'Load posted.', warning: null });
+
+    await waitFor(() => expect(screen.getByText('Load posted.')).toBeInTheDocument());
+  });
+
+  it('shows the address-book warning alongside it, since the load still posted', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad]);
+    renderLoadsList({ flash: 'Load posted.', warning: 'The load posted, but the collection address could not be saved.' });
+
+    await waitFor(() =>
+      expect(screen.getByText('The load posted, but the collection address could not be saved.')).toBeInTheDocument()
+    );
+    expect(screen.getByText('Load posted.')).toBeInTheDocument();
+  });
+
+  it('says nothing when the shipper simply opened the loads screen', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad]);
+    renderLoadsList();
+
+    await waitFor(() => expect(screen.getByText('All Loads')).toBeInTheDocument());
+    expect(screen.queryByText('Load posted.')).not.toBeInTheDocument();
+  });
+});
 
 describe('LoadsList — reuse a fulfilled load', () => {
   it('shows a Reuse button only for a fulfilled load, and navigates to Create Load with its addresses', async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Package, Weight, Box, Clock, Navigation, XCircle, Copy, Wrench } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
@@ -121,8 +121,18 @@ function SummaryCard({ label, value, tint, text }: { label: string; value: numbe
 export default function LoadsList() {
   const app = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const shipperTenantId = app.selected?.tenantId ?? null;
   const { loading, loads, reload } = useShipperLoads(shipperTenantId);
+
+  // Confirmation carried here by Create Load when it closes itself. Read once
+  // at mount and then dropped from history, so a later back/forward does not
+  // re-announce a load posted minutes ago.
+  const [flash] = useState(() => (location.state as { flash?: string; warning?: string | null } | null) ?? null);
+  useEffect(() => {
+    if (flash !== null) navigate('/', { replace: true, state: null });
+  }, [flash, navigate]);
+
   const [trackedLoadId, setTrackedLoadId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [backfillingId, setBackfillingId] = useState<string | null>(null);
@@ -180,6 +190,13 @@ export default function LoadsList() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">All Loads</h1>
         <p className="text-gray-600">Manage and monitor all created loads</p>
       </div>
+
+      {flash?.flash !== undefined && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">{flash.flash}</div>
+      )}
+      {flash?.warning != null && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">{flash.warning}</div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">{error}</div>
