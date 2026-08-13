@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Truck, FileText, ArrowLeft, Plus } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import {
@@ -9,6 +9,7 @@ import {
   VEHICLE_CONFIGURATION_LABELS,
   vehicleNeedsConfiguration,
   vehicleNeedsRegistrationDetails,
+  vehicleNeedsTrailerNumber,
 } from '@mbh/domain';
 import { useApp } from './context';
 import { dispatchAction } from '../lib/dispatch';
@@ -20,7 +21,13 @@ const INPUT = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 f
 export default function AddVehicle() {
   const app = useApp();
   const navigate = useNavigate();
-  const carrierTenantId = app.isCarrier && app.selected !== null ? app.selected.tenantId : null;
+  // Go back where the driver or shipper came from: the carrier's fleet lives
+  // on Profile, a shipper's on its own Fleet screen.
+  const returnTo = (useLocation().state as { from?: string } | null)?.from ?? '/profile';
+  const returnLabel = returnTo === '/vehicles' ? 'Back to Fleet' : 'Back to Profile';
+  // A fleet belongs to a company, not to a side of the marketplace — a
+  // shipper running its own vehicles manages them here too.
+  const fleetTenantId = app.selected?.tenantId ?? null;
 
   const [f, setF] = useState({
     make: '',
@@ -28,6 +35,7 @@ export default function AddVehicle() {
     year: '',
     vin: '',
     registration: '',
+    trailerNumber: '',
     vehicleType: '',
     vehicleConfiguration: '',
   });
@@ -40,6 +48,7 @@ export default function AddVehicle() {
   // enforces, so the form can never offer something the action will reject.
   const needsDetails = vehicleNeedsRegistrationDetails(f.vehicleType);
   const needsConfiguration = vehicleNeedsConfiguration(f.vehicleType);
+  const needsTrailerNumber = vehicleNeedsTrailerNumber(f.vehicleType);
 
   // Switching type clears what the new type does not use, so a rigid changed
   // to a trailer cannot quietly submit the make/plate typed a moment ago.
@@ -50,13 +59,14 @@ export default function AddVehicle() {
       vehicleType,
       ...(vehicleNeedsRegistrationDetails(vehicleType) ? {} : { make: '', model: '', year: '', registration: '', vin: '' }),
       ...(vehicleNeedsConfiguration(vehicleType) ? {} : { vehicleConfiguration: '' }),
+      ...(vehicleNeedsTrailerNumber(vehicleType) ? {} : { trailerNumber: '' }),
     }));
   };
 
   async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    if (carrierTenantId === null) {
-      setError('Select a carrier company before adding a vehicle.');
+    if (fleetTenantId === null) {
+      setError('Select a company before adding a vehicle.');
       return;
     }
     setSaving(true);
@@ -66,11 +76,12 @@ export default function AddVehicle() {
         app.auth.getIdToken,
         'addVehicle',
         {
-          carrierTenantId,
+          carrierTenantId: fleetTenantId,
           registration: f.registration,
           make: f.make,
           model: f.model,
           year: parseInt(f.year, 10) || 0,
+          trailerNumber: f.trailerNumber,
           vin: f.vin,
           vehicleType: f.vehicleType,
           vehicleConfiguration: f.vehicleConfiguration,
@@ -78,7 +89,7 @@ export default function AddVehicle() {
         genRequestId()
       );
       if (res.ok) {
-        navigate('/profile');
+        navigate(returnTo);
       } else {
         setError(res.error.message);
       }
@@ -90,9 +101,9 @@ export default function AddVehicle() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <button onClick={() => navigate('/profile')} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
+        <button onClick={() => navigate(returnTo)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
           <ArrowLeft className="w-4 h-4" />
-          Back to Profile
+          {returnLabel}
         </button>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Add Vehicle</h1>
         <p className="text-gray-600">Register a new vehicle to your fleet</p>
@@ -120,6 +131,24 @@ export default function AddVehicle() {
                 ))}
               </select>
             </div>
+            {needsTrailerNumber && (
+              <div>
+                <label htmlFor="trailerNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                  Trailer Number *
+                </label>
+                <input
+                  id="trailerNumber"
+                  value={f.trailerNumber}
+                  onChange={set('trailerNumber')}
+                  required
+                  placeholder="e.g., TR-114"
+                  className={INPUT}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  The fleet number on the trailer — it carries no plate of its own.
+                </p>
+              </div>
+            )}
             {needsConfiguration && (
               <div>
                 <label htmlFor="vehicleConfiguration" className="block text-sm font-medium text-gray-700 mb-1">
@@ -206,7 +235,7 @@ export default function AddVehicle() {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate(returnTo)}
             className="px-6 py-3 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancel

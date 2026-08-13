@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AppError,
   normalizeRegistration,
+  normalizeTrailerNumber,
   validateVehicleInput,
   type Role,
   type Vehicle,
@@ -11,12 +12,16 @@ import { vehicleDoc, vehiclesCollection } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
-import { requireTenantCapability } from '../require-capability.js';
+import { requireAnyTenantCapability } from '../require-capability.js';
 import { zodParse } from '../parse.js';
 
-// Fleet management. Any active member of a carrier tenant may manage its
+// Fleet management. Any active member of the owning tenant may manage its
 // vehicles — owner-drivers add their own truck.
 const FLEET_ROLES: readonly Role[] = ['owner', 'dispatcher', 'driver'];
+
+// A fleet is a company's, not a marketplace side's: shippers run their own
+// vehicles and trailers too. Either capability may keep one.
+const FLEET_CAPABILITIES = ['carrier', 'shipper'] as const;
 
 // Only the tenant and the type are structurally required: which of the rest
 // a vehicle actually needs depends on that type (a trailer has no plate or
@@ -24,11 +29,14 @@ const FLEET_ROLES: readonly Role[] = ['owner', 'dispatcher', 'driver'];
 // rule. The schema stays permissive so the domain can give the precise,
 // field-attributed error instead of a generic shape failure.
 const addVehicleSchema = z.object({
+  // The tenant whose fleet this is — a carrier's or a shipper's. Named for
+  // the carrier case it was built for; kept so existing clients keep working.
   carrierTenantId: z.string().min(1),
   registration: z.string(),
   make: z.string(),
   model: z.string(),
   year: z.number().int(),
+  trailerNumber: z.string().optional(),
   vin: z.string(),
   vehicleType: z.string().min(1),
   vehicleConfiguration: z.string(),
@@ -46,7 +54,7 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
   parse: zodParse(addVehicleSchema),
   async execute(tx, ctx, payload) {
     await requireMember(tx, payload.carrierTenantId, ctx.actorId, FLEET_ROLES);
-    await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
+    await requireAnyTenantCapability(tx, payload.carrierTenantId, FLEET_CAPABILITIES);
 
     // The domain owns what a valid vehicle is (beyond the schema's shape).
     const check = validateVehicleInput({
@@ -54,6 +62,7 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
       make: payload.make,
       model: payload.model,
       year: payload.year,
+      trailerNumber: payload.trailerNumber ?? '',
       vehicleType: payload.vehicleType,
       vehicleConfiguration: payload.vehicleConfiguration,
     });
@@ -62,14 +71,22 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
     }
 
     const registration = normalizeRegistration(payload.registration);
-    // One active vehicle per plate in a fleet — checked against committed
-    // state. Skipped for a plateless vehicle (a trailer): every one of those
-    // normalises to the same empty string, so this would refuse the SECOND
-    // trailer a carrier adds as a duplicate of the first.
-    if (registration !== '') {
+    const trailerNumber = normalizeTrailerNumber(payload.trailerNumber ?? '');
+    // One active vehicle per identifier in a fleet — checked against committed
+    // state. Which field identifies it depends on the type: a plate for
+    // anything that carries one, the fleet number for a trailer (which does
+    // not). Skipped entirely if neither is set, so an unidentified vehicle
+    // can't collide with every other unidentified one.
+    const identifier =
+      registration !== ''
+        ? { field: 'registration', value: registration }
+        : trailerNumber !== ''
+          ? { field: 'trailerNumber', value: trailerNumber }
+          : null;
+    if (identifier !== null) {
       const existing = await tx.query({
         collection: vehiclesCollection(payload.carrierTenantId),
-        filters: [{ field: 'registration', op: '==', value: registration }],
+        filters: [{ field: identifier.field, op: '==', value: identifier.value }],
       });
       if (existing.some((row) => (row.data.status as VehicleStatus) === 'active')) {
         throw new AppError('conflict', 'That vehicle is already in your fleet.', { recoverable: false });
@@ -84,6 +101,7 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
       make: payload.make.trim(),
       model: payload.model.trim(),
       year: payload.year,
+      trailerNumber,
       vin: payload.vin.trim(),
       vehicleType: payload.vehicleType as Vehicle['vehicleType'],
       vehicleConfiguration: payload.vehicleConfiguration as Vehicle['vehicleConfiguration'],
@@ -95,7 +113,7 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
 
     return {
       result: { vehicleId },
-      auditDetail: { vehicleId, tenantId: payload.carrierTenantId, registration },
+      auditDetail: { vehicleId, tenantId: payload.carrierTenantId, registration, trailerNumber },
     };
   },
 };
@@ -119,7 +137,7 @@ export const retireVehicleHandler: ActionHandler<RetireVehiclePayload, RetireVeh
   parse: zodParse(retireVehicleSchema),
   async execute(tx, ctx, payload) {
     await requireMember(tx, payload.carrierTenantId, ctx.actorId, FLEET_ROLES);
-    await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
+    await requireAnyTenantCapability(tx, payload.carrierTenantId, FLEET_CAPABILITIES);
 
     const path = vehicleDoc(payload.carrierTenantId, payload.vehicleId);
     const data = await tx.get(path);

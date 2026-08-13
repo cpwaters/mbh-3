@@ -249,14 +249,16 @@ describe('addVehicle / retireVehicle', () => {
     });
   });
 
-  it('refuses a non-member and a non-carrier tenant', async () => {
+  it('refuses a non-member, of either kind of tenant', async () => {
     const h = await makeHarness();
     await expectAppError(
       h.run('outsider', { type: 'addVehicle', payload: validVehicle(), requestId: 'r-out' }),
       'forbidden'
     );
+    // A shipper tenant may now keep a fleet of its own, so what stops this is
+    // membership, not capability: car-owner is nobody at shipper-1.
     await expectAppError(
-      h.run('ship-owner', { type: 'addVehicle', payload: validVehicle({ carrierTenantId: 'shipper-1' }), requestId: 'r-cap' }),
+      h.run('car-owner', { type: 'addVehicle', payload: validVehicle({ carrierTenantId: 'shipper-1' }), requestId: 'r-cap' }),
       'forbidden'
     );
   });
@@ -280,7 +282,7 @@ describe('addVehicle / retireVehicle', () => {
     );
   });
 
-  it('adds a trailer with no plate, make, model or year', async () => {
+  it('adds a trailer with no plate, make, model or year — just its number', async () => {
     const h = await makeHarness();
     const result = await h.run('driver-1', {
       type: 'addVehicle',
@@ -290,6 +292,7 @@ describe('addVehicle / retireVehicle', () => {
         make: '',
         model: '',
         year: 0,
+        trailerNumber: ' tr-114 ',
         vehicleConfiguration: 'refrigerated',
       }),
       requestId: 'r-trailer-1',
@@ -298,21 +301,48 @@ describe('addVehicle / retireVehicle', () => {
       vehicleType: 'trailer',
       vehicleConfiguration: 'refrigerated',
       registration: '',
+      trailerNumber: 'TR-114', // normalized, like a plate
       status: 'active',
     });
   });
 
-  it('lets a carrier add a whole row of trailers — plateless is not duplicate', async () => {
+  it('refuses a second trailer carrying the same number', async () => {
     const h = await makeHarness();
     const trailer = (over: Record<string, unknown> = {}) =>
-      validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, ...over });
+      validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, trailerNumber: 'TR-114', ...over });
+
+    await h.run('driver-1', { type: 'addVehicle', payload: trailer(), requestId: 'r-dup-a' });
+    await expectAppError(
+      h.run('driver-1', { type: 'addVehicle', payload: trailer({ trailerNumber: '  tr-114 ' }), requestId: 'r-dup-b' }),
+      'conflict'
+    );
+  });
+
+  it('lets a shipper keep its own fleet — vehicles belong to a company, not a side', async () => {
+    const h = await makeHarness();
+    const result = await h.run('ship-owner', {
+      type: 'addVehicle',
+      payload: validVehicle({ carrierTenantId: 'shipper-1' }),
+      requestId: 'r-ship-veh',
+    });
+    expect(await h.store.getDoc(`tenants/shipper-1/vehicles/${result.vehicleId}`)).toMatchObject({
+      tenantId: 'shipper-1',
+      registration: 'AB12 CDE',
+      status: 'active',
+    });
+  });
+
+  it('lets a carrier add a whole row of trailers — each told apart by its number', async () => {
+    const h = await makeHarness();
+    const trailer = (over: Record<string, unknown> = {}) =>
+      validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, trailerNumber: 'TR-114', ...over });
 
     await h.run('driver-1', { type: 'addVehicle', payload: trailer(), requestId: 'r-t-a' });
     // The second one shares the first's (empty) normalized plate. Refusing it
     // as a duplicate would cap every fleet at exactly one trailer.
     const second = await h.run('car-owner', {
       type: 'addVehicle',
-      payload: trailer({ vehicleConfiguration: 'flatbed' }),
+      payload: trailer({ trailerNumber: 'TR-115', vehicleConfiguration: 'flatbed' }),
       requestId: 'r-t-b',
     });
     expect(await h.store.getDoc(`tenants/carrier-1/vehicles/${second.vehicleId}`)).toMatchObject({
@@ -342,7 +372,7 @@ describe('addVehicle / retireVehicle', () => {
     const err = await expectAppError(
       h.run('driver-1', {
         type: 'addVehicle',
-        payload: validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, vehicleConfiguration: '' }),
+        payload: validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, trailerNumber: 'TR-9', vehicleConfiguration: '' }),
         requestId: 'r-t-bad',
       }),
       'invalid-payload'

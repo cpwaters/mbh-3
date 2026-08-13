@@ -177,6 +177,10 @@ export interface Vehicle {
   make: string; // '' on a trailer
   model: string; // '' on a trailer
   year: number; // 0 on a trailer
+  // The fleet number painted on a trailer's side — how a yard actually refers
+  // to one. It is a trailer's ONLY identifier (it carries no plate of its
+  // own), so it is required there and '' on everything else.
+  trailerNumber: string;
   vin: string; // may be empty
   vehicleType: VehicleType;
   vehicleConfiguration: VehicleConfiguration | ''; // '' on a unit

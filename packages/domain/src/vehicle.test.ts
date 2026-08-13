@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   isValidVehicleConfiguration,
   normalizeRegistration,
+  normalizeTrailerNumber,
   validateVehicleInput,
   vehicleNeedsConfiguration,
   vehicleNeedsRegistrationDetails,
+  vehicleNeedsTrailerNumber,
 } from './vehicle.js';
 
 const base = {
@@ -12,6 +14,7 @@ const base = {
   make: 'Volvo',
   model: 'FH16',
   year: 2020,
+  trailerNumber: '',
   vehicleType: 'unit',
   vehicleConfiguration: 'curtain sider',
 };
@@ -53,6 +56,7 @@ describe('what each vehicle type needs', () => {
     make: 'Volvo',
     model: 'FH16',
     year: 2021,
+    trailerNumber: '',
     vehicleType: 'rigid',
     vehicleConfiguration: 'box',
   };
@@ -66,6 +70,7 @@ describe('what each vehicle type needs', () => {
         make: '',
         model: '',
         year: 0,
+        trailerNumber: 'TR-114',
         vehicleConfiguration: 'curtain sider',
       })
     ).toEqual({ ok: true });
@@ -73,7 +78,16 @@ describe('what each vehicle type needs', () => {
 
   it('a trailer still needs a configuration — that is the whole point of one', () => {
     expect(
-      validateVehicleInput({ ...complete, vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, vehicleConfiguration: '' })
+      validateVehicleInput({
+        ...complete,
+        vehicleType: 'trailer',
+        registration: '',
+        make: '',
+        model: '',
+        year: 0,
+        trailerNumber: 'TR-114',
+        vehicleConfiguration: '',
+      })
     ).toMatchObject({ ok: false, field: 'vehicleConfiguration' });
   });
 
@@ -111,5 +125,37 @@ describe('what each vehicle type needs', () => {
     expect(vehicleNeedsRegistrationDetails('unit')).toBe(true);
     expect(vehicleNeedsConfiguration('unit')).toBe(false);
     expect(vehicleNeedsConfiguration('trailer')).toBe(true);
+    expect(vehicleNeedsTrailerNumber('trailer')).toBe(true);
+    expect(vehicleNeedsTrailerNumber('rigid')).toBe(false);
+  });
+});
+
+describe('a trailer number', () => {
+  const trailer = {
+    registration: '',
+    make: '',
+    model: '',
+    year: 0,
+    trailerNumber: 'TR-114',
+    vehicleType: 'trailer',
+    vehicleConfiguration: 'curtain sider',
+  };
+
+  it('is what identifies a trailer, so it is required', () => {
+    expect(validateVehicleInput(trailer)).toEqual({ ok: true });
+    expect(validateVehicleInput({ ...trailer, trailerNumber: '   ' })).toMatchObject({
+      ok: false,
+      field: 'trailerNumber',
+    });
+  });
+
+  it('is not asked of anything that carries a plate', () => {
+    const rigid = { ...trailer, vehicleType: 'rigid', registration: 'AB12 CDE', make: 'Volvo', model: 'FL', year: 2021 };
+    expect(validateVehicleInput({ ...rigid, trailerNumber: '' })).toEqual({ ok: true });
+  });
+
+  it('normalizes the way a plate does — a yard writes it every which way', () => {
+    expect(normalizeTrailerNumber('  tr-114 ')).toBe('TR-114');
+    expect(normalizeTrailerNumber('tr  114')).toBe('TR 114');
   });
 });

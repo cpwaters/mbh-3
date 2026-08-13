@@ -21,3 +21,22 @@ export async function requireTenantCapability(
   }
   return tenant;
 }
+
+// Some things belong to a company rather than to one side of the marketplace —
+// a fleet is the example: shippers run their own vehicles too. Any ONE of the
+// listed capabilities is enough.
+export async function requireAnyTenantCapability(
+  tx: TransactionContext,
+  tenantId: string,
+  capabilities: readonly TenantCapability[]
+): Promise<Tenant> {
+  const data = await tx.get(tenantDoc(tenantId));
+  if (data === null) {
+    throw new AppError('not-found', 'That organisation no longer exists.');
+  }
+  const tenant = data as unknown as Tenant;
+  if (!capabilities.some((capability) => tenant.capabilities.includes(capability))) {
+    throw new AppError('forbidden', `This organisation is not set up as a ${capabilities.join(' or ')}.`);
+  }
+  return tenant;
+}
