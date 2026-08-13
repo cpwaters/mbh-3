@@ -64,26 +64,54 @@ export interface VehicleInput {
 
 export type VehicleCheck = { ok: true } | { ok: false; field: string; message: string };
 
+// What each vehicle type actually needs, in the trade's terms:
+//
+// - A TRAILER has no engine and carries no DVLA registration of its own, so
+//   make/model/year/registration are not asked for. What matters is its
+//   configuration (curtain sider, tanker, ...).
+// - A UNIT (tractor) is the opposite: it is identified by its plate and
+//   make/model, and has no configuration of its own — the trailer it happens
+//   to be pulling carries that.
+// - Vans and rigids are one vehicle, so they need both.
+//
+// Exported so the form and the server enforce the SAME rule rather than
+// drifting apart.
+export function vehicleNeedsRegistrationDetails(vehicleType: string): boolean {
+  return vehicleType !== 'trailer';
+}
+
+export function vehicleNeedsConfiguration(vehicleType: string): boolean {
+  return vehicleType !== 'unit';
+}
+
 // The domain owns what a valid vehicle is — the action defends beyond the
 // schema with this, mirroring validateDeliveryEvidence.
 export function validateVehicleInput(input: VehicleInput): VehicleCheck {
-  if (!isValidRegistration(input.registration)) {
-    return { ok: false, field: 'registration', message: 'Enter a valid registration.' };
-  }
-  if (input.make.trim() === '') {
-    return { ok: false, field: 'make', message: 'Enter the make.' };
-  }
-  if (input.model.trim() === '') {
-    return { ok: false, field: 'model', message: 'Enter the model.' };
-  }
-  if (!isValidVehicleYear(input.year)) {
-    return { ok: false, field: 'year', message: 'Enter a valid year.' };
-  }
+  // Type first: everything below depends on which fields this type needs.
   if (!isValidVehicleType(input.vehicleType)) {
     return { ok: false, field: 'vehicleType', message: 'Choose a vehicle type.' };
   }
-  if (!isValidVehicleConfiguration(input.vehicleConfiguration)) {
-    return { ok: false, field: 'vehicleConfiguration', message: 'Choose a configuration.' };
+
+  if (vehicleNeedsRegistrationDetails(input.vehicleType)) {
+    if (!isValidRegistration(input.registration)) {
+      return { ok: false, field: 'registration', message: 'Enter a valid registration.' };
+    }
+    if (input.make.trim() === '') {
+      return { ok: false, field: 'make', message: 'Enter the make.' };
+    }
+    if (input.model.trim() === '') {
+      return { ok: false, field: 'model', message: 'Enter the model.' };
+    }
+    if (!isValidVehicleYear(input.year)) {
+      return { ok: false, field: 'year', message: 'Enter a valid year.' };
+    }
   }
+
+  if (vehicleNeedsConfiguration(input.vehicleType)) {
+    if (!isValidVehicleConfiguration(input.vehicleConfiguration)) {
+      return { ok: false, field: 'vehicleConfiguration', message: 'Choose a configuration.' };
+    }
+  }
+
   return { ok: true };
 }

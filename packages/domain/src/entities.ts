@@ -165,16 +165,21 @@ export type VehicleConfiguration =
   | 'skeleton';
 export type VehicleStatus = 'active' | 'retired';
 
+// Which of these a given type actually carries is vehicle.ts's rule
+// (vehicleNeedsRegistrationDetails / vehicleNeedsConfiguration): a trailer has
+// no plate, make, model or year of its own, and a unit (tractor) has no
+// configuration — so those fields are empty (or 0) on such a record rather
+// than absent, and readers must render around that.
 export interface Vehicle {
   vehicleId: string;
   tenantId: string; // the carrier tenant that owns the vehicle
-  registration: string; // UK number plate, normalized (uppercase, single-spaced)
-  make: string;
-  model: string;
-  year: number;
+  registration: string; // UK number plate, normalized (uppercase, single-spaced); '' on a trailer
+  make: string; // '' on a trailer
+  model: string; // '' on a trailer
+  year: number; // 0 on a trailer
   vin: string; // may be empty
   vehicleType: VehicleType;
-  vehicleConfiguration: VehicleConfiguration;
+  vehicleConfiguration: VehicleConfiguration | ''; // '' on a unit
   status: VehicleStatus;
   createdAt: string;
   createdBy: string; // the actorId that added it
