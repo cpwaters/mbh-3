@@ -21,11 +21,19 @@ export function MarkDelivered({
   job,
   location,
   onCommit,
+  onDelivered,
 }: {
   job: ActiveJob;
   // The device GPS fix at the point of delivery, stamped onto the evidence.
   location?: { lat: number; lng: number };
-  onCommit: (requestId: string, payload: DeliverCapture) => Promise<void>;
+  // Resolves true when the capture reached the server, false when it is still
+  // queued for signal.
+  onCommit: (requestId: string, payload: DeliverCapture) => Promise<boolean | void>;
+  // Called only when the delivery actually landed — the driver is finished
+  // with this job and the parent takes them onward. Without it (or while the
+  // record is still queued) this component shows its own confirmation, and
+  // the driver stays where the queue's status is visible.
+  onDelivered?: () => void;
 }) {
   const [photoRefs, setPhotoRefs] = useState<string[]>([]);
   const [signatureRef, setSignatureRef] = useState<string | null>(null);
@@ -72,7 +80,11 @@ export function MarkDelivered({
     }
     setBusy(true);
     try {
-      await onCommit(built.request.requestId, built.request.payload);
+      const delivered = await onCommit(built.request.requestId, built.request.payload);
+      if (delivered === true && onDelivered !== undefined) {
+        onDelivered();
+        return;
+      }
       setCommitted(true);
     } finally {
       setBusy(false);

@@ -59,7 +59,7 @@ export default function DriverApp() {
   const actorId = auth.session?.actorId ?? null;
   const queue = useSyncQueue(auth.getIdToken);
   const tenants = useTenants(actorId);
-  const { loading: jobLoading, job, reload: reloadJob } = useActiveJob(actorId);
+  const { loading: jobLoading, job, reload: reloadJob, reloadNow: reloadJobNow } = useActiveJob(actorId);
   const selected = tenants.selected;
   const isShipper = selected?.capabilities.includes('shipper') ?? false;
   const isCarrier = selected?.capabilities.includes('carrier') ?? false;
@@ -98,8 +98,15 @@ export default function DriverApp() {
   // location) so they survive navigating away from the Driving Time page.
   const drivingTimers = useDrivingTimers();
 
-  async function commit(requestId: string, payload: DeliverCapture) {
+  // Capture goes to the offline queue, which tries to deliver it immediately.
+  // Then re-read the job: with signal it has already reached the server and
+  // is no longer active ('delivered' is not an ACTIVE_JOB_STATUS), so the
+  // driver's screen must stop showing it as in transit. Returns whether the
+  // delivery actually landed — false means it is still queued, and the driver
+  // needs to stay where the queue's status is visible.
+  async function commit(requestId: string, payload: DeliverCapture): Promise<boolean> {
     await queue.enqueue('deliverJob', payload, requestId);
+    return (await reloadJobNow()) === null;
   }
   function onAccepted() {
     reloadJob();

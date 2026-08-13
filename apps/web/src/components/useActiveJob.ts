@@ -6,6 +6,10 @@ export interface ActiveJobState {
   loading: boolean;
   job: DriverJobView | null;
   reload: () => void;
+  // Same read, but awaitable and yielding the result — for a caller that has
+  // to act on what the job became (a delivery that reached the server leaves
+  // the driver with no active job at all).
+  reloadNow: () => Promise<DriverJobView | null>;
 }
 
 // Reads the signed-in driver's current job from Firestore. Re-reads when the
@@ -40,5 +44,12 @@ export function useActiveJob(actorId: string | null): ActiveJobState {
     };
   }, [reader, actorId, nonce]);
 
-  return { ...state, reload };
+  const reloadNow = useCallback(async (): Promise<DriverJobView | null> => {
+    if (actorId === null) return null;
+    const job = await reader.activeJobForDriver(actorId);
+    setState({ loading: false, job });
+    return job;
+  }, [reader, actorId]);
+
+  return { ...state, reload, reloadNow };
 }
