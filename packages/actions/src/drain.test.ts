@@ -315,9 +315,13 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     expect(mailer.sent[0]).toMatchObject({ recipientName: 'J. Smith' });
     const attachments = mailer.sentAttachments[0]!;
     expect(attachments).toHaveLength(2);
-    expect(attachments.find((a) => a.filename === 'signature.png')).toMatchObject({ contentType: 'image/png' });
+    expect(attachments.find((a) => a.filename === 'signature.png')).toMatchObject({
+      contentType: 'image/png',
+      cid: 'signature',
+    });
     expect(attachments.find((a) => a.filename === 'delivery-photo-1.jpg')).toMatchObject({
       contentType: 'image/jpeg',
+      cid: 'photo-1',
     });
   });
 

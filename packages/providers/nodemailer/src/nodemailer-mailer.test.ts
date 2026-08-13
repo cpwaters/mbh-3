@@ -56,6 +56,23 @@ describe('NodemailerMailer', () => {
     expect(call.attachments[2].filename).toBe('photo-1.jpg');
   });
 
+  it('marks cid\'d attachments inline (embedded in the body, not a separate download) and passes the cid through', async () => {
+    const { transport, sendMail } = stubTransport();
+    const mailer = new NodemailerMailer({ from: 'billing@mybackhaul.app', transport });
+
+    await mailer.sendInvoice(invoice, [
+      { filename: 'signature.png', content: Buffer.from('sig'), contentType: 'image/png', cid: 'signature' },
+    ]);
+
+    const call = sendMail.mock.calls.at(0)?.[0];
+    if (call === undefined) throw new Error('sendMail was not called with any arguments');
+    expect(call.html).toContain('src="cid:signature"');
+    const sigAttachment = call.attachments[1];
+    expect(sigAttachment).toMatchObject({ filename: 'signature.png', cid: 'signature', contentDisposition: 'inline' });
+    // The PDF has no cid — stays a plain download, not marked inline.
+    expect(call.attachments[0].contentDisposition).toBeUndefined();
+  });
+
   it('wraps an SMTP failure as a recoverable MailerError', async () => {
     const transport: MailTransport = { sendMail: vi.fn().mockRejectedValue(new Error('connection refused')) };
     const mailer = new NodemailerMailer({ from: 'billing@mybackhaul.app', transport });

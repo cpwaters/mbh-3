@@ -1,4 +1,5 @@
 import { formatGbp, type InvoiceData } from '@mbh/domain';
+import type { MailAttachment } from '@mbh/provider-interfaces';
 
 // Renders the invoice email body. A plain, self-contained HTML table styled
 // like a paper invoice — no external assets or stylesheets (email clients
@@ -7,7 +8,36 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-export function invoiceHtml(invoice: InvoiceData): string {
+// The PoD signature/photos, embedded directly in the body via the `cid`s
+// buildAttachments() (packages/actions/src/drain.ts) assigns — 'signature'
+// and 'photo-N' are the contract between the two. Attachments without a
+// `cid` (the invoice PDF) are ignored here; they stay plain downloads.
+function proofOfDeliverySection(invoice: InvoiceData, attachments: MailAttachment[]): string {
+  const signatureCid = attachments.find((a) => a.cid === 'signature')?.cid;
+  const photoCids = attachments.filter((a) => a.cid?.startsWith('photo-')).map((a) => a.cid as string);
+  if (signatureCid === undefined && photoCids.length === 0) return '';
+
+  const signatureImg =
+    signatureCid !== undefined
+      ? `<img src="cid:${signatureCid}" alt="Recipient signature" style="max-width:220px;border:1px solid #e5e7eb;border-radius:4px;padding:8px;background:#fff;display:block;margin-bottom:16px;" />`
+      : '';
+  const photoImgs = photoCids
+    .map(
+      (cid) =>
+        `<img src="cid:${cid}" alt="Delivery photo" style="max-width:260px;max-height:260px;object-fit:cover;border:1px solid #e5e7eb;border-radius:4px;margin:0 8px 8px 0;" />`
+    )
+    .join('');
+
+  return `
+  <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
+    <div style="font-size:11px;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">Proof of delivery</div>
+    ${invoice.recipientName ? `<div style="font-size:13px;color:#111827;margin-bottom:8px;">Signed for by ${escapeHtml(invoice.recipientName)}</div>` : ''}
+    ${signatureImg}
+    ${photoImgs ? `<div>${photoImgs}</div>` : ''}
+  </div>`;
+}
+
+export function invoiceHtml(invoice: InvoiceData, attachments: MailAttachment[] = []): string {
   const rows = invoice.lineItems
     .map(
       (item) => `
@@ -64,7 +94,7 @@ export function invoiceHtml(invoice: InvoiceData): string {
       </td>
     </tr>
   </table>
-
+  ${proofOfDeliverySection(invoice, attachments)}
   <div style="margin-top:32px;padding-top:16px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">
     Job reference ${escapeHtml(invoice.jobId)} — MyBackHaul
   </div>
