@@ -5,6 +5,7 @@ export * from './outbox.js';
 export * from './transitions.js';
 export * from './money.js';
 export * from './vehicle.js';
+export * from './address-book.js';
 export * from './user-profile.js';
 export * from './tenant.js';
 export * from './errors.js';

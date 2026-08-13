@@ -3,6 +3,7 @@ export * from './mock-auth-provider.js';
 export * from './mock-auth-client.js';
 export * from './mock-job-reader.js';
 export * from './mock-vehicle-reader.js';
+export * from './mock-address-book-reader.js';
 export * from './mock-profile-reader.js';
 export * from './mock-carrier-readers.js';
 export * from './in-memory-geocoder.js';

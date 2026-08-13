@@ -6,6 +6,7 @@
 //   tenants/{tenantId}
 //   tenants/{tenantId}/members/{actorId}
 //   tenants/{tenantId}/vehicles/{vehicleId}   (a carrier's fleet)
+//   tenants/{tenantId}/addressBook/{entryId} (a shipper's saved addresses)
 //   loads/{loadId}
 //   jobs/{jobId}
 //   jobs/{jobId}/events/{eventId}
@@ -52,6 +53,18 @@ export function vehiclesCollection(tenantId: string): string {
 
 export function vehicleDoc(tenantId: string, vehicleId: string): string {
   return `${vehiclesCollection(tenantId)}/${vehicleId}`;
+}
+
+// A shipper's saved addresses live under the owning tenant, so reads are
+// gated by membership of that tenant (same shape as the fleet above).
+export const ADDRESS_BOOK_SUBCOLLECTION = 'addressBook';
+
+export function addressBookCollection(tenantId: string): string {
+  return `${tenantDoc(tenantId)}/${ADDRESS_BOOK_SUBCOLLECTION}`;
+}
+
+export function addressBookEntryDoc(tenantId: string, entryId: string): string {
+  return `${addressBookCollection(tenantId)}/${entryId}`;
 }
 
 export function loadsCollection(): string {
