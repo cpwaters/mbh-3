@@ -467,7 +467,12 @@ test('the 30-second moment closes the loop to Firestore', async ({ page }) => {
   await page.mouse.up();
 
   await page.getByRole('button', { name: 'Record delivery' }).click();
-  await expect(page.getByRole('heading', { name: 'Delivery recorded' })).toBeVisible();
+
+  // With signal the capture lands immediately, so the job is finished: the
+  // driver is handed back to the loads they can pick up next rather than left
+  // on a card still claiming to be in transit.
+  await expect(page.getByText('Delivery recorded. Nice work.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 
   // The real proof: the authenticated dispatch reached Firestore through the
   // functions emulator and the job is now delivered.

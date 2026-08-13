@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, Navigation, MapPin, Loader2, RotateCcw } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
@@ -45,6 +45,19 @@ function fmtDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
 
+// A one-off message handed over by the screen that navigated here (a recorded
+// delivery). Read once and dropped from history, so going back later does not
+// re-announce something that happened an hour ago.
+function useFlash(): string | null {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [flash] = useState(() => (location.state as { flash?: string } | null)?.flash ?? null);
+  useEffect(() => {
+    if (flash !== null) navigate('/', { replace: true, state: null });
+  }, [flash, navigate]);
+  return flash;
+}
+
 function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { town: string; postcode: string }; destination: { town: string; postcode: string } }): ActiveJob {
   return {
     jobId: job.jobId,
@@ -56,6 +69,7 @@ function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { to
 
 export function Dashboard() {
   const app = useApp();
+  const flash = useFlash();
 
   if (app.selected === null) {
     return (
@@ -73,19 +87,29 @@ export function Dashboard() {
 
   if (app.isCarrier) {
     return (
-      <AvailableLoads
-        carrierTenantId={app.selected.tenantId}
-        listings={app.listings}
-        getIdToken={app.auth.getIdToken}
-        onAccepted={app.onAccepted}
-        onChanged={app.reloadListings}
-        hasActiveJob={app.job !== null}
-        driverLocation={app.location}
-        tracking={app.tracking}
-        watchingLocation={app.watchingLocation}
-        onEnableLocation={app.requestLocation}
-        locationError={app.locationError}
-      />
+      <>
+        {flash !== null && (
+          <div className="px-6 pt-6 max-w-3xl mx-auto">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+              {flash}
+            </div>
+          </div>
+        )}
+        <AvailableLoads
+          carrierTenantId={app.selected.tenantId}
+          listings={app.listings}
+          getIdToken={app.auth.getIdToken}
+          onAccepted={app.onAccepted}
+          onChanged={app.reloadListings}
+          hasActiveJob={app.job !== null}
+          driverLocation={app.location}
+          tracking={app.tracking}
+          watchingLocation={app.watchingLocation}
+          onEnableLocation={app.requestLocation}
+          locationError={app.locationError}
+        />
+      </>
     );
   }
 
@@ -158,7 +182,19 @@ export function ActiveJobsPage() {
   function deliverySection() {
     if (job === null) return null;
     if (atDestination && job.status === 'in_transit') {
-      return <MarkDelivered job={toActiveJob(job)} location={app.location ?? undefined} onCommit={app.commit} />;
+      return (
+        <MarkDelivered
+          job={toActiveJob(job)}
+          location={app.location ?? undefined}
+          onCommit={app.commit}
+          // The job is done and gone from this screen — take the driver back
+          // to the loads they can pick up next, rather than leaving them on a
+          // card that no longer has anything to say. Only fires when the
+          // capture actually reached the server; a queued one keeps them here,
+          // where "Waiting to send" and any failure are visible.
+          onDelivered={() => navigate('/', { state: { flash: 'Delivery recorded. Nice work.' } })}
+        />
+      );
     }
     if (atDestination) {
       // Arrived, but the status is still catching up to in_transit.

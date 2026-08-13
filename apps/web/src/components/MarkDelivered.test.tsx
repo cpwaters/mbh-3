@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MarkDelivered, type ActiveJob } from './MarkDelivered';
 
@@ -19,6 +19,60 @@ function file(name: string, sizeBytes: number, type = 'image/jpeg'): File {
   const f = new File([new Uint8Array(sizeBytes)], name, { type });
   return f;
 }
+
+// Fill in a complete PoD and press Record delivery. jsdom has no real canvas
+// backend, so the signature pad is stubbed just enough to yield a value —
+// same approach as SignaturePad.test.tsx.
+async function captureAndSubmit(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+  await user.upload(input, file('goods.jpg', 1024));
+  await waitFor(() => expect(screen.getByText('1 photo(s) captured')).toBeInTheDocument());
+  await user.type(screen.getByLabelText(/recipient name/i), 'J. Smith');
+
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    clearRect: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,stub');
+  const canvas = document.querySelector('canvas')!;
+  fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10 });
+  fireEvent.pointerMove(canvas, { clientX: 20, clientY: 20 });
+
+  await user.click(screen.getByRole('button', { name: 'Record delivery' }));
+}
+
+describe('MarkDelivered — what happens after the tick', () => {
+  it('hands the driver on when the delivery reached the server', async () => {
+    putMock.mockClear();
+    const onDelivered = vi.fn();
+    const user = userEvent.setup();
+    render(<MarkDelivered job={job} onCommit={vi.fn().mockResolvedValue(true)} onDelivered={onDelivered} />);
+
+    await captureAndSubmit(user);
+
+    await waitFor(() => expect(onDelivered).toHaveBeenCalledTimes(1));
+    // The parent moves them on, so this component never claims the screen.
+    expect(screen.queryByRole('heading', { name: 'Delivery recorded' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the driver here, with its own confirmation, while the record is still queued', async () => {
+    putMock.mockClear();
+    const onDelivered = vi.fn();
+    const user = userEvent.setup();
+    render(<MarkDelivered job={job} onCommit={vi.fn().mockResolvedValue(false)} onDelivered={onDelivered} />);
+
+    await captureAndSubmit(user);
+
+    // Out of signal: staying put is the point — this is the screen where
+    // "Waiting to send" and any failure are visible.
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Delivery recorded' })).toBeInTheDocument());
+    expect(screen.getByText(/sent to Leith automatically when you have signal/i)).toBeInTheDocument();
+    expect(onDelivered).not.toHaveBeenCalled();
+  });
+});
 
 describe('MarkDelivered — real photo capture', () => {
   it('stores the real file bytes locally under a local-blob: key, not a fake placeholder ref', async () => {
@@ -72,7 +126,6 @@ describe('MarkDelivered — real photo capture', () => {
     } as unknown as CanvasRenderingContext2D);
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,stub');
     const canvas = document.querySelector('canvas')!;
-    const { fireEvent } = await import('@testing-library/react');
     fireEvent.pointerDown(canvas, { clientX: 10, clientY: 10 });
     fireEvent.pointerMove(canvas, { clientX: 20, clientY: 20 });
 

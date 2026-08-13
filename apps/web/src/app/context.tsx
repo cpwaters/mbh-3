@@ -21,7 +21,9 @@ export interface AppData {
   reloadJob: () => void;
   listings: Listing[];
   reloadListings: () => void;
-  commit: (requestId: string, payload: DeliverCapture) => Promise<void>;
+  // Resolves true when the capture reached the server (the job is no longer
+  // the driver's active one); false when it is still sitting in the queue.
+  commit: (requestId: string, payload: DeliverCapture) => Promise<boolean>;
   onAccepted: () => void;
   // Live device GPS + the journey progress derived from it. Progress is null
   // until there's a fix and known endpoints; the map marker reads `location`.

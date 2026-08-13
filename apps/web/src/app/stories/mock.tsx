@@ -38,7 +38,7 @@ export function makeMockApp(over: Partial<AppData> = {}): AppData {
     reloadJob: () => {},
     listings: [],
     reloadListings: () => {},
-    commit: async () => {},
+    commit: async () => true,
     onAccepted: () => {},
     location: null,
     tracking: false,
