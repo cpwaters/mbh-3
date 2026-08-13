@@ -7,6 +7,8 @@ import { dispatchAction } from '../../lib/dispatch';
 import LiveLocationMap from '../LiveLocationMap';
 import { geocodePostcode, type GeoPoint } from '../../lib/geocode';
 import { getDrivingDistanceMiles, getDrivingRoute } from '../../lib/routing';
+import { useAddressBook } from '../../components/useAddressBook';
+import { AddressBookPicker, entryFromFields, fieldsFromEntry, type AddressSide } from './AddressBookPicker';
 
 const INPUT = 'block w-full px-3 py-2 border border-gray-300 rounded-lg';
 
@@ -42,6 +44,12 @@ export default function CreateLoad() {
     return reuseFrom ? { ...empty, ...reuseFrom } : empty;
   });
   const [reused] = useState(() => (location.state as { reuseFrom?: Partial<Form> } | null)?.reuseFrom !== undefined);
+  const addressBook = useAddressBook(shipperTenantId);
+  const [saveSides, setSaveSides] = useState<Record<AddressSide, boolean>>({ source: false, destination: false });
+  // Saving an address is a side-benefit of posting a load: if it fails, the
+  // load still posted and the shipper is told, rather than the whole submit
+  // reading as a failure.
+  const [addressBookNote, setAddressBookNote] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -134,6 +142,20 @@ export default function CreateLoad() {
     );
   }
 
+  const pickAddress = (side: AddressSide) => (entry: Parameters<typeof fieldsFromEntry>[1]) => {
+    setF((prev) => ({ ...prev, ...fieldsFromEntry(side, entry) }));
+    // Clear any "Required" errors the picked fields just satisfied.
+    setErrors((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(fieldsFromEntry(side, entry))) delete next[key];
+      return next;
+    });
+  };
+
+  // Only offer to save once there is actually an address worth saving.
+  const canSave = (side: AddressSide): boolean =>
+    f[`${side}_street`].trim() !== '' && f[`${side}_city`].trim() !== '' && f[`${side}_postcode`].trim() !== '';
+
   function validate(): boolean {
     const e: { [key: string]: string } = {};
     const req: (keyof Form)[] = [
@@ -147,6 +169,32 @@ export default function CreateLoad() {
     return Object.keys(e).length === 0;
   }
 
+  // Best-effort, and deliberately AFTER the load posts: the load is the thing
+  // the shipper came here to do. A failed save leaves a note rather than
+  // turning a successful post into an error.
+  async function saveTickedAddresses(tenantId: string): Promise<void> {
+    const sides = (['source', 'destination'] as AddressSide[]).filter((side) => saveSides[side]);
+    if (sides.length === 0) return;
+
+    const failed: string[] = [];
+    for (const side of sides) {
+      const res = await dispatchAction(
+        app.auth.getIdToken,
+        'saveAddressBookEntry',
+        { shipperTenantId: tenantId, ...entryFromFields(side, f) },
+        genRequestId()
+      );
+      if (!res.ok) failed.push(side === 'source' ? 'collection' : 'delivery');
+    }
+
+    if (failed.length > 0) {
+      setAddressBookNote(`The load posted, but the ${failed.join(' and ')} address could not be saved.`);
+    } else {
+      setAddressBookNote(null);
+      addressBook.reload();
+    }
+  }
+
   async function submit(ev: React.FormEvent): Promise<void> {
     ev.preventDefault();
     if (!validate()) return;
@@ -155,6 +203,7 @@ export default function CreateLoad() {
       return;
     }
     setLoading(true);
+    setAddressBookNote(null);
     try {
       const res = await dispatchAction(
         app.auth.getIdToken,
@@ -197,7 +246,9 @@ export default function CreateLoad() {
       );
       if (res.ok) {
         setSuccessMessage('Load created successfully!');
+        await saveTickedAddresses(shipperTenantId);
         setF(empty);
+        setSaveSides({ source: false, destination: false });
         setTimeout(() => setSuccessMessage(''), 4000);
       } else {
         setErrors({ submit: res.error.message });
@@ -227,6 +278,11 @@ export default function CreateLoad() {
           <p className="text-sm text-green-800">{successMessage}</p>
         </div>
       )}
+      {addressBookNote && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800">{addressBookNote}</p>
+        </div>
+      )}
       {errors.submit && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-sm text-red-800">{errors.submit}</p>
@@ -239,6 +295,14 @@ export default function CreateLoad() {
             <Building className="w-5 h-5" />
             Source Company
           </h2>
+          <AddressBookPicker
+            side="source"
+            entries={addressBook.entries}
+            onPick={pickAddress('source')}
+            save={saveSides.source}
+            onSaveChange={(next) => setSaveSides((prev) => ({ ...prev, source: next }))}
+            canSave={canSave('source')}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {text('source_company_name', 'Company Name', true, 'text', 'Tesco Distribution Centre')}
             {text('source_company_id', 'Company ID', false, 'text', 'TESCO-001')}
@@ -257,6 +321,14 @@ export default function CreateLoad() {
             <MapPin className="w-5 h-5" />
             Destination Company
           </h2>
+          <AddressBookPicker
+            side="destination"
+            entries={addressBook.entries}
+            onPick={pickAddress('destination')}
+            save={saveSides.destination}
+            onSaveChange={(next) => setSaveSides((prev) => ({ ...prev, destination: next }))}
+            canSave={canSave('destination')}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {text('destination_company_name', 'Company Name', true, 'text', 'Asda Warehouse')}
             {text('destination_company_id', 'Company ID', false, 'text', 'ASDA-002')}

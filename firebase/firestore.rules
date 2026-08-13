@@ -42,6 +42,15 @@ service cloud.firestore {
         allow read: if isActiveMember(tenantId);
         allow write: if false;
       }
+
+      // A shipper's saved addresses: readable by active members of the tenant
+      // (it is a company-level list, not a personal one); only the server
+      // writes it (via saveAddressBookEntry / updateAddressBookEntry /
+      // archiveAddressBookEntry).
+      match /addressBook/{entryId} {
+        allow read: if isActiveMember(tenantId);
+        allow write: if false;
+      }
     }
 
     // Loads are shipper-private (price, contacts). Only active members of the

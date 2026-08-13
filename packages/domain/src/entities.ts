@@ -180,6 +180,34 @@ export interface Vehicle {
   createdBy: string; // the actorId that added it
 }
 
+// A shipper's saved collection/delivery point, offered in the create-load
+// form. Archived, never deleted (see address-book.ts). Held under the owning
+// shipper tenant, so it is shared by that company's members rather than
+// private to whoever first typed it.
+export type AddressBookEntryStatus = 'active' | 'archived';
+
+// The user-supplied half of an entry — what a create/update action accepts,
+// and what validateAddressBookEntry() checks.
+export interface AddressBookEntryInput {
+  label: string; // what the shipper picks from the dropdown, e.g. "Tesco Trafford DC"
+  companyName: string;
+  line1: string;
+  town: string;
+  postcode: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+}
+
+export interface AddressBookEntry extends AddressBookEntryInput {
+  entryId: string;
+  tenantId: string; // the shipper tenant that owns it
+  status: AddressBookEntryStatus;
+  createdAt: string;
+  createdBy: string; // the actorId that saved it
+  updatedAt: string;
+}
+
 export type EventSource = 'member' | 'system';
 
 // JobEvents are append-only. Corrections are new events that name what they

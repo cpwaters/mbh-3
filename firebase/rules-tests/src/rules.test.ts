@@ -46,6 +46,7 @@ beforeEach(async () => {
     await setDoc(doc(db, `tenants/carrier-1/members/${CAR_DRIVER}`), { tenantId: 'carrier-1', actorId: CAR_DRIVER, role: 'driver', status: 'active' });
     await setDoc(doc(db, `tenants/carrier-1/members/${DISABLED}`), { tenantId: 'carrier-1', actorId: DISABLED, role: 'driver', status: 'disabled' });
     await setDoc(doc(db, 'tenants/carrier-1/vehicles/veh-1'), { vehicleId: 'veh-1', tenantId: 'carrier-1', registration: 'AB12 CDE', type: 'artic', capacityKg: 26000, status: 'active' });
+    await setDoc(doc(db, 'tenants/shipper-1/addressBook/addr-1'), { entryId: 'addr-1', tenantId: 'shipper-1', label: 'Tesco Trafford DC', companyName: 'Tesco', line1: '10 Distribution Way', town: 'Trafford', postcode: 'M17 1WS', contactName: 'John Smith', contactEmail: 'john@tesco.test', contactPhone: '', status: 'active', createdAt: '2026-08-13T09:00:00.000Z', createdBy: 'ship-owner', updatedAt: '2026-08-13T09:00:00.000Z' });
     await setDoc(doc(db, 'loads/load-1'), { loadId: 'load-1', tenantId: 'shipper-1', status: 'available', priceGbpPence: 68000 });
     await setDoc(doc(db, 'jobs/job-1'), { jobId: 'job-1', loadId: 'load-1', shipperTenantId: 'shipper-1', carrierTenantId: 'carrier-1', driverActorId: CAR_DRIVER, status: 'accepted' });
     await setDoc(doc(db, 'jobs/job-1/events/evt-1'), { eventId: 'evt-1', jobId: 'job-1', type: 'job.accepted', source: 'member', actorId: CAR_DRIVER });
@@ -100,6 +101,41 @@ describe('userProfiles (a user reads their own)', () => {
         actorId: CAR_DRIVER,
         displayName: 'Hacked',
         phone: '',
+      })
+    );
+  });
+});
+
+describe("addressBook (a shipper's saved addresses)", () => {
+  it('an active member of the shipper reads an entry and lists the book', async () => {
+    await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1/addressBook/addr-1')));
+    await assertSucceeds(getDocs(collection(db(SHIP_OWNER), 'tenants/shipper-1/addressBook')));
+  });
+
+  it('a non-member / disabled / anonymous cannot read the book', async () => {
+    // It carries customer contact names, emails and phone numbers — company
+    // -private, exactly like the raw loads it feeds.
+    await assertFails(getDoc(doc(db(CAR_DRIVER), 'tenants/shipper-1/addressBook/addr-1')));
+    await assertFails(getDoc(doc(db(DISABLED), 'tenants/shipper-1/addressBook/addr-1')));
+    await assertFails(getDoc(doc(db(null), 'tenants/shipper-1/addressBook/addr-1')));
+    await assertFails(getDocs(collection(db(CAR_DRIVER), 'tenants/shipper-1/addressBook')));
+  });
+
+  it('no client can write an entry — only the server, via the address-book actions', async () => {
+    await assertFails(
+      setDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1/addressBook/addr-1'), {
+        entryId: 'addr-1',
+        tenantId: 'shipper-1',
+        label: 'HACKED',
+        status: 'active',
+      })
+    );
+    await assertFails(
+      setDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1/addressBook/addr-new'), {
+        entryId: 'addr-new',
+        tenantId: 'shipper-1',
+        label: 'Client-created',
+        status: 'active',
       })
     );
   });

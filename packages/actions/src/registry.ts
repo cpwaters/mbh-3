@@ -10,6 +10,11 @@ import { createTenantHandler } from './actions/create-tenant.js';
 import { cancelLoadHandler } from './actions/cancel-load.js';
 import { recordRoutePointHandler } from './actions/record-route-point.js';
 import { sendTestInvoiceEmailHandler } from './actions/send-test-invoice-email.js';
+import {
+  archiveAddressBookEntryHandler,
+  saveAddressBookEntryHandler,
+  updateAddressBookEntryHandler,
+} from './actions/address-book.js';
 import { backfillCloseJobsHandler } from './actions/backfill-close-jobs.js';
 
 // Every action the dispatch function can run. Adding an action means adding
@@ -29,6 +34,9 @@ const HANDLERS: readonly AnyHandler[] = [
   recordRoutePointHandler,
   sendTestInvoiceEmailHandler,
   backfillCloseJobsHandler,
+  saveAddressBookEntryHandler,
+  updateAddressBookEntryHandler,
+  archiveAddressBookEntryHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -60,6 +68,9 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'recordRoutePoint',
   'sendTestInvoiceEmail',
   'backfillCloseJobs',
+  'saveAddressBookEntry',
+  'updateAddressBookEntry',
+  'archiveAddressBookEntry',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

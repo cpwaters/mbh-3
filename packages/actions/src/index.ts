@@ -20,3 +20,16 @@ export type {
   SendTestInvoiceEmailPayload,
   SendTestInvoiceEmailResult,
 } from './actions/send-test-invoice-email.js';
+export {
+  saveAddressBookEntryHandler,
+  updateAddressBookEntryHandler,
+  archiveAddressBookEntryHandler,
+} from './actions/address-book.js';
+export type {
+  SaveAddressBookEntryPayload,
+  SaveAddressBookEntryResult,
+  UpdateAddressBookEntryPayload,
+  UpdateAddressBookEntryResult,
+  ArchiveAddressBookEntryPayload,
+  ArchiveAddressBookEntryResult,
+} from './actions/address-book.js';

@@ -25,6 +25,7 @@ import {
   type TenantCapability,
   type UserProfile,
   type Vehicle,
+  type AddressBookEntry,
 } from '@mbh/domain';
 import {
   jobsCollection,
@@ -35,8 +36,10 @@ import {
   tenantDoc,
   userProfileDoc,
   vehiclesCollection,
+  addressBookCollection,
 } from '@mbh/paths';
 import type {
+  AddressBookReader,
   CompletedJobView,
   DriverJobView,
   JobReader,
@@ -93,7 +96,8 @@ export class FirestoreReader
     VehicleReader,
     ProfileReader,
     ShipperLoadReader,
-    OutboxTaskReader
+    OutboxTaskReader,
+    AddressBookReader
 {
   private readonly db: Firestore;
 
@@ -158,6 +162,16 @@ export class FirestoreReader
       .map((d) => d.data() as Vehicle)
       .filter((v) => v.status === 'active')
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+
+  async addressBookForTenant(shipperTenantId: string): Promise<AddressBookEntry[]> {
+    // Rules authorize this subcollection read via membership of the tenant.
+    const snap = await getDocs(collection(this.db, addressBookCollection(shipperTenantId)));
+    return snap.docs
+      .map((d) => d.data() as AddressBookEntry)
+      .filter((e) => e.status === 'active')
+      // Alphabetical: this is a pick-list a shipper scans by name, not a feed.
+      .sort((a, b) => a.label.localeCompare(b.label));
   }
 
   async profileForActor(actorId: string): Promise<UserProfile | null> {
