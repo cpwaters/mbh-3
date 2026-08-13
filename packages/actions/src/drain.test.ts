@@ -414,6 +414,16 @@ describe('runDrainOnce — sendTestInvoiceEmail', () => {
     });
     expect(mailer.sent[0]?.invoiceNumber.startsWith('TEST-')).toBe(true);
 
+    // The test email carries synthetic PoD images cid'd exactly like a real
+    // delivery's, so it exercises invoiceHtml's inline-image rendering rather
+    // than quietly skipping it — the whole point of this debug tool.
+    const attachments = mailer.sentAttachments[0]!;
+    expect(attachments.map((a) => a.cid)).toEqual(['signature', 'photo-1']);
+    for (const a of attachments) {
+      // Real PNG bytes, not a placeholder string.
+      expect(a.content.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    }
+
     const task = await harness.store.getDoc('outbox/task-1');
     expect(task?.status).toBe('done');
 

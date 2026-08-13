@@ -31,6 +31,7 @@ import {
   userProfileDoc,
 } from '@mbh/paths';
 import type { DataStore, Geocoder, Mailer, MailAttachment, ObjectStorageReader, RouteProvider } from '@mbh/provider-interfaces';
+import { samplePhotoPng, sampleSignaturePng } from './sample-pod-images.js';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
 // runs against the in-memory providers in CI and against Firestore + the real
@@ -364,12 +365,22 @@ async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): P
     carrierCompanyName: 'Test Carrier Ltd',
     shipperCompanyName: 'Test Shipper Ltd',
     recipientEmail,
+    recipientName: 'Sample Recipient',
     lineItems: [{ description: 'Test invoice — MyBackHaul SMTP configuration check', amountGbpPence: 100 }],
     totalGbpPence: 100,
   };
 
+  // Synthetic PoD images, cid'd exactly as buildAttachments() does for a real
+  // delivery — so this debug tool actually renders the "Proof of delivery"
+  // section rather than silently skipping it (which would make a passing
+  // test email prove less about the pipeline than it appears to).
+  const attachments: MailAttachment[] = [
+    { filename: 'signature.png', content: sampleSignaturePng(), contentType: 'image/png', cid: 'signature' },
+    { filename: 'delivery-photo-1.png', content: samplePhotoPng(), contentType: 'image/png', cid: 'photo-1' },
+  ];
+
   try {
-    await deps.mailer.sendInvoice(invoice);
+    await deps.mailer.sendInvoice(invoice, attachments);
     await recordTestInvoiceSent(deps, taskPath, invoice);
     return 'invoiced';
   } catch (error) {
