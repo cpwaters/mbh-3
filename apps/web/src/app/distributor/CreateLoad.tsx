@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { MapPin, Box, Building, Truck, CreditCard, PoundSterling, Info } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { MapPin, Box, Building, Truck, CreditCard, PoundSterling, Info, AlertCircle } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { dispatchAction } from '../../lib/dispatch';
@@ -26,6 +26,43 @@ const empty = {
 };
 export type Form = typeof empty;
 
+// What the form insists on, in the order it appears on screen. One list drives
+// both the check and the summary at the top, so a field can never be enforced
+// without being named — and the labels are qualified ("Collection postcode",
+// not "Postcode") because the summary is read away from the field it points
+// at.
+const REQUIRED_FIELDS: readonly { name: keyof Form; label: string }[] = [
+  { name: 'source_company_name', label: 'Collection company name' },
+  { name: 'source_street', label: 'Collection street' },
+  { name: 'source_city', label: 'Collection city' },
+  { name: 'source_postcode', label: 'Collection postcode' },
+  { name: 'source_contact_name', label: 'Collection contact name' },
+  { name: 'source_contact_email', label: 'Collection contact email' },
+  { name: 'destination_company_name', label: 'Delivery company name' },
+  { name: 'destination_street', label: 'Delivery street' },
+  { name: 'destination_city', label: 'Delivery city' },
+  { name: 'destination_postcode', label: 'Delivery postcode' },
+  { name: 'destination_contact_name', label: 'Delivery contact name' },
+  { name: 'destination_contact_email', label: 'Delivery contact email' },
+  { name: 'description', label: 'Description' },
+  { name: 'weight_kg', label: 'Weight (kg)' },
+  { name: 'price', label: 'Payment (£)' },
+  { name: 'pickup_date', label: 'Pickup date' },
+  { name: 'pickup_time', label: 'Pickup time' },
+  { name: 'delivery_date', label: 'Delivery date' },
+  { name: 'delivery_time', label: 'Delivery time' },
+];
+
+// Put the shipper in front of the field itself, rather than leaving them to
+// hunt a long form for a red border. scrollIntoView is guarded because jsdom
+// (the component tests' DOM) does not implement it.
+function focusField(name: string): void {
+  const el = document.getElementById(name);
+  if (el === null) return;
+  el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  el.focus({ preventScroll: true });
+}
+
 // Ported from the mbh-2 distributor prototype (distributor/src/pages/
 // CreateLoad.tsx). Wired to mbh-3's postLoad — the core (origin/destination/
 // consignment/price/dates) drives the marketplace; the rest rides along as
@@ -33,6 +70,7 @@ export type Form = typeof empty;
 export default function CreateLoad() {
   const app = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
   const shipperTenantId = app.selected?.tenantId ?? null;
   // "Reuse this load" (LoadsList.tsx) navigates here with the addresses of a
   // fulfilled load pre-filled via router state — weight/pallets/dates are
@@ -46,13 +84,12 @@ export default function CreateLoad() {
   const [reused] = useState(() => (location.state as { reuseFrom?: Partial<Form> } | null)?.reuseFrom !== undefined);
   const addressBook = useAddressBook(shipperTenantId);
   const [saveSides, setSaveSides] = useState<Record<AddressSide, boolean>>({ source: false, destination: false });
-  // Saving an address is a side-benefit of posting a load: if it fails, the
-  // load still posted and the shipper is told, rather than the whole submit
-  // reading as a failure.
-  const [addressBookNote, setAddressBookNote] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // The fields still missing, in form order — the summary at the top of the
+  // page, so a long form's problems are all visible at once.
+  const missing = REQUIRED_FIELDS.filter((field) => errors[field.name]);
 
   const [originPin, setOriginPin] = useState<GeoPoint | null>(null);
   const [destinationPin, setDestinationPin] = useState<GeoPoint | null>(null);
@@ -156,25 +193,21 @@ export default function CreateLoad() {
   const canSave = (side: AddressSide): boolean =>
     f[`${side}_street`].trim() !== '' && f[`${side}_city`].trim() !== '' && f[`${side}_postcode`].trim() !== '';
 
-  function validate(): boolean {
+  // Returns the first missing field so the caller can move the shipper to it,
+  // or null when the form is complete.
+  function validate(): keyof Form | null {
     const e: { [key: string]: string } = {};
-    const req: (keyof Form)[] = [
-      'source_company_name', 'source_street', 'source_city', 'source_postcode', 'source_contact_name', 'source_contact_email',
-      'destination_company_name', 'destination_street', 'destination_city', 'destination_postcode',
-      'destination_contact_name', 'destination_contact_email', 'description', 'weight_kg', 'price',
-      'pickup_date', 'pickup_time', 'delivery_date', 'delivery_time',
-    ];
-    for (const k of req) if (!String(f[k]).trim()) e[k] = 'Required';
+    for (const { name } of REQUIRED_FIELDS) if (!String(f[name]).trim()) e[name] = 'Required';
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return REQUIRED_FIELDS.find(({ name }) => e[name])?.name ?? null;
   }
 
   // Best-effort, and deliberately AFTER the load posts: the load is the thing
-  // the shipper came here to do. A failed save leaves a note rather than
-  // turning a successful post into an error.
-  async function saveTickedAddresses(tenantId: string): Promise<void> {
+  // the shipper came here to do. A failed save returns a note to carry back to
+  // the loads screen rather than turning a successful post into an error.
+  async function saveTickedAddresses(tenantId: string): Promise<string | null> {
     const sides = (['source', 'destination'] as AddressSide[]).filter((side) => saveSides[side]);
-    if (sides.length === 0) return;
+    if (sides.length === 0) return null;
 
     const failed: string[] = [];
     for (const side of sides) {
@@ -187,23 +220,22 @@ export default function CreateLoad() {
       if (!res.ok) failed.push(side === 'source' ? 'collection' : 'delivery');
     }
 
-    if (failed.length > 0) {
-      setAddressBookNote(`The load posted, but the ${failed.join(' and ')} address could not be saved.`);
-    } else {
-      setAddressBookNote(null);
-      addressBook.reload();
-    }
+    if (failed.length === 0) return null;
+    return `The load posted, but the ${failed.join(' and ')} address could not be saved.`;
   }
 
   async function submit(ev: React.FormEvent): Promise<void> {
     ev.preventDefault();
-    if (!validate()) return;
+    const firstMissing = validate();
+    if (firstMissing !== null) {
+      focusField(firstMissing);
+      return;
+    }
     if (shipperTenantId === null) {
       setErrors({ submit: 'Select a shipper company first.' });
       return;
     }
     setLoading(true);
-    setAddressBookNote(null);
     try {
       const res = await dispatchAction(
         app.auth.getIdToken,
@@ -245,11 +277,12 @@ export default function CreateLoad() {
         genRequestId()
       );
       if (res.ok) {
-        setSuccessMessage('Load created successfully!');
-        await saveTickedAddresses(shipperTenantId);
-        setF(empty);
-        setSaveSides({ source: false, destination: false });
-        setTimeout(() => setSuccessMessage(''), 4000);
+        // The job is done — close the form and go back to the loads screen,
+        // which reloads and shows the new load. The confirmation travels with
+        // the navigation rather than flashing on a form nobody is looking at.
+        const warning = await saveTickedAddresses(shipperTenantId);
+        if (warning === null) addressBook.reload();
+        navigate('/', { state: { flash: 'Load posted.', warning } });
       } else {
         setErrors({ submit: res.error.message });
       }
@@ -273,14 +306,25 @@ export default function CreateLoad() {
           </p>
         </div>
       )}
-      {successMessage && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm text-green-800">{successMessage}</p>
-        </div>
-      )}
-      {addressBookNote && (
-        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800">{addressBookNote}</p>
+      {missing.length > 0 && (
+        <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm font-medium text-red-800 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            {missing.length === 1 ? 'One field still needs filling in:' : `${missing.length} fields still need filling in:`}
+          </p>
+          <ul className="mt-2 ml-6 list-disc space-y-1">
+            {missing.map(({ name, label }) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  onClick={() => focusField(name)}
+                  className="text-sm text-red-700 underline hover:text-red-900"
+                >
+                  {label}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {errors.submit && (

@@ -76,6 +76,11 @@ test('a shipper posts a load through the distributor UI', async ({ page }) => {
   await page.getByRole('link', { name: 'Create Load' }).click();
   await expect(page.getByRole('heading', { name: 'Create New Load' })).toBeVisible();
 
+  // Nothing filled in yet: the form names what is missing rather than
+  // silently doing nothing.
+  await page.getByRole('button', { name: 'Create Load' }).click();
+  await expect(page.getByRole('alert')).toContainText('fields still need filling in');
+
   await page.locator('#source_company_name').fill('Tesco DC');
   await page.locator('#source_street').fill('10 Distribution Way');
   await page.locator('#source_city').fill('Trafford');
@@ -98,10 +103,11 @@ test('a shipper posts a load through the distributor UI', async ({ page }) => {
   await page.locator('#delivery_time').fill('17:00');
 
   await page.getByRole('button', { name: 'Create Load' }).click();
-  await expect(page.getByText('Load created successfully!')).toBeVisible();
 
-  // It shows up on the All Loads page.
-  await page.getByRole('link', { name: 'All Loads' }).click();
+  // The form closes itself and returns to All Loads, where the new load is
+  // already listed — no second navigation by hand.
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+  await expect(page.getByText('Load posted.')).toBeVisible();
   await expect(page.getByText('Trafford, M17 1WS')).toBeVisible();
 });
 
