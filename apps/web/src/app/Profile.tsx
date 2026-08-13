@@ -200,6 +200,7 @@ export default function Profile() {
                                 its type + configuration rather than an empty
                                 heading. */}
                             {`${vehicle.make} ${vehicle.model}`.trim() ||
+                              vehicle.trailerNumber ||
                               [
                                 VEHICLE_TYPE_LABELS[vehicle.vehicleType as VehicleType],
                                 vehicle.vehicleConfiguration &&
@@ -217,6 +218,12 @@ export default function Profile() {
                         {/* Each row appears only when that type carries the
                             field: a trailer has no plate/year, a unit has no
                             configuration of its own. */}
+                        {vehicle.trailerNumber !== '' && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Trailer number:</span>
+                            <span className="font-medium text-gray-900">{vehicle.trailerNumber}</span>
+                          </div>
+                        )}
                         {vehicle.registration !== '' && (
                           <div className="flex justify-between">
                             <span className="text-gray-600">Registration:</span>

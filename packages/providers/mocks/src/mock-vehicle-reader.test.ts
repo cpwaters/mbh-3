@@ -9,6 +9,7 @@ const veh = (over: Partial<Vehicle>): Vehicle => ({
   make: 'Volvo',
   model: 'FH16',
   year: 2020,
+  trailerNumber: '',
   vin: '',
   vehicleType: 'unit',
   vehicleConfiguration: 'curtain sider',

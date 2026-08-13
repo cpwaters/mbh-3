@@ -268,6 +268,27 @@ test('a carrier adds a vehicle to their fleet', async ({ page }) => {
   await expect(page.getByText('Volvo FH16')).toBeVisible();
 });
 
+test('a shipper keeps its own fleet, and a trailer is known by its number', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'Fleet' }).click();
+  await expect(page.getByRole('heading', { name: 'Fleet' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add vehicle' }).click();
+  await expect(page.getByRole('heading', { name: 'Add Vehicle' })).toBeVisible();
+
+  // A trailer is asked only for what it has: no plate, make, model or year.
+  await page.getByLabel('Vehicle Type *', { exact: true }).selectOption('trailer');
+  await expect(page.getByLabel('Registration Number *', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Trailer Number *', { exact: true }).fill('TR-114');
+  await page.getByLabel('Vehicle Configuration *', { exact: true }).selectOption('curtain sider');
+  await page.getByRole('button', { name: 'Add Vehicle' }).click();
+
+  // The shipper's own fleet now holds it, headed by its number.
+  await expect(page.getByRole('heading', { name: 'Fleet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'TR-114' })).toBeVisible();
+  await expect(page.getByText('Curtain Sider')).toBeVisible();
+});
+
 test('a user edits their account profile', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   await page.getByRole('link', { name: 'Profile' }).click();

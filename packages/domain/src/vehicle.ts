@@ -41,6 +41,18 @@ export function isValidRegistration(raw: string): boolean {
   return reg.length >= 2 && reg.length <= 10;
 }
 
+// A trailer's fleet number normalizes the same way a plate does — yards write
+// it in every casing and spacing there is, and two records that differ only in
+// whitespace are the same trailer.
+export function normalizeTrailerNumber(raw: string): string {
+  return normalizeRegistration(raw);
+}
+
+export function isValidTrailerNumber(raw: string): boolean {
+  const number = normalizeTrailerNumber(raw);
+  return number.length >= 1 && number.length <= 20;
+}
+
 export function isValidVehicleType(type: string): type is VehicleType {
   return (VEHICLE_TYPES as readonly string[]).includes(type);
 }
@@ -58,6 +70,7 @@ export interface VehicleInput {
   make: string;
   model: string;
   year: number;
+  trailerNumber: string;
   vehicleType: string;
   vehicleConfiguration: string;
 }
@@ -84,6 +97,12 @@ export function vehicleNeedsConfiguration(vehicleType: string): boolean {
   return vehicleType !== 'unit';
 }
 
+// A trailer carries no plate, so without its fleet number there is nothing to
+// tell two of them apart — on the yard or in the record.
+export function vehicleNeedsTrailerNumber(vehicleType: string): boolean {
+  return vehicleType === 'trailer';
+}
+
 // The domain owns what a valid vehicle is — the action defends beyond the
 // schema with this, mirroring validateDeliveryEvidence.
 export function validateVehicleInput(input: VehicleInput): VehicleCheck {
@@ -104,6 +123,12 @@ export function validateVehicleInput(input: VehicleInput): VehicleCheck {
     }
     if (!isValidVehicleYear(input.year)) {
       return { ok: false, field: 'year', message: 'Enter a valid year.' };
+    }
+  }
+
+  if (vehicleNeedsTrailerNumber(input.vehicleType)) {
+    if (!isValidTrailerNumber(input.trailerNumber)) {
+      return { ok: false, field: 'trailerNumber', message: 'Enter the trailer number.' };
     }
   }
 
