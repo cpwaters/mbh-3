@@ -280,6 +280,76 @@ describe('addVehicle / retireVehicle', () => {
     );
   });
 
+  it('adds a trailer with no plate, make, model or year', async () => {
+    const h = await makeHarness();
+    const result = await h.run('driver-1', {
+      type: 'addVehicle',
+      payload: validVehicle({
+        vehicleType: 'trailer',
+        registration: '',
+        make: '',
+        model: '',
+        year: 0,
+        vehicleConfiguration: 'refrigerated',
+      }),
+      requestId: 'r-trailer-1',
+    });
+    expect(await h.store.getDoc(`tenants/carrier-1/vehicles/${result.vehicleId}`)).toMatchObject({
+      vehicleType: 'trailer',
+      vehicleConfiguration: 'refrigerated',
+      registration: '',
+      status: 'active',
+    });
+  });
+
+  it('lets a carrier add a whole row of trailers — plateless is not duplicate', async () => {
+    const h = await makeHarness();
+    const trailer = (over: Record<string, unknown> = {}) =>
+      validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, ...over });
+
+    await h.run('driver-1', { type: 'addVehicle', payload: trailer(), requestId: 'r-t-a' });
+    // The second one shares the first's (empty) normalized plate. Refusing it
+    // as a duplicate would cap every fleet at exactly one trailer.
+    const second = await h.run('car-owner', {
+      type: 'addVehicle',
+      payload: trailer({ vehicleConfiguration: 'flatbed' }),
+      requestId: 'r-t-b',
+    });
+    expect(await h.store.getDoc(`tenants/carrier-1/vehicles/${second.vehicleId}`)).toMatchObject({
+      vehicleType: 'trailer',
+      vehicleConfiguration: 'flatbed',
+      status: 'active',
+    });
+  });
+
+  it('adds a unit with no configuration — the trailer it pulls carries that', async () => {
+    const h = await makeHarness();
+    const result = await h.run('driver-1', {
+      type: 'addVehicle',
+      payload: validVehicle({ vehicleType: 'unit', vehicleConfiguration: '' }),
+      requestId: 'r-unit-1',
+    });
+    expect(await h.store.getDoc(`tenants/carrier-1/vehicles/${result.vehicleId}`)).toMatchObject({
+      vehicleType: 'unit',
+      vehicleConfiguration: '',
+      registration: 'AB12 CDE',
+      status: 'active',
+    });
+  });
+
+  it('still demands what a type does need: a trailer without a configuration', async () => {
+    const h = await makeHarness();
+    const err = await expectAppError(
+      h.run('driver-1', {
+        type: 'addVehicle',
+        payload: validVehicle({ vehicleType: 'trailer', registration: '', make: '', model: '', year: 0, vehicleConfiguration: '' }),
+        requestId: 'r-t-bad',
+      }),
+      'invalid-payload'
+    );
+    expect(err.field).toBe('vehicleConfiguration');
+  });
+
   it('retires a vehicle (append-only status change) and 404s a missing one', async () => {
     const h = await makeHarness();
     await h.run('driver-1', { type: 'addVehicle', payload: validVehicle(), requestId: 'r-add' });

@@ -18,15 +18,20 @@ import { zodParse } from '../parse.js';
 // vehicles — owner-drivers add their own truck.
 const FLEET_ROLES: readonly Role[] = ['owner', 'dispatcher', 'driver'];
 
+// Only the tenant and the type are structurally required: which of the rest
+// a vehicle actually needs depends on that type (a trailer has no plate or
+// make; a unit has no configuration), and validateVehicleInput owns that
+// rule. The schema stays permissive so the domain can give the precise,
+// field-attributed error instead of a generic shape failure.
 const addVehicleSchema = z.object({
   carrierTenantId: z.string().min(1),
-  registration: z.string().min(1),
-  make: z.string().min(1),
-  model: z.string().min(1),
+  registration: z.string(),
+  make: z.string(),
+  model: z.string(),
   year: z.number().int(),
   vin: z.string(),
   vehicleType: z.string().min(1),
-  vehicleConfiguration: z.string().min(1),
+  vehicleConfiguration: z.string(),
 });
 
 export type AddVehiclePayload = z.infer<typeof addVehicleSchema>;
@@ -57,13 +62,18 @@ export const addVehicleHandler: ActionHandler<AddVehiclePayload, AddVehicleResul
     }
 
     const registration = normalizeRegistration(payload.registration);
-    // One active vehicle per plate in a fleet — checked against committed state.
-    const existing = await tx.query({
-      collection: vehiclesCollection(payload.carrierTenantId),
-      filters: [{ field: 'registration', op: '==', value: registration }],
-    });
-    if (existing.some((row) => (row.data.status as VehicleStatus) === 'active')) {
-      throw new AppError('conflict', 'That vehicle is already in your fleet.', { recoverable: false });
+    // One active vehicle per plate in a fleet — checked against committed
+    // state. Skipped for a plateless vehicle (a trailer): every one of those
+    // normalises to the same empty string, so this would refuse the SECOND
+    // trailer a carrier adds as a duplicate of the first.
+    if (registration !== '') {
+      const existing = await tx.query({
+        collection: vehiclesCollection(payload.carrierTenantId),
+        filters: [{ field: 'registration', op: '==', value: registration }],
+      });
+      if (existing.some((row) => (row.data.status as VehicleStatus) === 'active')) {
+        throw new AppError('conflict', 'That vehicle is already in your fleet.', { recoverable: false });
+      }
     }
 
     const vehicleId = ctx.newId('veh');

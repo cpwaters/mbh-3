@@ -196,7 +196,17 @@ export default function Profile() {
                         <div className="flex items-center gap-2">
                           <Truck className="w-5 h-5 text-blue-600" />
                           <h4 className="font-semibold text-gray-900">
-                            {vehicle.make} {vehicle.model}
+                            {/* A trailer carries no make/model, so fall back to
+                                its type + configuration rather than an empty
+                                heading. */}
+                            {`${vehicle.make} ${vehicle.model}`.trim() ||
+                              [
+                                VEHICLE_TYPE_LABELS[vehicle.vehicleType as VehicleType],
+                                vehicle.vehicleConfiguration &&
+                                  VEHICLE_CONFIGURATION_LABELS[vehicle.vehicleConfiguration as VehicleConfiguration],
+                              ]
+                                .filter(Boolean)
+                                .join(' — ')}
                           </h4>
                         </div>
                         <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
@@ -204,23 +214,32 @@ export default function Profile() {
                         </span>
                       </div>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Registration:</span>
-                          <span className="font-medium text-gray-900">{vehicle.registration}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Year:</span>
-                          <span className="font-medium text-gray-900 flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {vehicle.year}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Configuration:</span>
-                          <span className="font-medium text-gray-900">
-                            {VEHICLE_CONFIGURATION_LABELS[vehicle.vehicleConfiguration as VehicleConfiguration]}
-                          </span>
-                        </div>
+                        {/* Each row appears only when that type carries the
+                            field: a trailer has no plate/year, a unit has no
+                            configuration of its own. */}
+                        {vehicle.registration !== '' && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Registration:</span>
+                            <span className="font-medium text-gray-900">{vehicle.registration}</span>
+                          </div>
+                        )}
+                        {vehicle.year > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Year:</span>
+                            <span className="font-medium text-gray-900 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {vehicle.year}
+                            </span>
+                          </div>
+                        )}
+                        {vehicle.vehicleConfiguration !== '' && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Configuration:</span>
+                            <span className="font-medium text-gray-900">
+                              {VEHICLE_CONFIGURATION_LABELS[vehicle.vehicleConfiguration as VehicleConfiguration]}
+                            </span>
+                          </div>
+                        )}
                         {vehicle.vin && (
                           <div className="flex justify-between">
                             <span className="text-gray-600">VIN:</span>
