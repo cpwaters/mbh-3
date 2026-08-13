@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom';
-import { Truck, Plus, Calendar, Container } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Truck, Plus, Calendar, Container, Upload } from 'lucide-react';
 import {
   VEHICLE_TYPE_LABELS,
   VEHICLE_CONFIGURATION_LABELS,
@@ -19,8 +20,16 @@ import { dispatchAction } from '../../lib/dispatch';
 export default function Fleet() {
   const app = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const tenantId = app.selected?.tenantId ?? null;
   const { loading, vehicles, reload } = useVehicles(tenantId);
+
+  // Carried here by the importer. Read once and dropped from history, so
+  // going back later does not re-announce an import from an hour ago.
+  const [flash] = useState(() => (location.state as { flash?: string } | null)?.flash ?? null);
+  useEffect(() => {
+    if (flash !== null) navigate('/vehicles', { replace: true, state: null });
+  }, [flash, navigate]);
 
   async function retire(vehicleId: string): Promise<void> {
     if (tenantId === null) return;
@@ -48,14 +57,28 @@ export default function Fleet() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Fleet</h1>
           <p className="text-gray-600">Your own vehicles and trailers</p>
         </div>
-        <button
-          onClick={() => navigate('/vehicles/add', { state: { from: '/vehicles' } })}
-          className="shrink-0 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Add vehicle
-        </button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            onClick={() => navigate('/vehicles/import')}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+            title="Add a whole fleet from a spreadsheet"
+          >
+            <Upload className="w-4 h-4" />
+            Import
+          </button>
+          <button
+            onClick={() => navigate('/vehicles/add', { state: { from: '/vehicles' } })}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add vehicle
+          </button>
+        </div>
       </div>
+
+      {flash !== null && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">{flash}</div>
+      )}
 
       {vehicles.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -67,7 +90,7 @@ export default function Fleet() {
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles yet</h3>
-          <p className="text-gray-600">Add the vehicles and trailers you run yourself.</p>
+          <p className="text-gray-600">Add the vehicles and trailers you run yourself, or import them from a spreadsheet.</p>
         </div>
       )}
     </div>

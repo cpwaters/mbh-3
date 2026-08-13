@@ -82,7 +82,7 @@ export function Navigation() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white border-t border-gray-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-6">
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -91,7 +91,7 @@ export function Navigation() {
                 to={item.path}
                 end={item.path === '/'}
                 className={({ isActive }) =>
-                  `flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium ${
+                  `flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium whitespace-nowrap ${
                     isActive ? 'text-blue-600' : 'text-gray-500'
                   }`
                 }
