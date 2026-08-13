@@ -26,6 +26,7 @@ import AddVehicle from '../app/AddVehicle';
 import DistributorNavigation from '../app/distributor/Navigation';
 import LoadsList from '../app/distributor/LoadsList';
 import CreateLoad from '../app/distributor/CreateLoad';
+import AddressBook from '../app/distributor/AddressBook';
 import { FounderBar } from '../app/FounderBar';
 import { isFounder } from '../lib/founder';
 
@@ -165,6 +166,7 @@ export default function DriverApp() {
                     <>
                       <Route path="/" element={<LoadsList />} />
                       <Route path="/create" element={<CreateLoad />} />
+                      <Route path="/addresses" element={<AddressBook />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
                     </>

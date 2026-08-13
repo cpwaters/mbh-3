@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, LogOut, User, BookMarked } from 'lucide-react';
 import { TenantSwitcher } from '../../components/TenantSwitcher';
 import { useApp } from '../context';
 
@@ -9,6 +9,7 @@ import { useApp } from '../context';
 const navItems = [
   { path: '/', label: 'All Loads', mobileLabel: 'Loads', icon: LayoutDashboard },
   { path: '/create', label: 'Create Load', mobileLabel: 'Create', icon: PlusCircle },
+  { path: '/addresses', label: 'Address Book', mobileLabel: 'Addresses', icon: BookMarked },
 ];
 
 export default function DistributorNavigation() {
@@ -85,7 +86,7 @@ export default function DistributorNavigation() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white border-t border-gray-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
