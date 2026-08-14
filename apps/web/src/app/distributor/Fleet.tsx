@@ -52,12 +52,12 @@ export default function Fleet() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Fleet</h1>
           <p className="text-gray-600">Your own vehicles and trailers</p>
         </div>
-        <div className="flex flex-wrap gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => navigate('/vehicles/import')}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
