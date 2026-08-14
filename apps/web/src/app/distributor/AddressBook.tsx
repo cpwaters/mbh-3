@@ -135,7 +135,7 @@ export default function AddressBook() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Address Book</h1>
           <p className="text-gray-600">Saved collection and delivery points, offered when you create a load</p>
@@ -143,7 +143,7 @@ export default function AddressBook() {
         {editing === null && (
           <button
             onClick={startNew}
-            className="shrink-0 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="self-start bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add address
