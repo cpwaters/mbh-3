@@ -19,7 +19,8 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       { "source": "/api/**", "function": { "functionId": "dispatch", "region": "europe-west2" } },
-      { "source": "/health", "function": { "functionId": "dispatch", "region": "europe-west2" } }
+      { "source": "/health", "function": { "functionId": "dispatch", "region": "europe-west2" } },
+      { "source": "/app/**", "destination": "/app/index.html" }
     ]
   },
   "emulators": {
