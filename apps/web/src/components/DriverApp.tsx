@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { MemoryRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import type { DeliverCapture } from '@mbh/client';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
@@ -39,6 +39,20 @@ function LoadingCard() {
     </div>
   );
 }
+
+function FullPageSpinner() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// The app lives under /app on the static host, so react-router's paths are
+// relative to that: '/vehicles' here is '/app/vehicles' in the address bar.
+// firebase.json rewrites /app/** to the app's index.html, so opening or
+// refreshing a deep link serves the app rather than a 404.
+const BASENAME = '/app';
 
 // The signed-in chrome: the role's nav bar plus the matched page. A layout
 // route so the carrier/shipper sign-up pages can render full-screen alongside
@@ -140,20 +154,17 @@ export default function DriverApp() {
     drivingTimers,
   };
 
-  if (!auth.ready) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Auth resolves from IndexedDB on a refresh; until it does we cannot tell a
+  // signed-in reload from a signed-out one, and guessing would bounce the
+  // driver to /login and lose the page they were on.
+  if (!auth.ready) return <FullPageSpinner />;
 
   const loading = tenants.loading || jobLoading || listings.loading;
   const founder = isFounder(auth.session);
 
   return (
     <AppProvider value={app}>
-      <MemoryRouter>
+      <BrowserRouter basename={BASENAME}>
         <div className="min-h-screen bg-gray-50">
           {auth.session === null ? (
             <Routes>
@@ -163,6 +174,12 @@ export default function DriverApp() {
               <Route path="/signup/shipper" element={<SignUp auth={auth} role="shipper" />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
+          ) : tenants.loading ? (
+            // Which routes exist depends on the selected tenant's
+            // capabilities. Rendering the table before that is known would
+            // send a distributor URL through the catch-all and rewrite the
+            // address bar to '/' — exactly what a refresh must not do.
+            <FullPageSpinner />
           ) : (
             <>
               {founder && <FounderBar />}
@@ -200,7 +217,7 @@ export default function DriverApp() {
             </>
           )}
         </div>
-      </MemoryRouter>
+      </BrowserRouter>
     </AppProvider>
   );
 }

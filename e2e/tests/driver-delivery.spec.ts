@@ -111,6 +111,40 @@ test('a shipper posts a load through the distributor UI', async ({ page }) => {
   await expect(page.getByText('Trafford, M17 1WS')).toBeVisible();
 });
 
+test('every page has its own URL, and a refresh stays on it', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/?$/);
+
+  await page.getByRole('link', { name: 'Fleet' }).click();
+  await expect(page).toHaveURL(/\/app\/vehicles$/);
+
+  // The real test of the rewrite AND of not redirecting before the tenant is
+  // known: /vehicles exists only for a shipper, so a reload that renders the
+  // route table too early would bounce the address bar back to /app/.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Fleet' })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/vehicles$/);
+
+  // Typed straight into the address bar, not navigated to.
+  await page.goto('/app/addresses');
+  await expect(page.getByRole('heading', { name: 'Address Book' })).toBeVisible();
+
+  // Back goes where the browser's back button should.
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Fleet' })).toBeVisible();
+});
+
+test('a driver keeps their page across a refresh too', async ({ page }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Driving Time' }).click();
+  await expect(page).toHaveURL(/\/app\/driving$/);
+
+  await page.reload();
+  await expect(page).toHaveURL(/\/app\/driving$/);
+  await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+});
+
 test('the guide explains how it works', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'How it works' }).click();
