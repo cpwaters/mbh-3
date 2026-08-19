@@ -7,11 +7,19 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: false
+  # A new push supersedes an unfinished PR run. Without this, one hung job
+  # (a `playwright install` that stalled on a slow runner, 2026-08-19) holds
+  # the group and leaves every later run on the branch queued until GitHub's
+  # 6-hour default timeout. Pushes to main are never cancelled — that run
+  # feeds the deploy.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # The full sweep runs in ~5 minutes; anything past 25 is a stuck runner,
+    # and failing is more useful than squatting on the concurrency group.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       # Version comes from the packageManager field in package.json —
