@@ -1,6 +1,6 @@
 import { AppError } from '@mbh/domain';
 import { requestMarkerDoc } from '@mbh/paths';
-import type { DataStore, DocData } from '@mbh/provider-interfaces';
+import type { DataStore, DocData, VerifiedActor } from '@mbh/provider-interfaces';
 import { buildAuditOp, type ActionContext, type ActionHandler } from './context.js';
 
 export interface DispatchRequest {
@@ -24,9 +24,10 @@ export type AnyHandler = ActionHandler<any, DocData>;
 export async function dispatch(
   deps: DispatchDeps,
   registry: ReadonlyMap<string, AnyHandler>,
-  actorId: string,
+  actor: VerifiedActor,
   request: DispatchRequest
 ): Promise<DocData> {
+  const { actorId } = actor;
   const handler = registry.get(request.type);
   if (handler === undefined) {
     throw new AppError('not-found', `Unknown action: ${request.type}`);
@@ -45,7 +46,7 @@ export async function dispatch(
     });
   }
 
-  const ctx: ActionContext = { actorId, now: deps.now, newId: deps.newId };
+  const ctx: ActionContext = { actorId, actorEmail: actor.email, now: deps.now, newId: deps.newId };
 
   return deps.store.runTransaction(async (tx) => {
     // Idempotency: a replayed requestId returns the ORIGINAL result; a

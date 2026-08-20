@@ -1,8 +1,11 @@
-// The founder account. When signed in as this user, the app shows an extra
-// founder nav bar for jumping to the public site and the carrier/shipper
-// sign-up pages. Kept as a single source of truth so the check is consistent.
-export const FOUNDER_EMAIL = 'nvwebdevelopers@gmail.com';
+import { isFounderEmail } from '@mbh/domain';
+
+// The founder account, for the UI gate that shows the founder toolbar. The
+// address itself lives in @mbh/domain so the server-side guard on
+// founder-only actions (requireFounder) checks the SAME value — this is
+// convenience, that is the invariant.
+export { FOUNDER_EMAIL } from '@mbh/domain';
 
 export function isFounder(session: { email: string | null } | null): boolean {
-  return (session?.email ?? '').trim().toLowerCase() === FOUNDER_EMAIL;
+  return isFounderEmail(session?.email ?? null);
 }

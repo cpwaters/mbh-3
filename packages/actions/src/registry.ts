@@ -7,6 +7,7 @@ import { relistJobHandler } from './actions/relist-job.js';
 import { addVehicleHandler, retireVehicleHandler } from './actions/vehicles.js';
 import { updateProfileHandler } from './actions/update-profile.js';
 import { createTenantHandler } from './actions/create-tenant.js';
+import { createInviteHandler, revokeInviteHandler } from './actions/invites.js';
 import { cancelLoadHandler } from './actions/cancel-load.js';
 import { recordRoutePointHandler } from './actions/record-route-point.js';
 import { sendTestInvoiceEmailHandler } from './actions/send-test-invoice-email.js';
@@ -30,6 +31,8 @@ const HANDLERS: readonly AnyHandler[] = [
   retireVehicleHandler,
   updateProfileHandler,
   createTenantHandler,
+  createInviteHandler,
+  revokeInviteHandler,
   cancelLoadHandler,
   recordRoutePointHandler,
   sendTestInvoiceEmailHandler,
@@ -71,6 +74,8 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'saveAddressBookEntry',
   'updateAddressBookEntry',
   'archiveAddressBookEntry',
+  'createInvite',
+  'revokeInvite',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

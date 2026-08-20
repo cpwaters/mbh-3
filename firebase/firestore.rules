@@ -22,8 +22,40 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/tenants/$(tenantId)/members/$(request.auth.uid)).data.status == 'active';
     }
 
+    // The founder, by the email on their token. Deliberately the SAME bar as
+    // requireFounder() in the Action Layer: two different tests for one
+    // identity is worse than either, because the weaker one is the real one.
+    //
+    // The address alone is sound here because Firebase Auth will not register
+    // an email that already has an account, and this one does — so holding
+    // the address means being that account. A custom claim would be stronger
+    // still and is the natural hardening if this ever guards more than
+    // listing invitations; it needs an admin-side script to set, which is why
+    // it is not the bar today.
+    //
+    // This only widens READS. Every write still goes through dispatch.
+    function isFounder() {
+      return isSignedIn()
+        && request.auth.token.email.lower() == 'nvwebdevelopers@gmail.com';
+    }
+
     function jobData(jobId) {
       return get(/databases/$(database)/documents/jobs/$(jobId)).data;
+    }
+
+    // Invitations to the marketplace. The doc id IS the secret in the link,
+    // so knowing it is what grants the read — hence `get` (one doc you can
+    // already name) is allowed to any signed-in user, while `list` is not:
+    // nobody may enumerate the collection and harvest unspent links. The
+    // founder may list, to manage the ones they have sent.
+    //
+    // Client writes are denied outright: minting, revoking and spending all
+    // go through the Action Layer, which is where one-use is enforced
+    // atomically with creating the company.
+    match /invites/{inviteId} {
+      allow get: if isSignedIn();
+      allow list: if isFounder();
+      allow write: if false;
     }
 
     // Tenants + members: readable by active members of the same tenant.

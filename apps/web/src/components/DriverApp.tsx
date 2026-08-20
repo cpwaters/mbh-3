@@ -29,6 +29,8 @@ import CreateLoad from '../app/distributor/CreateLoad';
 import AddressBook from '../app/distributor/AddressBook';
 import Fleet from '../app/distributor/Fleet';
 import FleetImport from '../app/distributor/FleetImport';
+import Invites from '../app/Invites';
+import InviteLanding from '../app/InviteLanding';
 import { FounderBar } from '../app/FounderBar';
 import { isFounder } from '../lib/founder';
 
@@ -168,6 +170,9 @@ export default function DriverApp() {
         <div className="min-h-screen bg-gray-50">
           {auth.session === null ? (
             <Routes>
+              {/* An invitation is nearly always opened by someone with no
+                  account yet, so this has to resolve before sign-in. */}
+              <Route path="/invite/:inviteId" element={<InviteLanding signedIn={false} />} />
               <Route path="/login" element={<Login auth={auth} />} />
               <Route path="/signup" element={<SignUp auth={auth} />} />
               <Route path="/signup/carrier" element={<SignUp auth={auth} role="carrier" />} />
@@ -187,6 +192,7 @@ export default function DriverApp() {
                 {/* Founder previews (and direct sign-up links): full-screen, no app nav. */}
                 <Route path="/signup/carrier" element={<SignUp auth={auth} role="carrier" />} />
                 <Route path="/signup/shipper" element={<SignUp auth={auth} role="shipper" />} />
+                <Route path="/invite/:inviteId" element={<InviteLanding signedIn />} />
                 <Route element={<AppLayout distributor={showDistributor} loading={loading} />}>
                   {showDistributor ? (
                     <>
@@ -198,6 +204,7 @@ export default function DriverApp() {
                       <Route path="/vehicles/add" element={<AddVehicle />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
+                      {founder && <Route path="/invites" element={<Invites />} />}
                     </>
                   ) : (
                     <>
@@ -209,6 +216,7 @@ export default function DriverApp() {
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
                       <Route path="/vehicles/add" element={<AddVehicle />} />
+                      {founder && <Route path="/invites" element={<Invites />} />}
                     </>
                   )}
                   <Route path="*" element={<Navigate to="/" replace />} />

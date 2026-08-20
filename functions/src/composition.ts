@@ -18,7 +18,7 @@ class FirebaseAuthProvider implements AuthProvider {
   async verifyIdToken(idToken: string): Promise<VerifiedActor | null> {
     try {
       const decoded = await getAuth().verifyIdToken(idToken);
-      return { actorId: decoded.uid };
+      return { actorId: decoded.uid, email: decoded.email ?? null };
     } catch {
       return null;
     }

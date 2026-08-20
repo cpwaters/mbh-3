@@ -1,9 +1,17 @@
-import { useState } from 'react';
-import { Building2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Building2, MailCheck, AlertCircle } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
-import { TENANT_CAPABILITIES, TENANT_CAPABILITY_LABELS, type TenantCapability } from '@mbh/domain';
+import {
+  TENANT_CAPABILITIES,
+  TENANT_CAPABILITY_LABELS,
+  inviteState,
+  inviteStateMessage,
+  type TenantCapability,
+} from '@mbh/domain';
 import { dispatchAction } from '../lib/dispatch';
 import { takeSignupIntent } from '../lib/signupIntent';
+import { clearInviteToken, peekInviteToken } from '../lib/inviteToken';
+import { getReader } from '../lib/reader';
 
 const INPUT =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500';
@@ -27,6 +35,39 @@ export function CreateCompany({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Joining is by invitation. The id came in the link and was pocketed by
+  // InviteLanding; now that we are signed in we can actually read it and say
+  // whether it is any good BEFORE the person fills the form in.
+  const [inviteId] = useState(peekInviteToken);
+  const [inviteProblem, setInviteProblem] = useState<string | null>(null);
+  const [checkingInvite, setCheckingInvite] = useState(inviteId !== null);
+
+  useEffect(() => {
+    if (inviteId === null) return;
+    let cancelled = false;
+    getReader()
+      .inviteById(inviteId)
+      .then((invite) => {
+        if (cancelled) return;
+        if (invite === null) {
+          setInviteProblem('That invitation link is not valid.');
+        } else {
+          const state = inviteState(invite, new Date().toISOString());
+          setInviteProblem(state === 'valid' ? null : inviteStateMessage(state));
+        }
+        setCheckingInvite(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Could not read it — say nothing here and let the server be the
+        // judge when they submit, rather than blocking on a flaky read.
+        setCheckingInvite(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteId]);
+
   const toggle = (c: TenantCapability) =>
     setCaps((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
@@ -37,11 +78,16 @@ export function CreateCompany({
       const res = await dispatchAction(
         getIdToken,
         'createTenant',
-        { name, capabilities: caps },
+        { name, capabilities: caps, ...(inviteId !== null ? { inviteId } : {}) },
         genRequestId()
       );
-      if (res.ok) onCreated(res.result.tenantId as string);
-      else setError(res.error.message);
+      if (res.ok) {
+        // Spent — and only now, so a failed attempt can be retried.
+        clearInviteToken();
+        onCreated(res.result.tenantId as string);
+      } else {
+        setError(res.error.message);
+      }
     } finally {
       setBusy(false);
     }
@@ -56,6 +102,19 @@ export function CreateCompany({
         <h2 className="text-xl font-bold text-gray-900">Create your company</h2>
       </div>
       <p className="text-gray-600 mb-4">Set up your business to start posting or carrying loads.</p>
+
+      {inviteId !== null && inviteProblem === null && !checkingInvite && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm flex items-center gap-2">
+          <MailCheck className="w-4 h-4 flex-shrink-0" />
+          Your invitation is valid — set your company up below.
+        </div>
+      )}
+      {inviteProblem !== null && (
+        <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          {inviteProblem}
+        </div>
+      )}
 
       {error !== null && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">{error}</div>

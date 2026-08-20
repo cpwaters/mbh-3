@@ -1,5 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
-import { E2E, getDeliveryPhotoRefs, getJobStatus, getLoadStatus, storageObjectExists } from '../support/admin.js';
+import {
+  E2E,
+  getDeliveryPhotoRefs,
+  getJobStatus,
+  getLoadStatus,
+  seedInvite,
+  storageObjectExists,
+} from '../support/admin.js';
 
 // A minimal valid 1x1 PNG — the "photo of the delivered goods". Inline so
 // there is no binary fixture to maintain.
@@ -14,6 +21,15 @@ async function signIn(page: Page, email: string, password: string): Promise<void
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+}
+
+async function signUp(page: Page, firstName: string, surname: string, email: string, password: string): Promise<void> {
+  await page.getByLabel('First Name').fill(firstName);
+  await page.getByLabel('Surname').fill(surname);
+  await page.getByLabel('Email Address').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('Confirm Password').fill(password);
+  await page.getByRole('button', { name: 'Create Account', exact: true }).click();
 }
 
 // The app is a multi-page SPA now; delivery lives on the Active Jobs page.
@@ -143,6 +159,55 @@ test('a driver keeps their page across a refresh too', async ({ page }) => {
   await page.reload();
   await expect(page).toHaveURL(/\/app\/driving$/);
   await expect(page.getByRole('heading', { name: 'Driving Time', level: 1 })).toBeVisible();
+});
+
+test('an invitation link lets exactly one company in', async ({ page }) => {
+  // The founder mints a link.
+  await signIn(page, E2E.founderEmail, E2E.founderPassword);
+  await page.getByRole('link', { name: 'Invitations' }).click();
+  await expect(page.getByRole('heading', { name: 'Invitations' })).toBeVisible();
+  await page.getByLabel('Who is this for?').fill('Pennine Transport');
+  await page.getByRole('button', { name: 'New invitation' }).click();
+
+  await expect(page.getByText('Unused')).toBeVisible();
+  const link = await page.locator('code', { hasText: '/app/invite/' }).first().textContent();
+  if (link === null) throw new Error('no invitation link rendered');
+  const invitePath = new URL(link).pathname;
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
+
+  // Someone new opens it, makes an account, and gets their company.
+  const newcomer = `invited-${Date.now()}@haulier.test`;
+  await page.goto(invitePath);
+  await expect(page.getByText('Create your driver account')).toBeVisible();
+  await signUp(page, 'Pat', 'Newcomer', newcomer, 'test-password-new');
+
+  await expect(page.getByText(/invitation is valid/i)).toBeVisible();
+  await page.getByLabel(/company name/i).fill('Pennine Transport');
+  await page.getByLabel(/carrier/i).check();
+  await page.getByRole('button', { name: /create company/i }).click();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+
+  // And it is spent: a second person following the same link is refused.
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
+  const second = `second-${Date.now()}@haulier.test`;
+  await page.goto(invitePath);
+  await signUp(page, 'Second', 'Comer', second, 'test-password-two');
+
+  await expect(page.getByRole('alert')).toContainText(/already been used/i);
+});
+
+test('without an invitation there is no way onto the marketplace', async ({ page }) => {
+  const uninvited = `uninvited-${Date.now()}@haulier.test`;
+  await page.goto('/app/signup');
+  await signUp(page, 'No', 'Invite', uninvited, 'test-password-none');
+
+  await page.getByLabel(/company name/i).fill('Gatecrasher Ltd');
+  await page.getByLabel(/carrier/i).check();
+  await page.getByRole('button', { name: /create company/i }).click();
+
+  await expect(page.getByText(/by invitation/i)).toBeVisible();
 });
 
 test('the guide explains how it works', async ({ page }) => {
@@ -375,8 +440,19 @@ test('a user edits their account profile', async ({ page }) => {
 });
 
 test('a new user creates their company and lands on the dashboard', async ({ page }) => {
+  // Own the precondition: an invitation is one-use, so this test mints a
+  // fresh one rather than trusting a shared seed to still be unspent.
+  await seedInvite(E2E.newbieInviteId);
   await signIn(page, E2E.newbieEmail, E2E.newbiePassword);
+  // Wait for the sign-in to actually land before navigating: goto is a full
+  // page load, and firing it mid-sign-in races Firebase writing the session
+  // to IndexedDB — the reload then comes up signed out.
   await expect(page.getByRole('heading', { name: 'Create your company' })).toBeVisible();
+
+  // Joining is by invitation: arrive through the link they were sent.
+  await page.goto(`/app/invite/${E2E.newbieInviteId}`);
+  await expect(page.getByRole('heading', { name: 'Create your company' })).toBeVisible();
+  await expect(page.getByText(/invitation is valid/i)).toBeVisible();
 
   await page.getByLabel('Company name').fill('Solo Haulage Ltd');
   await page.getByLabel('Post loads (shipper)').check();
