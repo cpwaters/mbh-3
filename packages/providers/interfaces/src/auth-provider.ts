@@ -4,6 +4,10 @@
 
 export interface VerifiedActor {
   actorId: string;
+  // The address on the VERIFIED token, not anything the client sent. Null
+  // when the identity provider gave none. This is what founder-only actions
+  // are authorized against.
+  email: string | null;
 }
 
 export interface AuthProvider {

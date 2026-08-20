@@ -35,6 +35,9 @@ export const E2E = {
   multiEmail: 'multi.e2e@both.test',
   multiPassword: 'test-password-abc',
   // A brand-new user with NO company — exercises the onboarding flow.
+  // A standing invitation the newbie redeems when creating their company —
+  // joining is by invitation now.
+  newbieInviteId: 'inv-e2e-newbie',
   newbieUid: 'newbie-e2e-user',
   newbieEmail: 'newbie.e2e@nobody.test',
   newbiePassword: 'test-password-def',
@@ -84,6 +87,7 @@ export async function seedDeliverableJob(): Promise<void> {
   await ensureUser(E2E.founderUid, E2E.founderEmail, E2E.founderPassword);
 
   const db = getFirestore();
+  await seedInvite(E2E.newbieInviteId);
   await db.doc(`tenants/${E2E.carrierTenantId}`).set({
     tenantId: E2E.carrierTenantId,
     name: 'Waters Haulage',
@@ -255,4 +259,22 @@ export async function storageObjectExists(ref: string): Promise<boolean> {
   app();
   const [exists] = await getStorage().bucket().file(ref).exists();
   return exists;
+}
+
+// A fresh, unspent invitation. An invite is one-use by design, so a test that
+// needs to redeem one must mint its own rather than lean on a shared seed
+// that another test may already have spent.
+export async function seedInvite(inviteId: string): Promise<void> {
+  // Tests run in a different process from globalSetup, so the admin app has
+  // to be initialised here too — same as the other test-side helpers.
+  app();
+  await getFirestore().doc(`invites/${inviteId}`).set({
+    inviteId,
+    status: 'pending',
+    note: 'e2e',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    createdBy: E2E.founderUid,
+    // Far future: the suite must not start failing because a date passed.
+    expiresAt: '2099-01-01T00:00:00.000Z',
+  });
 }

@@ -26,6 +26,7 @@ import {
   type UserProfile,
   type Vehicle,
   type AddressBookEntry,
+  type Invite,
 } from '@mbh/domain';
 import {
   jobsCollection,
@@ -37,9 +38,12 @@ import {
   userProfileDoc,
   vehiclesCollection,
   addressBookCollection,
+  inviteDoc,
+  invitesCollection,
 } from '@mbh/paths';
 import type {
   AddressBookReader,
+  InviteReader,
   CompletedJobView,
   DriverJobView,
   JobReader,
@@ -97,7 +101,8 @@ export class FirestoreReader
     ProfileReader,
     ShipperLoadReader,
     OutboxTaskReader,
-    AddressBookReader
+    AddressBookReader,
+    InviteReader
 {
   private readonly db: Firestore;
 
@@ -247,6 +252,23 @@ export class FirestoreReader
         return { tenantId: data.tenantId, name, role: data.role, capabilities };
       })
     );
+  }
+
+  // The caller already knows the id — it was in the link they were sent, and
+  // knowing it is what authorizes the read (see the `get` rule on /invites).
+  async inviteById(inviteId: string): Promise<Invite | null> {
+    const snap = await getDoc(doc(this.db, inviteDoc(inviteId)));
+    return snap.exists() ? (snap.data() as Invite) : null;
+  }
+
+  // Founder-only, enforced by the `list` rule: for anyone else this rejects
+  // rather than returning an empty list, so a harvest cannot be mistaken for
+  // "no invites".
+  async invitesForFounder(): Promise<Invite[]> {
+    const snap = await getDocs(collection(this.db, invitesCollection()));
+    return snap.docs
+      .map((d) => d.data() as Invite)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)); // newest first
   }
 
   async testEmailTaskStatus(taskId: string): Promise<TestEmailTaskView | null> {

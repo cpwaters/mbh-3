@@ -1,4 +1,5 @@
 import { InMemoryDataStore } from '@mbh/provider-mocks';
+import type { VerifiedActor } from '@mbh/provider-interfaces';
 import { buildRegistry, dispatch, type DispatchRequest } from './index.js';
 
 // A deterministic id generator: per-prefix counters, so test assertions can
@@ -16,7 +17,7 @@ export const FIXED_NOW = '2026-08-01T09:00:00.000Z';
 
 export interface Harness {
   store: InMemoryDataStore;
-  run(actorId: string, request: DispatchRequest): Promise<Record<string, unknown>>;
+  run(actor: string | VerifiedActor, request: DispatchRequest): Promise<Record<string, unknown>>;
 }
 
 export async function makeHarness(): Promise<Harness> {
@@ -40,8 +41,16 @@ export async function makeHarness(): Promise<Harness> {
   // One id generator for the whole harness so ids stay unique across
   // dispatches (like real uuids), while remaining deterministic.
   const newId = makeIdGen();
-  const run = (actorId: string, request: DispatchRequest) =>
-    dispatch({ store, now: FIXED_NOW, newId }, registry, actorId, request);
+  // Most tests only care who the actor is, so a bare actorId string is
+  // accepted; a test exercising a founder-only action passes the whole
+  // verified actor so it can carry an email.
+  const run = (actor: string | VerifiedActor, request: DispatchRequest) =>
+    dispatch(
+      { store, now: FIXED_NOW, newId },
+      registry,
+      typeof actor === 'string' ? { actorId: actor, email: null } : actor,
+      request
+    );
 
   return { store, run };
 }

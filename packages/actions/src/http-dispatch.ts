@@ -67,7 +67,7 @@ export async function handleHttpRequest(deps: HttpDispatchDeps, req: HttpRequest
   }
 
   try {
-    const actorId = await authenticateActor(deps.auth, bearerToken(req.authorization));
+    const actor = await authenticateActor(deps.auth, bearerToken(req.authorization));
 
     const body = req.body;
     if (typeof body !== 'object' || body === null) {
@@ -81,7 +81,7 @@ export async function handleHttpRequest(deps: HttpDispatchDeps, req: HttpRequest
     const result = await dispatch(
       { store: deps.store, now: deps.now(), newId: deps.newId },
       deps.registry,
-      actorId,
+      actor,
       { type, payload, ...(typeof requestId === 'string' ? { requestId } : {}) }
     );
 

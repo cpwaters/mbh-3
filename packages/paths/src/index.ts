@@ -133,3 +133,16 @@ export function userProfilesCollection(): string {
 export function userProfileDoc(actorId: string): string {
   return `${COLLECTIONS.userProfiles}/${actorId}`;
 }
+
+// Invitations to the marketplace. Top-level: an invite exists before the
+// company it creates, so it cannot live under a tenant. The doc id is the
+// secret in the link.
+const INVITES_COLLECTION = 'invites';
+
+export function invitesCollection(): string {
+  return INVITES_COLLECTION;
+}
+
+export function inviteDoc(inviteId: string): string {
+  return `${INVITES_COLLECTION}/${inviteId}`;
+}

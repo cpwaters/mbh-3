@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppError } from '@mbh/domain';
+import { AppError, FOUNDER_EMAIL } from '@mbh/domain';
 import { makeHarness, validPostLoadPayload } from './test-harness.js';
 
 async function expectAppError(promise: Promise<unknown>, code: string): Promise<AppError> {
@@ -454,11 +454,23 @@ describe('updateProfile', () => {
 });
 
 describe('createTenant', () => {
-  it('a signed-in user creates a company and becomes its active owner', async () => {
+  // Joining is invitation-only now (see invites.test.ts for the gate itself),
+  // so these tests mint one first and exercise what creating a company does.
+  const FOUNDER = { actorId: 'founder-1', email: FOUNDER_EMAIL };
+
+  async function invited(h: Awaited<ReturnType<typeof makeHarness>>, requestId = 'r-inv'): Promise<string> {
+    const { inviteId } = (await h.run(FOUNDER, { type: 'createInvite', payload: {}, requestId })) as {
+      inviteId: string;
+    };
+    return inviteId;
+  }
+
+  it('an invited user creates a company and becomes its active owner', async () => {
     const h = await makeHarness();
+    const inviteId = await invited(h);
     const result = await h.run('newcomer', {
       type: 'createTenant',
-      payload: { name: '  Solo Haulage Ltd ', capabilities: ['carrier'] },
+      payload: { name: '  Solo Haulage Ltd ', capabilities: ['carrier'], inviteId },
       requestId: 'r-ct-1',
     });
     expect(result).toEqual({ tenantId: 'tenant-1' });
@@ -477,10 +489,11 @@ describe('createTenant', () => {
 
   it("uses the creator's profile name for their membership when set", async () => {
     const h = await makeHarness();
+    const inviteId = await invited(h);
     await h.run('newcomer', { type: 'updateProfile', payload: validProfile({ firstName: 'Nadia', lastName: 'Ferry' }), requestId: 'r-p' });
     await h.run('newcomer', {
       type: 'createTenant',
-      payload: { name: 'Nadia Transport', capabilities: ['shipper', 'carrier'] },
+      payload: { name: 'Nadia Transport', capabilities: ['shipper', 'carrier'], inviteId },
       requestId: 'r-ct',
     });
     expect(await h.store.getDoc('tenants/tenant-1/members/newcomer')).toMatchObject({ displayName: 'Nadia Ferry' });
@@ -488,15 +501,18 @@ describe('createTenant', () => {
 
   it('rejects a too-short name and empty capabilities', async () => {
     const h = await makeHarness();
+    const inviteId = await invited(h);
     const nameErr = await expectAppError(
-      h.run('newcomer', { type: 'createTenant', payload: { name: 'a', capabilities: ['carrier'] }, requestId: 'r-n' }),
+      h.run('newcomer', { type: 'createTenant', payload: { name: 'a', capabilities: ['carrier'], inviteId }, requestId: 'r-n' }),
       'invalid-payload'
     );
     expect(nameErr.field).toBe('name');
     await expectAppError(
-      h.run('newcomer', { type: 'createTenant', payload: { name: 'Valid Co', capabilities: [] }, requestId: 'r-c' }),
+      h.run('newcomer', { type: 'createTenant', payload: { name: 'Valid Co', capabilities: [], inviteId }, requestId: 'r-c' }),
       'invalid-payload'
     );
+    // A rejected payload must not burn the invitation.
+    expect(await h.store.getDoc(`invites/${inviteId}`)).toMatchObject({ status: 'pending' });
   });
 });
 

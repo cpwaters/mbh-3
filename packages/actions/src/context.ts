@@ -6,6 +6,10 @@ import { auditDoc } from '@mbh/paths';
 // and randomness.
 export interface ActionContext {
   actorId: string;
+  // The address on the actor's VERIFIED token, or null if their provider gave
+  // none. The only trustworthy answer to "who is this" beyond the uid — a
+  // profile document is user-editable and so cannot authorize anything.
+  actorEmail: string | null;
   now: string; // ISO-8601 UTC, fixed for the whole dispatch
   newId(prefix: string): string;
 }

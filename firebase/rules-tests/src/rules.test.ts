@@ -57,11 +57,17 @@ beforeEach(async () => {
     await setDoc(doc(db, 'outbox/test-email-1'), { taskId: 'test-email-1', type: 'sendTestInvoiceEmail', status: 'done', tenantId: 'shipper-1', recipientEmail: 'owner@acme.test', actorId: SHIP_OWNER });
     await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
     await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
+    await setDoc(doc(db, 'invites/inv-1'), { inviteId: 'inv-1', status: 'pending', note: 'Waters Haulage', createdAt: '2026-08-19T09:00:00.000Z', createdBy: 'founder-1', expiresAt: '2026-08-26T09:00:00.000Z' });
   });
 });
 
 function db(actorId: string | null) {
   return actorId === null ? env.unauthenticatedContext().firestore() : env.authenticatedContext(actorId).firestore();
+}
+
+// The founder is identified by the email claim on their token.
+function founderDb(email = 'nvwebdevelopers@gmail.com') {
+  return env.authenticatedContext('founder-1', { email }).firestore();
 }
 
 describe('tenants + members', () => {
@@ -279,6 +285,38 @@ describe('outbox (drain work — internal, except the founder test-email readbac
     await assertFails(
       setDoc(doc(db(SHIP_OWNER), 'outbox/test-email-1'), { type: 'sendTestInvoiceEmail', status: 'done', actorId: SHIP_OWNER })
     );
+  });
+});
+
+describe('invites (the link is the secret)', () => {
+  it('lets a signed-in user read the one invite they can name', async () => {
+    // Knowing the id IS the credential — that is what makes the link work.
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), 'invites/inv-1')));
+  });
+
+  it('never lets anyone enumerate them, which would harvest every unspent link', async () => {
+    await assertFails(getDocs(collection(db(OUTSIDER), 'invites')));
+    await assertFails(getDocs(collection(db(SHIP_OWNER), 'invites')));
+  });
+
+  it('lets the founder list them, to manage what they have sent', async () => {
+    await assertSucceeds(getDocs(collection(founderDb(), 'invites')));
+  });
+
+  it('does not take a lookalike address for the founder', async () => {
+    await assertFails(getDocs(collection(founderDb('nvwebdevelopers@gmail.com.attacker.test'), 'invites')));
+    await assertFails(getDocs(collection(founderDb('notnvwebdevelopers@gmail.com'), 'invites')));
+  });
+
+  it('refuses a signed-out reader outright', async () => {
+    await assertFails(getDoc(doc(db(null), 'invites/inv-1')));
+  });
+
+  it('denies every client write — minting and spending go through dispatch', async () => {
+    await assertFails(setDoc(doc(db(OUTSIDER), 'invites/inv-2'), { inviteId: 'inv-2', status: 'pending' }));
+    // Above all: nobody may un-spend an invite to reuse the link.
+    await assertFails(setDoc(doc(db(OUTSIDER), 'invites/inv-1'), { status: 'pending' }));
+    await assertFails(setDoc(doc(founderDb(), 'invites/inv-1'), { status: 'pending' }));
   });
 });
 

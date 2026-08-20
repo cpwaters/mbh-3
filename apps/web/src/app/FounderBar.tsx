@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Home, Truck, Package, LayoutDashboard, Mail, Loader2, Check, X } from 'lucide-react';
+import { ShieldCheck, Home, Truck, Package, LayoutDashboard, Mail, Loader2, Check, X, Ticket } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import { dispatchAction } from '../lib/dispatch';
@@ -96,6 +96,10 @@ export function FounderBar() {
         <Link to="/signup/shipper" className={link}>
           <Package className="w-4 h-4" />
           Shipper sign-up
+        </Link>
+        <Link to="/invites" className={link}>
+          <Ticket className="w-4 h-4" />
+          Invitations
         </Link>
         <button type="button" onClick={sendTestEmail} disabled={busy} className={link}>
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
