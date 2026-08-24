@@ -210,6 +210,30 @@ test('without an invitation there is no way onto the marketplace', async ({ page
   await expect(page.getByText(/by invitation/i)).toBeVisible();
 });
 
+test('a carrier can invite a company in from their profile', async ({ page }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Profile' }).click();
+  await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Invite a company' }).click();
+  await expect(page.getByText(/expires in 7 days/i)).toBeVisible();
+
+  const link = await page.locator('code', { hasText: '/app/invite/' }).first().textContent();
+  if (link === null) throw new Error('no invitation link rendered');
+
+  // The link a member hands out is a real one: it gets a company in.
+  await page.getByRole('button', { name: 'Logout' }).click();
+  await expect(page.getByText('Sign in to your driver account')).toBeVisible();
+  await page.goto(new URL(link).pathname);
+  await signUp(page, 'Vouched', 'For', `vouched-${Date.now()}@haulier.test`, 'test-password-vouch');
+
+  await expect(page.getByText(/invitation is valid/i)).toBeVisible();
+  await page.getByLabel(/company name/i).fill('Vouched Haulage');
+  await page.getByLabel(/carrier/i).check();
+  await page.getByRole('button', { name: /create company/i }).click();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+});
+
 test('the guide explains how it works', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'How it works' }).click();

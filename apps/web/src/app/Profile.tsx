@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Star, Truck, MapPin, Phone, Building, FileText, Calendar } from 'lucide-react';
+import { User, Star, Truck, MapPin, Phone, Building, FileText, Calendar, UserPlus, Copy, Check } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { VEHICLE_TYPE_LABELS, VEHICLE_CONFIGURATION_LABELS, type VehicleType, type VehicleConfiguration } from '@mbh/domain';
 import { useApp } from './context';
@@ -15,6 +16,45 @@ export default function Profile() {
   const navigate = useNavigate();
   const actorId = app.auth.session?.actorId ?? null;
   const carrierTenantId = app.isCarrier && app.selected !== null ? app.selected.tenantId : null;
+  // Inviting is a company thing, not a carrier thing — a shipper vouching for
+  // a haulier is as much a way in as the other way round.
+  const tenantId = app.selected?.tenantId ?? null;
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
+
+  async function createInvite(): Promise<void> {
+    if (tenantId === null) return;
+    setInviteBusy(true);
+    setInviteError(null);
+    const res = await dispatchAction(app.auth.getIdToken, 'createInvite', { tenantId }, genRequestId());
+    setInviteBusy(false);
+    if (!res.ok) {
+      setInviteError(res.error.message);
+      return;
+    }
+    const link = `${window.location.origin}/app/invite/${res.result.inviteId as string}`;
+    setInviteLink(link);
+    setInviteCopied(false);
+    // Straight onto the clipboard: the only reason to make one is to send it.
+    try {
+      await navigator.clipboard.writeText(link);
+      setInviteCopied(true);
+    } catch {
+      /* clipboard blocked — the link is on screen to copy by hand */
+    }
+  }
+
+  async function copyInvite(): Promise<void> {
+    if (inviteLink === null) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      setInviteCopied(true);
+    } catch {
+      /* ignore */
+    }
+  }
   const { loading, profile } = useProfile(actorId);
   const { vehicles, reload: reloadVehicles } = useVehicles(carrierTenantId);
 
@@ -103,6 +143,42 @@ export default function Profile() {
                 >
                   Edit Profile
                 </button>
+                {tenantId !== null && (
+                  <div className="w-full">
+                    <button
+                      onClick={() => void createInvite()}
+                      disabled={inviteBusy}
+                      className="w-full border border-blue-300 text-blue-700 px-4 py-2 rounded-lg font-medium hover:bg-blue-50 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+                      title="Create a link that lets one company join MyBackHaul"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {inviteBusy ? 'Creating…' : 'Invite a company'}
+                    </button>
+
+                    {inviteError !== null && (
+                      <p role="alert" className="mt-2 text-sm text-red-600">
+                        {inviteError}
+                      </p>
+                    )}
+
+                    {inviteLink !== null && (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-left">
+                        <p className="text-xs text-blue-900 mb-2">
+                          Send this link to the company you are inviting. It sets up one company, once, and
+                          expires in 7 days.
+                        </p>
+                        <code className="block text-xs text-gray-700 break-all mb-2">{inviteLink}</code>
+                        <button
+                          onClick={() => void copyInvite()}
+                          className="text-sm font-medium text-blue-700 hover:text-blue-900 flex items-center gap-1.5"
+                        >
+                          {inviteCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          {inviteCopied ? 'Copied' : 'Copy link'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {carrierTenantId !== null && (
                   <button
                     onClick={() => navigate('/vehicles/add')}

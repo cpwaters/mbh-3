@@ -1,18 +1,28 @@
 import { z } from 'zod';
-import { AppError, inviteExpiresAt, inviteState, inviteStateMessage, type Invite } from '@mbh/domain';
+import { AppError, inviteExpiresAt, inviteState, inviteStateMessage, type Invite, type Role } from '@mbh/domain';
 import { inviteDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireFounder } from '../require-founder.js';
+import { requireMember } from '../require-member.js';
 import { zodParse } from '../parse.js';
 
-// Minting and withdrawing invitations to the marketplace. Founder-only:
-// whoever can mint decides who trades here, so this is checked against the
-// verified token email, not a client-supplied claim.
+// Minting and withdrawing invitations to the marketplace.
+//
+// Any active member of a company may invite another company in — a haulier
+// vouching for the firm they subcontract to is how a marketplace like this
+// actually grows. Which is a real widening of the gate: "invitation-only"
+// now means "anyone already in can bring someone in", not "the founder
+// chooses everyone". Withdrawing stays the founder's, since only they can
+// see the list of what is outstanding.
+const INVITE_ROLES: readonly Role[] = ['owner', 'dispatcher', 'driver'];
 
 const createInviteSchema = z.object({
-  // The founder's own note about who it is for. Never shown to the invitee.
+  // A note about who it is for. Never shown to the invitee.
   note: z.string().max(200).optional(),
+  // The company doing the inviting. Absent means the founder minting from
+  // their own toolbar, which is checked the other way.
+  tenantId: z.string().optional(),
 });
 
 export type CreateInvitePayload = z.infer<typeof createInviteSchema>;
@@ -27,7 +37,13 @@ export const createInviteHandler: ActionHandler<CreateInvitePayload, CreateInvit
   idempotent: true,
   parse: zodParse(createInviteSchema),
   async execute(tx, ctx, payload) {
-    requireFounder(ctx);
+    // Two ways to be allowed: acting for a company you are a member of, or
+    // being the founder (who mints from the toolbar, for no company).
+    if (payload.tenantId !== undefined && payload.tenantId !== '') {
+      await requireMember(tx, payload.tenantId, ctx.actorId, INVITE_ROLES);
+    } else {
+      requireFounder(ctx);
+    }
 
     // The id is the secret: at the composition root newId is randomUUID, so
     // this is 122 bits of CSPRNG entropy, not a guessable counter.
@@ -39,6 +55,9 @@ export const createInviteHandler: ActionHandler<CreateInvitePayload, CreateInvit
       note: (payload.note ?? '').trim(),
       createdAt: ctx.now,
       createdBy: ctx.actorId,
+      ...(payload.tenantId !== undefined && payload.tenantId !== ''
+        ? { createdByTenantId: payload.tenantId }
+        : {}),
       expiresAt,
     };
     tx.write({ kind: 'create', path: inviteDoc(inviteId), data: { ...invite } });
@@ -47,7 +66,11 @@ export const createInviteHandler: ActionHandler<CreateInvitePayload, CreateInvit
       result: { inviteId, expiresAt },
       // The note, not the id: an audit entry is readable by more people than
       // the link should be.
-      auditDetail: { note: invite.note, expiresAt },
+      auditDetail: {
+        note: invite.note,
+        expiresAt,
+        ...(payload.tenantId !== undefined ? { tenantId: payload.tenantId } : {}),
+      },
     };
   },
 };

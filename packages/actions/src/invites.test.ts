@@ -96,6 +96,66 @@ describe('createInvite — who may mint', () => {
   });
 });
 
+describe('createInvite — a member invites a company in', () => {
+  it('lets any active member of a company mint one, and records who did', async () => {
+    const h = await makeHarness();
+    for (const [actorId, tenantId, requestId] of [
+      ['ship-owner', 'shipper-1', 'r-m1'],
+      ['ship-dispatch', 'shipper-1', 'r-m2'],
+      ['driver-1', 'carrier-1', 'r-m3'], // a driver counts too
+    ] as const) {
+      const { inviteId } = (await h.run(actorId, {
+        type: 'createInvite',
+        payload: { note: 'a mate', tenantId },
+        requestId,
+      })) as { inviteId: string };
+      expect(await h.store.getDoc(`invites/${inviteId}`)).toMatchObject({
+        status: 'pending',
+        createdBy: actorId,
+        createdByTenantId: tenantId,
+      });
+    }
+  });
+
+  it('refuses a company the actor is not a member of', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run('ship-owner', { type: 'createInvite', payload: { tenantId: 'carrier-1' }, requestId: 'r-wrong' }),
+      'forbidden'
+    );
+  });
+
+  it('refuses a disabled member', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run('driver-disabled', { type: 'createInvite', payload: { tenantId: 'carrier-1' }, requestId: 'r-dis' }),
+      'forbidden'
+    );
+  });
+
+  it('still refuses a stranger who names no company', async () => {
+    const h = await makeHarness();
+    await expectAppError(h.run(outsider, { type: 'createInvite', payload: {}, requestId: 'r-none' }), 'forbidden');
+  });
+
+  it('mints a link that really works — a member can bring a company in', async () => {
+    const h = await makeHarness();
+    const { inviteId } = (await h.run('ship-owner', {
+      type: 'createInvite',
+      payload: { tenantId: 'shipper-1' },
+      requestId: 'r-chain',
+    })) as { inviteId: string };
+
+    const { tenantId } = (await h.run(outsider, {
+      type: 'createTenant',
+      payload: newCompany({ inviteId }),
+      requestId: 'r-chain-join',
+    })) as { tenantId: string };
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ name: 'Waters Haulage' });
+    expect(await h.store.getDoc(`invites/${inviteId}`)).toMatchObject({ status: 'redeemed' });
+  });
+});
+
 describe('createTenant — the marketplace is invitation-only', () => {
   it('refuses to create a company with no invitation', async () => {
     const h = await makeHarness();
