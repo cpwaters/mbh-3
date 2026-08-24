@@ -17,6 +17,9 @@ export interface Invite {
   note: string;
   createdAt: string;
   createdBy: string;
+  // The company whose member sent it. Absent when the founder minted it
+  // directly, who acts for no company.
+  createdByTenantId?: string;
   expiresAt: string;
   // Set together, when and only when status becomes 'redeemed'.
   redeemedAt?: string;
