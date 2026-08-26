@@ -30,6 +30,11 @@ export interface AuthClient {
   // Create a new account with a display name, then sign in as that user.
   signUpWithPassword(email: string, password: string, displayName: string): Promise<AuthSession>;
   signInWithGoogle(): Promise<AuthSession>;
+  // Email the account a link to set a new password. Resolves whether or not
+  // the address has an account: telling a stranger which emails are
+  // registered is an account-enumeration leak, so the UI says the same thing
+  // either way.
+  sendPasswordReset(email: string): Promise<void>;
   signOut(): Promise<void>;
   // The current bearer token for POST /api/dispatch, or null when signed out.
   getIdToken(): Promise<string | null>;

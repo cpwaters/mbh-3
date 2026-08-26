@@ -12,7 +12,31 @@ export default function Login({ auth }: { auth: AuthView }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Resetting a password is its own small errand on this screen: it needs the
+  // email box that is already here, and nothing else.
+  const [resetNote, setResetNote] = useState('');
+  const [resetting, setResetting] = useState(false);
   const navigate = useNavigate();
+
+  async function handleForgotPassword(): Promise<void> {
+    setError('');
+    setResetNote('');
+    if (!email.includes('@')) {
+      setError('Enter your email address above, then press Forgot password.');
+      return;
+    }
+    setResetting(true);
+    try {
+      await auth.sendPasswordReset(email);
+      // Deliberately the same message whether or not that address has an
+      // account — otherwise this form tells a stranger who is registered.
+      setResetNote(`If ${email} has an account, a reset link is on its way.`);
+    } catch {
+      setError('Could not send a reset email just now. Try again in a moment.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +93,14 @@ export default function Login({ auth }: { auth: AuthView }) {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-800">{error}</p>
+          </div>
+        )}
+
+        {resetNote !== '' && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">{resetNote}</p>
           </div>
         )}
 
@@ -142,9 +172,14 @@ export default function Login({ auth }: { auth: AuthView }) {
                 Remember me
               </label>
             </div>
-            <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              Forgot password?
-            </a>
+            <button
+              type="button"
+              onClick={() => void handleForgotPassword()}
+              disabled={resetting}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-60"
+            >
+              {resetting ? 'Sending…' : 'Forgot password?'}
+            </button>
           </div>
 
           {/* Submit Button */}
@@ -201,6 +236,14 @@ export default function Login({ auth }: { auth: AuthView }) {
           <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-700">
             Sign up
           </Link>
+        </p>
+
+        {/* A way back out. The app is a separate island from the marketing
+            site, so without this the only exit is the browser's back button. */}
+        <p className="mt-3 text-center text-sm">
+          <a href="/" className="text-gray-500 hover:text-gray-700">
+            ← Back to MyBackHaul
+          </a>
         </p>
       </div>
     </div>

@@ -56,6 +56,13 @@ export class MockAuthClient implements AuthClient {
     return this.setSession({ actorId, email, displayName: displayName || null });
   }
 
+  // Recorded rather than sent: a test asserts the address it was asked for.
+  readonly passwordResetsSent: string[] = [];
+
+  async sendPasswordReset(email: string): Promise<void> {
+    this.passwordResetsSent.push(email);
+  }
+
   async signInWithGoogle(): Promise<AuthSession> {
     if (this.googleAccount === null) {
       throw new AuthClientError('cancelled', 'Google sign-in was cancelled.');

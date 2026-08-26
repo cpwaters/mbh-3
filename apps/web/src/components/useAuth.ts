@@ -8,6 +8,7 @@ export interface AuthView {
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
 }
@@ -41,8 +42,18 @@ export function useAuth(): AuthView {
   const signInWithGoogle = useCallback(async () => {
     await auth.signInWithGoogle();
   }, [auth]);
+  const sendPasswordReset = useCallback((email: string) => auth.sendPasswordReset(email), [auth]);
   const signOut = useCallback(() => auth.signOut(), [auth]);
   const getIdToken = useCallback(() => auth.getIdToken(), [auth]);
 
-  return { ready, session, signInWithPassword, signUpWithPassword, signInWithGoogle, signOut, getIdToken };
+  return {
+    ready,
+    session,
+    signInWithPassword,
+    signUpWithPassword,
+    signInWithGoogle,
+    sendPasswordReset,
+    signOut,
+    getIdToken,
+  };
 }

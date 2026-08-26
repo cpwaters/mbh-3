@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   onIdTokenChanged,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithPopup,
   signOut,
   updateProfile,
@@ -76,6 +77,19 @@ export class FirebaseAuthClient implements AuthClient {
       const cred = await signInWithEmailAndPassword(this.auth, email, password);
       return toSession(cred.user);
     } catch (error) {
+      throw mapError(error);
+    }
+  }
+
+  async sendPasswordReset(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(this.auth, email);
+    } catch (error) {
+      // auth/user-not-found must not surface: it would turn this form into a
+      // way to discover which addresses hold accounts. Anything else (a
+      // malformed address, no network) is worth reporting.
+      const code = (error as { code?: string }).code;
+      if (code === 'auth/user-not-found') return;
       throw mapError(error);
     }
   }
