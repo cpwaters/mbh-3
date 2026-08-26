@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A manual "Run workflow" button. GitHub stopped creating runs for this repo
+  # on 2026-08-26 — a merge to main landed and no run appeared, so the deploy
+  # never fired and there was nothing to re-run. This gives a way to start one
+  # by hand instead of pushing an empty commit to provoke it.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -61,7 +66,14 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     # Only from main, and only when the repo variable is explicitly enabled.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.PRODUCTION_DEPLOY == 'true'
+    # workflow_dispatch counts: a manual run is the fallback when a push does
+    # not produce one, and it would be useless if it validated and then skipped
+    # the deploy. Running it needs write access to the repo, and the ref check
+    # above still means main only.
+    if: >-
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && vars.PRODUCTION_DEPLOY == 'true'
     concurrency:
       group: deploy-production
       cancel-in-progress: false
