@@ -1,8 +1,8 @@
 // Hand-written service worker. Network-first for navigations (always try the
-// live app, fall back to the cached shell when offline); versioned shell
-// cache — BUMP CACHE_NAME to force-clear stale clients on the next visit.
-const CACHE_NAME = 'mbh-shell-v3';
-const SHELL = ['/', '/app', '/manifest.webmanifest', '/icon.svg'];
+// live app, fall back to the cached shell when offline); versioned cache —
+// BUMP CACHE_NAME to force-clear stale clients on the next visit.
+const CACHE_NAME = 'mbh-shell-v4';
+const SHELL = ['/', '/app', '/manifest.webmanifest', '/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
@@ -20,9 +20,13 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
+
+  const url = new URL(request.url);
   // Never touch the API — dispatch must always hit the network (or fail so
-  // the offline queue owns the retry). Only GETs are cacheable anyway.
-  if (request.method !== 'GET' || new URL(request.url).pathname.startsWith('/api/')) {
+  // the offline queue owns the retry). Leave other origins (Firebase, map
+  // tiles) to the network too: they are not ours to serve stale.
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
     return;
   }
 
@@ -39,6 +43,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Other GETs: cache-first for the versioned shell assets.
-  event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));
+  // Everything else we serve ourselves: cache-first, and cache what we fetch.
+  // Without that last part an installed app opened cold with no signal got the
+  // shell HTML and then failed on the script tag it points at — the built
+  // assets are content-hashed, so their names are not known ahead of time and
+  // nothing here could precache them. They are immutable, so caching on first
+  // sight is safe: a new build asks for new filenames.
+  event.respondWith(
+    caches.match(request).then(
+      (cached) =>
+        cached ??
+        fetch(request).then((res) => {
+          // Only store a response we actually own and that succeeded.
+          if (res.ok && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return res;
+        })
+    )
+  );
 });
