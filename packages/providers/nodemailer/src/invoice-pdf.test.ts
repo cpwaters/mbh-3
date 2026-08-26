@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { InvoiceData } from '@mbh/domain';
+import { MYBACKHAUL_LOGO_PNG_BASE64, type InvoiceData } from '@mbh/domain';
 import { invoicePdfBuffer } from './invoice-pdf.js';
 
 const invoice: InvoiceData = {
@@ -17,6 +17,22 @@ const invoice: InvoiceData = {
 describe('invoicePdfBuffer', () => {
   it('renders a well-formed PDF buffer', async () => {
     const buffer = await invoicePdfBuffer(invoice);
+    expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+    expect(buffer.length).toBeGreaterThan(500);
+  });
+
+  it('draws the letterhead when one is supplied', async () => {
+    const plain = await invoicePdfBuffer(invoice);
+    const withLogo = await invoicePdfBuffer(invoice, Buffer.from(MYBACKHAUL_LOGO_PNG_BASE64, 'base64'));
+    expect(withLogo.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+    // The image data lands in the document, so it is measurably bigger.
+    expect(withLogo.length).toBeGreaterThan(plain.length);
+  });
+
+  it('still renders when the logo bytes are unusable', async () => {
+    // A corrupt image must not cost the carrier their invoice — the
+    // letterhead is decoration, the billing is not.
+    const buffer = await invoicePdfBuffer(invoice, Buffer.from('not an image'));
     expect(buffer.subarray(0, 5).toString('ascii')).toBe('%PDF-');
     expect(buffer.length).toBeGreaterThan(500);
   });

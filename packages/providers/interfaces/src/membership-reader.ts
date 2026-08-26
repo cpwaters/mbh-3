@@ -9,6 +9,12 @@ export interface Membership {
   name: string;
   role: Role;
   capabilities: TenantCapability[];
+  // The company's logo, when it has set one. Carried here because reading a
+  // membership already reads the tenant document for its name and
+  // capabilities — the profile screen would otherwise re-read it just for
+  // this.
+  logoRef?: string;
+  logoContentType?: string;
 }
 
 export interface MembershipReader {

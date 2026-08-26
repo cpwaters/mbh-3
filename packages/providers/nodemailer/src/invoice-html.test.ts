@@ -16,6 +16,29 @@ const invoice: InvoiceData = {
   totalGbpPence: 68000,
 };
 
+describe('invoiceHtml — the letterhead', () => {
+  const letterhead: MailAttachment = {
+    filename: 'company-logo.png',
+    content: Buffer.from('logo'),
+    contentType: 'image/png',
+    cid: 'company-logo',
+  };
+
+  it('embeds the logo inline, above INVOICE', () => {
+    const html = invoiceHtml(invoice, [letterhead]);
+    expect(html).toContain('src="cid:company-logo"');
+    // Above the word INVOICE, so it reads as a letterhead rather than
+    // floating somewhere in the body.
+    expect(html.indexOf('cid:company-logo')).toBeLessThan(html.indexOf('>INVOICE<'));
+  });
+
+  it('renders without one rather than showing a broken image', () => {
+    const html = invoiceHtml(invoice, []);
+    expect(html).not.toContain('cid:company-logo');
+    expect(html).toContain('INVOICE');
+  });
+});
+
 describe('invoiceHtml', () => {
   it('includes the invoice number, both company names, the total, and the VAT number', () => {
     const html = invoiceHtml(invoice);

@@ -249,7 +249,15 @@ export class FirestoreReader
         const tenant = await getDoc(doc(this.db, tenantDoc(data.tenantId)));
         const capabilities = (tenant.data()?.capabilities ?? []) as TenantCapability[];
         const name = (tenant.data()?.name ?? data.tenantId) as string;
-        return { tenantId: data.tenantId, name, role: data.role, capabilities };
+        const logoRef = (tenant.data()?.logoRef ?? '') as string;
+        const logoContentType = (tenant.data()?.logoContentType ?? '') as string;
+        return {
+          tenantId: data.tenantId,
+          name,
+          role: data.role,
+          capabilities,
+          ...(logoRef !== '' ? { logoRef, logoContentType } : {}),
+        };
       })
     );
   }

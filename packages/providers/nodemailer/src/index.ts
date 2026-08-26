@@ -73,9 +73,14 @@ export class NodemailerMailer implements Mailer {
   }
 
   async sendInvoice(invoice: InvoiceData, attachments: MailAttachment[] = []): Promise<void> {
+    // The letterhead rides in as a cid'd attachment (the drain always
+    // supplies one) so the PDF and the email body show the same mark without
+    // Mailer having to know anything about object storage.
+    const letterhead = attachments.find((a) => a.cid === 'company-logo')?.content;
+
     let pdf: Buffer;
     try {
-      pdf = await invoicePdfBuffer(invoice);
+      pdf = await invoicePdfBuffer(invoice, letterhead);
     } catch (cause) {
       // A rendering bug is not transient — retrying the same invoice data
       // will fail identically every time.

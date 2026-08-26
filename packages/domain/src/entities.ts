@@ -11,6 +11,10 @@ export interface Tenant {
   name: string;
   capabilities: TenantCapability[];
   createdAt: string;
+  // The company's own logo, letterheading its invoices. Absent until someone
+  // sets one, in which case invoices carry the MyBackHaul mark instead.
+  logoRef?: string;
+  logoContentType?: string;
 }
 
 export type Role = 'owner' | 'dispatcher' | 'driver';

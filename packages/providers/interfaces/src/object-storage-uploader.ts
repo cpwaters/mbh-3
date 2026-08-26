@@ -5,6 +5,11 @@
 // the same reason.
 export interface ObjectStorageUploader {
   upload(ref: string, blob: Blob, contentType: string): Promise<void>;
+  // A URL the browser can render the object from, for the one kind of object
+  // the client is allowed to read back: a company's own logo, shown on its
+  // profile. PoD photos stay unreadable to clients — the storage rules, not
+  // this method, are what decide that.
+  viewUrl(ref: string): Promise<string>;
 }
 
 export class ObjectStorageError extends Error {

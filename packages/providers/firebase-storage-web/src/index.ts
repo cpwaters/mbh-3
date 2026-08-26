@@ -1,6 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
 import {
   connectStorageEmulator,
+  getDownloadURL,
   getStorage,
   ref as storageRef,
   uploadBytes,
@@ -42,6 +43,15 @@ export class FirebaseStorageUploader implements ObjectStorageUploader {
       await uploadBytes(storageRef(this.storage, ref), blob, { contentType });
     } catch (cause) {
       throw new ObjectStorageError(`failed to upload ${ref}: ${String(cause)}`);
+    }
+  }
+
+  async viewUrl(ref: string): Promise<string> {
+    try {
+      return await getDownloadURL(storageRef(this.storage, ref));
+    } catch (cause) {
+      // Not recoverable by retrying: the object is gone, or the rules say no.
+      throw new ObjectStorageError(`failed to resolve ${ref}: ${String(cause)}`, false);
     }
   }
 }
