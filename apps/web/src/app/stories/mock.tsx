@@ -10,6 +10,7 @@ export const mockAuth: AuthView = {
   signInWithPassword: async () => {},
   signUpWithPassword: async () => {},
   signInWithGoogle: async () => {},
+  sendPasswordReset: async () => {},
   signOut: async () => {},
   getIdToken: async () => 'sb-token',
 };

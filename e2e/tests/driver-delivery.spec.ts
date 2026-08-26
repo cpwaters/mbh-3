@@ -79,10 +79,22 @@ async function denyGeolocation(page: Page): Promise<void> {
 const LEITH = { latitude: 55.9758, longitude: -3.1706 };
 const CARDIFF = { latitude: 51.4816, longitude: -3.1791 };
 
-test('landing invites the driver into the app', async ({ page }) => {
+test('the landing page opens a door for each trade, and one for returning users', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Fill your empty return legs.' })).toBeVisible();
-  await page.getByRole('link', { name: 'Open the driver app' }).click();
+
+  // A haulier's door lands on the carrier sign-up.
+  await page.getByRole('link', { name: /I haul loads/ }).click();
+  await expect(page.getByText('Create your carrier account')).toBeVisible();
+
+  // A shipper's door lands on theirs.
+  await page.goto('/');
+  await page.getByRole('link', { name: /I ship loads/ }).click();
+  await expect(page.getByText('Create your shipper account')).toBeVisible();
+
+  // And someone who already has an account can just sign in.
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Sign in' }).click();
   await expect(page.getByText('Sign in to your driver account')).toBeVisible();
 });
 
@@ -198,16 +210,20 @@ test('an invitation link lets exactly one company in', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText(/already been used/i);
 });
 
-test('without an invitation there is no way onto the marketplace', async ({ page }) => {
-  const uninvited = `uninvited-${Date.now()}@haulier.test`;
-  await page.goto('/app/signup');
-  await signUp(page, 'No', 'Invite', uninvited, 'test-password-none');
+test('a stranger can set a company up from the homepage, no invitation needed', async ({ page }) => {
+  // The whole journey the homepage promises: door -> account -> company ->
+  // their own page.
+  await page.goto('/');
+  await page.getByRole('link', { name: /I haul loads/ }).click();
+  await signUp(page, 'Walk', 'In', `walkin-${Date.now()}@haulier.test`, 'test-password-walk');
 
-  await page.getByLabel(/company name/i).fill('Gatecrasher Ltd');
-  await page.getByLabel(/carrier/i).check();
+  await expect(page.getByRole('heading', { name: 'Create your company' })).toBeVisible();
+  await page.getByLabel(/company name/i).fill('Walk-In Haulage');
+  // The door they came through pre-selected what kind of company this is.
+  await expect(page.getByLabel(/carry loads \(carrier\)/i)).toBeChecked();
   await page.getByRole('button', { name: /create company/i }).click();
 
-  await expect(page.getByText(/by invitation/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
 });
 
 test('a carrier can invite a company in from their profile', async ({ page }) => {

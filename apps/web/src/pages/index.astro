@@ -21,23 +21,32 @@ import Base from '../layouts/Base.astro';
           back — with a proof of delivery you can rely on, captured even where there's no signal.
         </p>
 
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        {/* Two doors, because the page sells to two trades. Each carries the
+            intent into the matching sign-up, which pre-selects the kind of
+            company they are setting up. */}
+        <div class="flex flex-col sm:flex-row items-stretch justify-center gap-3 max-w-xl mx-auto">
           <a
-            href="/app"
-            class="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 text-white px-7 py-3.5 rounded-lg font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-colors"
+            href="/app/signup/shipper"
+            class="flex-1 inline-flex flex-col items-center justify-center gap-1 bg-blue-600 text-white px-7 py-4 rounded-lg font-semibold shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-colors"
           >
-            Open the driver app
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
+            <span class="text-base">I ship loads</span>
+            <span class="text-xs font-normal text-blue-100">Post backhauls to hauliers</span>
           </a>
           <a
-            href="/guide"
-            class="inline-flex items-center justify-center w-full sm:w-auto px-7 py-3.5 rounded-lg font-semibold text-blue-700 hover:bg-blue-50 transition-colors"
+            href="/app/signup/carrier"
+            class="flex-1 inline-flex flex-col items-center justify-center gap-1 bg-gray-900 text-white px-7 py-4 rounded-lg font-semibold shadow-lg shadow-gray-900/20 hover:bg-gray-800 transition-colors"
           >
-            How it works
+            <span class="text-base">I haul loads</span>
+            <span class="text-xs font-normal text-gray-300">Fill your empty return legs</span>
           </a>
         </div>
+
+        <p class="text-gray-600 mt-5">
+          Already with us?
+          <a href="/app" class="font-semibold text-blue-700 hover:text-blue-900">Sign in</a>
+          <span class="text-gray-400 mx-2">·</span>
+          <a href="/guide" class="font-semibold text-blue-700 hover:text-blue-900">How it works</a>
+        </p>
       </div>
 
       <div class="grid sm:grid-cols-3 gap-5 mt-16 sm:mt-24">

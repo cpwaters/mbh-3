@@ -156,15 +156,15 @@ describe('createInvite — a member invites a company in', () => {
   });
 });
 
-describe('createTenant — the marketplace is invitation-only', () => {
-  it('refuses to create a company with no invitation', async () => {
+describe('createTenant — an invitation is honoured, not required', () => {
+  it('lets anyone set a company up without one: signing up is open', async () => {
     const h = await makeHarness();
-    const err = await expectAppError(
-      h.run(outsider, { type: 'createTenant', payload: newCompany(), requestId: 'r-no-inv' }),
-      'forbidden'
-    );
-    expect(err.field).toBe('inviteId');
-    expect(err.message).toMatch(/invitation/i);
+    const { tenantId } = (await h.run(outsider, {
+      type: 'createTenant',
+      payload: newCompany(),
+      requestId: 'r-no-inv',
+    })) as { tenantId: string };
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ name: 'Waters Haulage' });
   });
 
   it('creates the company and spends the invite in one go', async () => {
@@ -245,6 +245,21 @@ describe('createTenant — the marketplace is invitation-only', () => {
     expect(await h.store.getDoc('invites/inv-stale')).toMatchObject({ status: 'pending' });
   });
 
+  it('still refuses a link that is stale, rather than quietly ignoring it', async () => {
+    // The invitation is optional, but a bad one is not the same as none: it
+    // means someone was sent a link that no longer works, and they should be
+    // told rather than waved through as if they had never had one.
+    const h = await makeHarness();
+    const inviteId = await mintInvite(h);
+    await h.run(founder, { type: 'revokeInvite', payload: { inviteId }, requestId: 'r-rv' });
+
+    await expectAppError(
+      h.run(outsider, { type: 'createTenant', payload: newCompany({ inviteId }), requestId: 'r-stale-opt' }),
+      'conflict'
+    );
+    expect(await h.store.getDoc('tenants/tenant-1')).toBeNull();
+  });
+
   it('refuses an invitation that does not exist', async () => {
     const h = await makeHarness();
     await expectAppError(
@@ -253,7 +268,7 @@ describe('createTenant — the marketplace is invitation-only', () => {
     );
   });
 
-  it('lets the founder create a company without inviting themselves', async () => {
+  it('lets the founder create a company too, as everyone now can', async () => {
     const h = await makeHarness();
     const { tenantId } = (await h.run(founder, {
       type: 'createTenant',
