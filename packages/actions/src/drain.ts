@@ -360,13 +360,29 @@ async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): P
     return 'failed';
   }
 
+  // The company the founder had selected when they pressed the button. Its
+  // name and logo stand in for the carrier's, so the test email previews what
+  // this company's real invoices will look like rather than a generic one —
+  // which is the point of looking at it. Falls back to the placeholder name
+  // and the MyBackHaul mark if the tenant has neither.
+  const tenantId = claim.task.tenantId as string | undefined;
+  const tenant =
+    tenantId !== undefined && tenantId !== ''
+      ? ((await deps.store.getDoc(tenantDoc(tenantId))) as unknown as Tenant | null)
+      : null;
+  const tenantLogoRef = tenant?.logoRef?.trim();
+  const testLogo =
+    tenantLogoRef !== undefined && tenantLogoRef !== ''
+      ? { ref: tenantLogoRef, contentType: tenant?.logoContentType ?? 'image/png' }
+      : null;
+
   const now = deps.now();
   const invoice: InvoiceData = {
     invoiceNumber: `TEST-${deps.newId('test').toUpperCase()}`,
     issuedAt: now,
     dueAt: invoiceDueDate(now),
     jobId: 'TEST',
-    carrierCompanyName: 'Test Carrier Ltd',
+    carrierCompanyName: tenant?.name ?? 'Test Carrier Ltd',
     shipperCompanyName: 'Test Shipper Ltd',
     recipientEmail,
     recipientName: 'Sample Recipient',
@@ -379,7 +395,7 @@ async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): P
   // section rather than silently skipping it (which would make a passing
   // test email prove less about the pipeline than it appears to).
   const attachments: MailAttachment[] = [
-    await buildLetterhead(deps, null),
+    await buildLetterhead(deps, testLogo),
     { filename: 'signature.png', content: sampleSignaturePng(), contentType: 'image/png', cid: 'signature' },
     { filename: 'delivery-photo-1.png', content: samplePhotoPng(), contentType: 'image/png', cid: 'photo-1' },
   ];

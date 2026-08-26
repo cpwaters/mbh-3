@@ -413,6 +413,37 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
   });
 });
 
+describe('runDrainOnce — sendTestInvoiceEmail previews the real letterhead', () => {
+  it('uses the selected company’s name and logo, so the test shows what real invoices will look like', async () => {
+    const harness = await makeHarness();
+    await harness.store.runBatch([
+      { kind: 'create', path: 'userProfiles/car-owner', data: { actorId: 'car-owner', email: 'founder@waters.test' } },
+    ]);
+    const logoRef = companyLogoStoragePath('carrier-1', 'req-logo', 'image/png');
+    await harness.run('car-owner', {
+      type: 'setCompanyLogo',
+      payload: { tenantId: 'carrier-1', logoRef, contentType: 'image/png' },
+      requestId: 'r-logo',
+    });
+    await harness.run('car-owner', {
+      type: 'sendTestInvoiceEmail',
+      payload: { tenantId: 'carrier-1' },
+      requestId: 'r-test',
+    });
+
+    const objectStorage = new InMemoryObjectStorage();
+    await objectStorage.upload(logoRef, new Blob([Buffer.from('waters-logo')]), 'image/png');
+    const mailer = new InMemoryMailer();
+    await runDrainOnce(drainDeps(harness, { mailer, objectStorage }));
+
+    // The company's own name, not the 'Test Carrier Ltd' placeholder...
+    expect(mailer.sent[0]).toMatchObject({ carrierCompanyName: 'Waters Haulage' });
+    // ...and the company's own logo.
+    const letterhead = mailer.sentAttachments[0]?.find((a) => a.cid === 'company-logo');
+    expect(letterhead?.content.toString()).toBe('waters-logo');
+  });
+});
+
 describe('runDrainOnce — closeJob', () => {
   it('closes the job and fulfills its load once delivered, recording the outcome', async () => {
     const harness = await makeHarness();
@@ -477,7 +508,9 @@ describe('runDrainOnce — sendTestInvoiceEmail', () => {
     expect(mailer.sent[0]).toMatchObject({
       jobId: 'TEST',
       recipientEmail: 'founder@mybackhaul.test',
-      carrierCompanyName: 'Test Carrier Ltd',
+      // The selected company's real name — the test email previews what this
+      // company's invoices look like, rather than a generic placeholder.
+      carrierCompanyName: 'Acme',
       shipperCompanyName: 'Test Shipper Ltd',
     });
     expect(mailer.sent[0]?.invoiceNumber.startsWith('TEST-')).toBe(true);
@@ -486,8 +519,8 @@ describe('runDrainOnce — sendTestInvoiceEmail', () => {
     // delivery's, so it exercises invoiceHtml's inline-image rendering rather
     // than quietly skipping it — the whole point of this debug tool.
     const attachments = mailer.sentAttachments[0]!;
-    // Letterheaded with the MyBackHaul mark, since there is no real carrier
-    // behind a synthetic invoice — so this also exercises the fallback.
+    // Letterheaded with the MyBackHaul mark, since this company has set no
+    // logo — so this also exercises the fallback.
     expect(attachments.map((a) => a.cid)).toEqual(['company-logo', 'signature', 'photo-1']);
     for (const a of attachments) {
       // Real PNG bytes, not a placeholder string.
