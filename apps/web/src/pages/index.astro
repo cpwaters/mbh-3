@@ -51,6 +51,36 @@ import Base from '../layouts/Base.astro';
           <span class="text-gray-400 mx-2">·</span>
           <a href="/guide" class="font-semibold text-blue-700 hover:text-blue-900">How it works</a>
         </p>
+
+        {/* Installing it. A driver wants this on the home screen next to the
+            tachograph apps, not behind a browser tab — it opens full screen and
+            the proof-of-delivery capture keeps working with no signal. Chrome
+            and Edge hand us a prompt to fire; iOS has no such API, so there the
+            honest thing is to name the two taps. Both start hidden and are
+            revealed by the script below, so nobody is told to install an app
+            they are already running. */}
+        <div id="install" hidden class="mt-8">
+          <button
+            id="install-button"
+            type="button"
+            hidden
+            class="inline-flex items-center gap-2 bg-white text-gray-900 border border-gray-300 px-5 py-2.5 rounded-lg font-semibold shadow-sm hover:bg-gray-50 transition-colors"
+          >
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" />
+            </svg>
+            Install the app
+          </button>
+
+          <p id="install-ios" hidden class="text-sm text-gray-600 max-w-sm mx-auto">
+            <span class="font-semibold text-gray-900">Install on this device:</span>
+            tap Share, then <span class="font-semibold text-gray-900">Add to Home Screen</span>.
+          </p>
+
+          <p class="text-xs text-gray-500 mt-2">
+            Works offline. Loads and proof of delivery stay on the device until there's signal.
+          </p>
+        </div>
       </div>
 
       <div class="grid sm:grid-cols-3 gap-5 mt-16 sm:mt-24">
@@ -83,4 +113,48 @@ import Base from '../layouts/Base.astro';
       </p>
     </div>
   </main>
+
+  <script>
+    import { isIOS, isStandalone } from '../lib/platform';
+
+    // Progressive: if none of this runs, the page is exactly as it was.
+    const wrap = document.getElementById('install');
+    const button = document.getElementById('install-button');
+    const ios = document.getElementById('install-ios');
+
+    // Already launched from the home screen — nothing to offer.
+    if (wrap && button && ios && !isStandalone()) {
+      let prompt: (Event & { prompt(): Promise<void> }) | null = null;
+
+      // Chromium fires this when the app qualifies (manifest + service worker
+      // + https). Holding onto the event is what lets us put the prompt behind
+      // our own button instead of the browser's mini-infobar.
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        prompt = event as Event & { prompt(): Promise<void> };
+        wrap.hidden = false;
+        button.hidden = false;
+      });
+
+      button.addEventListener('click', () => {
+        if (!prompt) return;
+        void prompt.prompt();
+        // The event is single-use: a second prompt() throws.
+        prompt = null;
+        button.hidden = true;
+      });
+
+      window.addEventListener('appinstalled', () => {
+        wrap.hidden = true;
+      });
+
+      // Safari on iPhone/iPad can install, but only by hand. Chrome and
+      // Firefox on iOS are Safari underneath and cannot install at all, so
+      // telling them to tap Share would be a lie.
+      if (isIOS() && !/CriOS|FxiOS/.test(window.navigator.userAgent)) {
+        wrap.hidden = false;
+        ios.hidden = false;
+      }
+    }
+  </script>
 </Base>

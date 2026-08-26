@@ -15,9 +15,30 @@ const { title } = Astro.props;
     <meta name="theme-color" content="#2563eb" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+    {/* iOS reads none of the manifest's icons: without this, a home-screen
+        install gets a screenshot of the page instead of the mark. */}
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="MyBackHaul" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 overflow-x-hidden">
     <slot />
+    <script>
+      // Register the PWA service worker (network-first navigations, versioned
+      // shell cache). It lives here rather than on /app because a browser will
+      // not offer to install until a service worker controls the page the
+      // visitor is actually on — which is the homepage. Guarded so a failed
+      // registration never breaks the page.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {
+            /* offline capture still works without the SW */
+          });
+        });
+      }
+    </script>
   </body>
 </html>

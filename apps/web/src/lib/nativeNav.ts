@@ -1,11 +1,8 @@
+import { isIOS } from './platform';
+
 export interface NavPoint {
   lat: number;
   lng: number;
-}
-
-function isIOS(): boolean {
-  const ua = navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 // Opens the device's native map app with the journey pre-filled — Apple Maps on
