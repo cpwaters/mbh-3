@@ -11,13 +11,27 @@ function fmtDate(iso: string): string {
 // (that one's for the driver's evidence-pack export, a different feature);
 // this PDF has no browser to render in, since it's built and attached inside
 // a scheduled function.
-export function invoicePdfBuffer(invoice: InvoiceData): Promise<Buffer> {
+export function invoicePdfBuffer(invoice: InvoiceData, letterhead?: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 50 });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+
+    // The letterhead: the carrier's own logo, or the MyBackHaul mark when
+    // they have not set one. Drawn scaled into a fixed box so any shape of
+    // logo lands in the same place, then the cursor is moved below it.
+    // Wrapped because a corrupt image would otherwise throw here and fail
+    // the whole invoice — the letterhead is decoration, not billing.
+    if (letterhead !== undefined) {
+      try {
+        doc.image(letterhead, 50, 45, { fit: [140, 45] });
+        doc.y = 45 + 45 + 12;
+      } catch {
+        doc.y = 50;
+      }
+    }
 
     doc
       .fontSize(20)

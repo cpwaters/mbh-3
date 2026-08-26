@@ -21,6 +21,15 @@ export class InMemoryObjectStorage implements ObjectStorageUploader, ObjectStora
     this.blobs.set(ref, { blob, contentType });
   }
 
+  // Object URLs are a browser API; tests only need something stable and
+  // distinguishable, so the ref itself stands in for one.
+  async viewUrl(ref: string): Promise<string> {
+    if (!this.blobs.has(ref)) {
+      throw new ObjectStorageError(`no object at ref: ${ref}`, false);
+    }
+    return `memory://${ref}`;
+  }
+
   async download(ref: string): Promise<Buffer> {
     if (this.failNext) {
       this.failNext = false;

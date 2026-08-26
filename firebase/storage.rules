@@ -1,20 +1,43 @@
 rules_version = '2';
 
-// PoD photo uploads only. Write-only for the assigned driver, scoped to
-// their own job; never client-readable — the drain (admin SDK, bypasses
-// these rules entirely) is the only reader, to attach photos to the
-// invoice email. Mirrors firestore.rules' job-driver idiom
-// (`jobs/{jobId}.driverActorId == request.auth.uid`), just cross-service
-// via firestore.get() since Storage rules can't read Storage-side state to
-// authorize against.
+// Two kinds of object, authorized cross-service against Firestore since
+// Storage rules cannot read Storage-side state to authorize against.
+//
+// PoD photos: write-only for the assigned driver, scoped to their own job,
+// and never client-readable — the drain (admin SDK, which bypasses these
+// rules entirely) is the only reader, to attach them to the invoice email.
+// Mirrors firestore.rules' job-driver idiom.
+//
+// Company logos: readable AND writable by active members of the owning
+// company, because the profile page has to show a company its own logo.
 service firebase.storage {
   match /b/{bucket}/o {
+    // Mirrors firestore.rules' helper of the same name. Cross-service via
+    // firestore.get(), since Storage rules cannot read Storage-side state.
+    function isActiveMember(tenantId) {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/tenants/$(tenantId)/members/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/tenants/$(tenantId)/members/$(request.auth.uid)).data.status == 'active';
+    }
+
     match /pod/{jobId}/{requestId}/{fileName} {
       allow write: if request.auth != null
         && firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.driverActorId == request.auth.uid
         && request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
       allow read: if false;
+    }
+
+    // A company's logo. Unlike PoD photos this IS client-readable — the
+    // profile page shows a company its own logo back — but only to active
+    // members of that company, the same bar firestore.rules uses for the
+    // tenant document itself. The drain reads it with the admin SDK, which
+    // bypasses these rules, to letterhead an invoice.
+    match /company-logos/{tenantId}/{fileName} {
+      allow read: if isActiveMember(tenantId);
+      allow write: if isActiveMember(tenantId)
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType in ['image/png', 'image/jpeg'];
     }
 
     // Deny everything not explicitly allowed above.

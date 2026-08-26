@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { GeoPoint } from '@mbh/domain';
+import {
+  MYBACKHAUL_LOGO_PNG_BASE64,
+  companyLogoStoragePath,
+  type GeoPoint,
+} from '@mbh/domain';
 import { InMemoryGeocoder, InMemoryMailer, InMemoryObjectStorage, InMemoryRouteProvider } from '@mbh/provider-mocks';
 import { runDrainOnce, type DrainDeps } from './drain.js';
 import { makeHarness, validPostLoadPayload, type Harness } from './test-harness.js';
@@ -251,6 +255,67 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     expect(audits[0]?.data).toMatchObject({ jobId, actorId: 'system', source: 'system' });
   });
 
+  it('letterheads the invoice with the MyBackHaul mark when the carrier has no logo', async () => {
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    await deliveredJob(harness);
+
+    const mailer = new InMemoryMailer();
+    await runDrainOnce(drainDeps(harness, { mailer }));
+
+    const letterhead = mailer.sentAttachments[0]?.find((a) => a.cid === 'company-logo');
+    expect(letterhead, 'every invoice should carry a letterhead').toBeDefined();
+    expect(letterhead?.contentType).toBe('image/png');
+    // The real mark, compiled into the bundle — not a placeholder.
+    expect(letterhead?.content.equals(Buffer.from(MYBACKHAUL_LOGO_PNG_BASE64, 'base64'))).toBe(true);
+  });
+
+  it('letterheads the invoice with the carrier’s own logo once they have set one', async () => {
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    const logoRef = companyLogoStoragePath('carrier-1', 'req-logo', 'image/jpeg');
+    await harness.run('car-owner', {
+      type: 'setCompanyLogo',
+      payload: { tenantId: 'carrier-1', logoRef, contentType: 'image/jpeg' },
+      requestId: 'r-logo',
+    });
+    await deliveredJob(harness);
+
+    const objectStorage = new InMemoryObjectStorage();
+    await objectStorage.upload(logoRef, new Blob([Buffer.from('carrier-logo-bytes')]), 'image/jpeg');
+    const mailer = new InMemoryMailer();
+    await runDrainOnce(drainDeps(harness, { mailer, objectStorage }));
+
+    const letterhead = mailer.sentAttachments[0]?.find((a) => a.cid === 'company-logo');
+    expect(letterhead?.contentType).toBe('image/jpeg');
+    expect(letterhead?.content.toString()).toBe('carrier-logo-bytes');
+  });
+
+  it('falls back to the mark when the carrier’s logo will not resolve, rather than failing the invoice', async () => {
+    // A deleted object or a transient Storage error must not stop a company
+    // being paid. Billing is not load-bearing on artwork.
+    const harness = await makeHarness();
+    await seedShipperBillingProfile(harness);
+    await harness.run('car-owner', {
+      type: 'setCompanyLogo',
+      payload: {
+        tenantId: 'carrier-1',
+        logoRef: companyLogoStoragePath('carrier-1', 'gone', 'image/png'),
+        contentType: 'image/png',
+      },
+      requestId: 'r-logo',
+    });
+    await deliveredJob(harness);
+
+    const mailer = new InMemoryMailer();
+    // Nothing uploaded at that ref — the download will throw.
+    const summary = await runDrainOnce(drainDeps(harness, { mailer }));
+
+    expect(summary).toMatchObject({ invoiced: 1, failed: 0 });
+    const letterhead = mailer.sentAttachments[0]?.find((a) => a.cid === 'company-logo');
+    expect(letterhead?.content.equals(Buffer.from(MYBACKHAUL_LOGO_PNG_BASE64, 'base64'))).toBe(true);
+  });
+
   it('includes the carrier VAT number when the carrier owner has one on file', async () => {
     const harness = await makeHarness();
     await seedShipperBillingProfile(harness);
@@ -314,7 +379,9 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
 
     expect(mailer.sent[0]).toMatchObject({ recipientName: 'J. Smith' });
     const attachments = mailer.sentAttachments[0]!;
-    expect(attachments).toHaveLength(2);
+    // The letterhead rides along on every invoice; these are the PoD images.
+    const pod = attachments.filter((a) => a.cid !== 'company-logo');
+    expect(pod).toHaveLength(2);
     expect(attachments.find((a) => a.filename === 'signature.png')).toMatchObject({
       contentType: 'image/png',
       cid: 'signature',
@@ -340,8 +407,9 @@ describe('runDrainOnce — sendInvoiceEmail', () => {
     expect(summary).toMatchObject({ invoiced: 1, failed: 0 });
 
     const attachments = mailer.sentAttachments[0]!;
-    expect(attachments).toHaveLength(1);
-    expect(attachments[0]).toMatchObject({ filename: 'signature.png' });
+    const pod = attachments.filter((a) => a.cid !== 'company-logo');
+    expect(pod).toHaveLength(1);
+    expect(pod[0]).toMatchObject({ filename: 'signature.png' });
   });
 });
 
@@ -418,7 +486,9 @@ describe('runDrainOnce — sendTestInvoiceEmail', () => {
     // delivery's, so it exercises invoiceHtml's inline-image rendering rather
     // than quietly skipping it — the whole point of this debug tool.
     const attachments = mailer.sentAttachments[0]!;
-    expect(attachments.map((a) => a.cid)).toEqual(['signature', 'photo-1']);
+    // Letterheaded with the MyBackHaul mark, since there is no real carrier
+    // behind a synthetic invoice — so this also exercises the fallback.
+    expect(attachments.map((a) => a.cid)).toEqual(['company-logo', 'signature', 'photo-1']);
     for (const a of attachments) {
       // Real PNG bytes, not a placeholder string.
       expect(a.content.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');

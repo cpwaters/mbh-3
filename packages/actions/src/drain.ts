@@ -4,6 +4,8 @@ import {
   canTransitionLoad,
   invoiceDueDate,
   MAX_OUTBOX_ATTEMPTS,
+  MYBACKHAUL_LOGO_CONTENT_TYPE,
+  MYBACKHAUL_LOGO_PNG_BASE64,
   type Address,
   type InvoiceData,
   type Job,
@@ -264,13 +266,15 @@ async function processSendInvoiceEmail(deps: DrainDeps, taskPath: string): Promi
 
   try {
     const evidence = await loadDeliveryEvidence(deps, job.jobId);
-    const invoice = await buildInvoice(deps, job, evidence);
-    if (invoice === null) {
+    const built = await buildInvoice(deps, job, evidence);
+    if (built === null) {
       await settle(deps, taskPath, 'failed', 'no billing email on file for the shipper');
       return 'failed';
     }
+    const { invoice } = built;
 
-    const attachments = evidence !== null ? await buildAttachments(deps, evidence) : [];
+    const letterhead = await buildLetterhead(deps, built.carrierLogo);
+    const attachments = [letterhead, ...(evidence !== null ? await buildAttachments(deps, evidence) : [])];
     await deps.mailer.sendInvoice(invoice, attachments);
     await recordInvoiceSent(deps, taskPath, job, invoice);
     return 'invoiced';
@@ -375,6 +379,7 @@ async function processSendTestInvoiceEmail(deps: DrainDeps, taskPath: string): P
   // section rather than silently skipping it (which would make a passing
   // test email prove less about the pipeline than it appears to).
   const attachments: MailAttachment[] = [
+    await buildLetterhead(deps, null),
     { filename: 'signature.png', content: sampleSignaturePng(), contentType: 'image/png', cid: 'signature' },
     { filename: 'delivery-photo-1.png', content: samplePhotoPng(), contentType: 'image/png', cid: 'photo-1' },
   ];
@@ -516,7 +521,15 @@ async function buildAttachments(deps: DrainDeps, evidence: JobEvidence): Promise
 // null when there's no billing email to send to at all (a hard failure —
 // nothing else here is worth failing the whole invoice over, so the VAT
 // number and company names all degrade gracefully instead).
-async function buildInvoice(deps: DrainDeps, job: Job, evidence: JobEvidence | null): Promise<InvoiceData | null> {
+interface BuiltInvoice {
+  invoice: InvoiceData;
+  // The carrier's own logo, if they have set one — resolved to bytes later,
+  // by buildLetterhead. Read here because the carrier tenant is already
+  // being fetched for its name.
+  carrierLogo: { ref: string; contentType: string } | null;
+}
+
+async function buildInvoice(deps: DrainDeps, job: Job, evidence: JobEvidence | null): Promise<BuiltInvoice | null> {
   const [shipperTenant, carrierTenant, shipperOwnerProfile, carrierOwnerProfile] = await Promise.all([
     deps.store.getDoc(tenantDoc(job.shipperTenantId)),
     deps.store.getDoc(tenantDoc(job.carrierTenantId)),
@@ -536,18 +549,64 @@ async function buildInvoice(deps: DrainDeps, job: Job, evidence: JobEvidence | n
   const originLabel = `${job.origin.town}, ${job.origin.postcode}`;
   const destinationLabel = `${job.destination.town}, ${job.destination.postcode}`;
 
+  // The invoice is issued BY the carrier, so the letterhead is theirs.
+  const carrier = carrierTenant as unknown as Tenant | null;
+  const logoRef = carrier?.logoRef?.trim();
+  const carrierLogo =
+    logoRef !== undefined && logoRef !== ''
+      ? { ref: logoRef, contentType: carrier?.logoContentType ?? 'image/png' }
+      : null;
+
   return {
-    invoiceNumber: buildInvoiceNumber(job.jobId),
-    issuedAt: now,
-    dueAt: invoiceDueDate(now),
-    jobId: job.jobId,
-    carrierCompanyName,
-    ...(carrierVatNumber ? { carrierVatNumber } : {}),
-    shipperCompanyName,
-    recipientEmail,
-    ...(recipientName ? { recipientName } : {}),
-    lineItems: [{ description: `Haulage: ${originLabel} → ${destinationLabel}`, amountGbpPence: job.priceGbpPence }],
-    totalGbpPence: job.priceGbpPence,
+    invoice: {
+      invoiceNumber: buildInvoiceNumber(job.jobId),
+      issuedAt: now,
+      dueAt: invoiceDueDate(now),
+      jobId: job.jobId,
+      carrierCompanyName,
+      ...(carrierVatNumber ? { carrierVatNumber } : {}),
+      shipperCompanyName,
+      recipientEmail,
+      ...(recipientName ? { recipientName } : {}),
+      lineItems: [{ description: `Haulage: ${originLabel} → ${destinationLabel}`, amountGbpPence: job.priceGbpPence }],
+      totalGbpPence: job.priceGbpPence,
+    },
+    carrierLogo,
+  };
+}
+
+// Every invoice gets a letterhead. A company that has set its own logo gets
+// that; everyone else gets the MyBackHaul mark, which is compiled into the
+// bundle rather than fetched, so it cannot be the thing that fails.
+//
+// A logo that will not resolve (a deleted object, a transient Storage error)
+// falls back too rather than failing the send — same principle as the PoD
+// images: billing is not load-bearing on artwork.
+export const LETTERHEAD_CID = 'company-logo';
+
+async function buildLetterhead(
+  deps: DrainDeps,
+  logo: { ref: string; contentType: string } | null
+): Promise<MailAttachment> {
+  if (logo !== null) {
+    try {
+      const content = await deps.objectStorage.download(logo.ref);
+      return {
+        filename: logo.contentType === 'image/jpeg' ? 'company-logo.jpg' : 'company-logo.png',
+        content,
+        contentType: logo.contentType,
+        cid: LETTERHEAD_CID,
+      };
+    } catch {
+      // unresolvable — fall through to the mark below
+    }
+  }
+
+  return {
+    filename: 'mybackhaul.png',
+    content: Buffer.from(MYBACKHAUL_LOGO_PNG_BASE64, 'base64'),
+    contentType: MYBACKHAUL_LOGO_CONTENT_TYPE,
+    cid: LETTERHEAD_CID,
   };
 }
 

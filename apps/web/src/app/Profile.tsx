@@ -4,6 +4,7 @@ import { User, Star, Truck, MapPin, Phone, Building, FileText, Calendar, UserPlu
 import { genRequestId } from '@mbh/client';
 import { VEHICLE_TYPE_LABELS, VEHICLE_CONFIGURATION_LABELS, type VehicleType, type VehicleConfiguration } from '@mbh/domain';
 import { useApp } from './context';
+import CompanyLogo from './CompanyLogo';
 import { useProfile } from '../components/useProfile';
 import { useVehicles } from '../components/useVehicles';
 import { dispatchAction } from '../lib/dispatch';
@@ -214,6 +215,8 @@ export default function Profile() {
             <Field label="VAT Number" value={profile?.vatNumber} />
             <Field label="Number of Vehicles" value={String(profile?.quantityOfVehicles ?? 0)} />
           </Section>
+
+          {tenantId !== null && <CompanyLogo tenantId={tenantId} />}
 
           <Section icon={<MapPin className="w-5 h-5 text-blue-600" />} title="Company Address">
             <div className="md:col-span-2">

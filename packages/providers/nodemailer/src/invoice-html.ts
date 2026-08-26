@@ -37,6 +37,20 @@ function proofOfDeliverySection(invoice: InvoiceData, attachments: MailAttachmen
   </div>`;
 }
 
+// The letterhead: the carrier's own logo when they have set one, and the
+// MyBackHaul mark when they have not. The drain always supplies one under
+// this cid (see buildLetterhead in packages/actions/src/drain.ts) — 'company-
+// logo' is the contract between the two, the same way 'signature' and
+// 'photo-N' are. Absent only in a caller that supplies no attachments at all,
+// in which case the header simply renders without it.
+function letterheadImg(attachments: MailAttachment[]): string {
+  const logo = attachments.find((a) => a.cid === 'company-logo');
+  if (logo === undefined) return '';
+  // max-height rather than a fixed size: a logo can be any shape, and email
+  // clients honour max-height far more reliably than object-fit.
+  return `<img src="cid:${logo.cid}" alt="" style="max-height:48px;max-width:180px;display:block;margin-bottom:10px;" />`;
+}
+
 export function invoiceHtml(invoice: InvoiceData, attachments: MailAttachment[] = []): string {
   const rows = invoice.lineItems
     .map(
@@ -52,6 +66,7 @@ export function invoiceHtml(invoice: InvoiceData, attachments: MailAttachment[] 
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;color:#111827;">
   <div style="border-bottom:3px solid #2563eb;padding-bottom:16px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;">
     <div>
+      ${letterheadImg(attachments)}
       <div style="font-size:22px;font-weight:bold;color:#2563eb;">INVOICE</div>
       <div style="color:#6b7280;font-size:13px;">${escapeHtml(invoice.invoiceNumber)}</div>
     </div>
