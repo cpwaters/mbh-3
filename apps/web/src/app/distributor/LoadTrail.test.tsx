@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { JobTrail } from '@mbh/provider-interfaces';
-import { TrailStatus, isStale, lastSeenLabel, stoppedForLabel } from './LoadTrail';
+import { TrailStatus, isStale, lastSeenLabel, pausedForLabel, stoppedForLabel } from './LoadTrail';
 
 const NOW = Date.parse('2026-08-01T12:00:00.000Z');
 const ago = (ms: number): string => new Date(NOW - ms).toISOString();
@@ -10,7 +10,12 @@ const ago = (ms: number): string => new Date(NOW - ms).toISOString();
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
-function trailWith(lastSeenAt: string | null, pointCount = 3, stoppedSince: string | null = null): JobTrail {
+function trailWith(
+  lastSeenAt: string | null,
+  pointCount = 3,
+  stoppedSince: string | null = null,
+  pausedSince: string | null = null
+): JobTrail {
   return {
     jobId: 'job-1',
     status: 'in_transit',
@@ -19,6 +24,7 @@ function trailWith(lastSeenAt: string | null, pointCount = 3, stoppedSince: stri
       lng: -2,
       at: ago((pointCount - i) * MINUTE),
     })),
+    pausedSince,
     stoppedSince,
     lastSeenAt,
   };
@@ -60,6 +66,15 @@ describe('stoppedForLabel', () => {
     expect(stoppedForLabel(ago(2 * HOUR), NOW)).toBe('Stopped for 2 hours');
     expect(stoppedForLabel(ago(2 * HOUR + 15 * MINUTE), NOW)).toBe('Stopped for 2h 15m');
     expect(stoppedForLabel(ago(30 * HOUR), NOW)).toBe('Stopped for 1 day');
+  });
+});
+
+describe('pausedForLabel', () => {
+  it('reads as a decision someone made, with when they made it', () => {
+    expect(pausedForLabel(ago(30_000), NOW)).toBe('Driver paused tracking');
+    expect(pausedForLabel(ago(MINUTE), NOW)).toBe('Driver paused tracking 1 minute ago');
+    expect(pausedForLabel(ago(25 * MINUTE), NOW)).toBe('Driver paused tracking 25 minutes ago');
+    expect(pausedForLabel(ago(3 * HOUR), NOW)).toBe('Driver paused tracking 3 hours ago');
   });
 });
 
@@ -128,6 +143,37 @@ describe('TrailStatus', () => {
     );
     expect(screen.queryByText(/stopped for/i)).not.toBeInTheDocument();
     expect(screen.getByText(/last seen 2 minutes ago/i)).toBeInTheDocument();
+  });
+
+  it('names a pause as the driver’s choice, not as a fault', () => {
+    render(
+      <TrailStatus
+        trail={trailWith(ago(30 * MINUTE), 3, null, ago(30 * MINUTE))}
+        loading={false}
+        error={null}
+        now={NOW}
+        onRefresh={noop}
+      />
+    );
+    expect(screen.getByText(/driver paused tracking 30 minutes ago/i)).toBeInTheDocument();
+    // And says it ends by itself, so nobody rings the driver to ask.
+    expect(screen.getByText(/resumes when the load is moving again/i)).toBeInTheDocument();
+  });
+
+  it('a pause takes precedence over calling the load stopped', () => {
+    // A paused tracker reports no movement either way, so "stopped" would be
+    // an inference we have not earned.
+    render(
+      <TrailStatus
+        trail={trailWith(ago(30 * MINUTE), 3, ago(30 * MINUTE), ago(30 * MINUTE))}
+        loading={false}
+        error={null}
+        now={NOW}
+        onRefresh={noop}
+      />
+    );
+    expect(screen.getByText(/driver paused tracking/i)).toBeInTheDocument();
+    expect(screen.queryByText(/stopped for/i)).not.toBeInTheDocument();
   });
 
   it('can be refreshed by hand', async () => {

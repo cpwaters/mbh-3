@@ -48,6 +48,7 @@ export function makeMockApp(over: Partial<AppData> = {}): AppData {
     requestLocation: () => {},
     progress: null,
     distanceRemainingMeters: null,
+    trackingPause: { paused: false, busy: false, toggle: () => {} },
     drivingTimers: {
       timers: [],
       dailyRestHours: 9,

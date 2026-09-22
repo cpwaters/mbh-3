@@ -7,6 +7,7 @@ import {
   seedInvite,
   seedRoutePoint,
   seedStop,
+  seedTrackingPause,
   storageObjectExists,
 } from '../support/admin.js';
 
@@ -356,6 +357,32 @@ test('a stopped load says so, instead of just going quiet', async ({ page }) => 
   await matchedRow.getByRole('button', { name: 'View Route' }).click();
 
   await expect(matchedRow.getByText(/stopped for 42 minutes/i)).toBeVisible();
+});
+
+test('a paused tracker is named as the driver’s choice, not left as a silent gap', async ({ page }) => {
+  await seedTrackingPause(E2E.browseLoadId);
+
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'All Loads' }).click();
+  const matchedRow = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
+  await matchedRow.getByRole('button', { name: 'View Route' }).click();
+
+  await expect(matchedRow.getByText(/driver paused tracking/i)).toBeVisible();
+  await expect(matchedRow.getByText(/resumes when the load is moving again/i)).toBeVisible();
+});
+
+test('a driver can pause and resume tracking on their active job', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
+  await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
+
+  await page.getByRole('button', { name: 'Pause tracking' }).click();
+  // The bargain is stated on the driver's screen too, not just the shipper's.
+  await expect(page.getByText(/not being recorded/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resume tracking' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Resume tracking' }).click();
+  await expect(page.getByRole('button', { name: 'Pause tracking' })).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {

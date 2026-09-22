@@ -5,6 +5,7 @@ import type { DriverJobView, Membership } from '@mbh/provider-interfaces';
 import type { AuthView } from '../components/useAuth';
 import type { QueueView } from '../components/useSyncQueue';
 import type { DrivingTimersView } from '../components/useDrivingTimers';
+import type { TrackingPauseView } from '../components/useTrackingPause';
 import type { GeoPoint } from '../lib/geocode';
 
 // The shared app state, resolved once in the shell and read by every page.
@@ -42,6 +43,8 @@ export interface AppData {
   // keep running and their state survives navigating away from the Driving
   // Time page and back.
   drivingTimers: DrivingTimersView;
+  // The driver's switch for location recording on the active job.
+  trackingPause: TrackingPauseView;
 }
 
 const Ctx = createContext<AppData | null>(null);

@@ -324,3 +324,22 @@ export async function seedStop(loadId: string, since: string): Promise<void> {
     detail: { lat: 51.49, lng: -2.69, since },
   });
 }
+
+// A tracking pause on whichever job a load became, written the way
+// setJobTracking writes one.
+export async function seedTrackingPause(loadId: string): Promise<void> {
+  app();
+  const db = getFirestore();
+  const jobs = await db.collection('jobs').where('loadId', '==', loadId).get();
+  const jobDoc = jobs.docs[0];
+  if (jobDoc === undefined) throw new Error(`no job for load ${loadId}`);
+  const eventId = `evt-pause-${Date.now()}`;
+  await db.doc(`jobs/${jobDoc.id}/events/${eventId}`).set({
+    eventId,
+    jobId: jobDoc.id,
+    type: 'job.trackingPaused',
+    at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+    actorId: E2E.joblessUid,
+    source: 'member',
+  });
+}
