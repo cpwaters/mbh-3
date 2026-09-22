@@ -5,6 +5,8 @@ import { formatGbp } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import type { ShipperLoad } from '@mbh/provider-interfaces';
 import { useApp } from '../context';
+import { useJobTrail } from '../../components/useJobTrail';
+import { TrailStatus } from './LoadTrail';
 import { useShipperLoads } from '../../components/useShipperLoads';
 import { dispatchAction } from '../../lib/dispatch';
 import LiveLocationMap from '../LiveLocationMap';
@@ -49,10 +51,22 @@ function reuseFieldsFrom(load: ShipperLoad): Partial<Form> {
   };
 }
 
-// A small map for one load: geocodes its origin/destination strings and draws
-// the road-following route. (mbh-3 has no server-side live GPS, so no driver
-// marker — the route is what we can show honestly.)
-function LoadRouteMap({ origin, destination }: { origin: string; destination: string }) {
+// A small map for one load: geocodes its origin/destination strings, draws the
+// road-following route, and — once a carrier has it — overlays where the load
+// has actually been, from the driver's recorded breadcrumbs. The planned route
+// and the travelled trail are drawn differently on purpose; a shipper chasing
+// a late load needs to tell the plan from what happened.
+function LoadRouteMap({
+  origin,
+  destination,
+  loadId,
+  shipperTenantId,
+}: {
+  origin: string;
+  destination: string;
+  loadId: string;
+  shipperTenantId: string | null;
+}) {
   const [originPin, setOriginPin] = useState<GeoPoint | null>(null);
   const [destinationPin, setDestinationPin] = useState<GeoPoint | null>(null);
   const [routeGeometry, setRouteGeometry] = useState<GeoPoint[] | null>(null);
@@ -85,17 +99,44 @@ function LoadRouteMap({ origin, destination }: { origin: string; destination: st
     };
   }, [originPin, destinationPin]);
 
+  // The panel is only rendered while it is open, so the read is scoped to
+  // exactly the load the shipper is looking at.
+  const { trail, loading: trailLoading, error: trailError, reload: reloadTrail } = useJobTrail(
+    loadId,
+    shipperTenantId,
+    true
+  );
+  // Fixed at render rather than ticking: the ages shown are in minutes, and a
+  // per-second clock would re-render every open map for no visible gain.
+  const now = Date.now();
+
+  const trailPins = trail?.points.map((p) => ({ lat: p.lat, lng: p.lng })) ?? [];
+  const latest = trailPins[trailPins.length - 1];
+
   return (
-    <div className="h-72 rounded-lg overflow-hidden border border-gray-200">
-      {originPin || destinationPin ? (
-        <LiveLocationMap
-          origin={originPin ? { ...originPin, label: origin } : undefined}
-          destination={destinationPin ? { ...destinationPin, label: destination } : undefined}
-          routeGeometry={routeGeometry ?? undefined}
-        />
-      ) : (
-        <div className="h-full flex items-center justify-center bg-gray-50 text-gray-500 text-sm">Loading route...</div>
-      )}
+    <div className="space-y-2">
+      <div className="h-72 rounded-lg overflow-hidden border border-gray-200">
+        {originPin || destinationPin ? (
+          <LiveLocationMap
+            origin={originPin ? { ...originPin, label: origin } : undefined}
+            destination={destinationPin ? { ...destinationPin, label: destination } : undefined}
+            routeGeometry={routeGeometry ?? undefined}
+            trail={trailPins.length > 1 ? trailPins : undefined}
+            currentLocation={latest !== undefined ? { ...latest, label: 'Last recorded position' } : undefined}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center bg-gray-50 text-gray-500 text-sm">
+            Loading route...
+          </div>
+        )}
+      </div>
+      <TrailStatus
+        trail={trail}
+        loading={trailLoading}
+        error={trailError}
+        now={now}
+        onRefresh={reloadTrail}
+      />
     </div>
   );
 }
@@ -300,7 +341,12 @@ export default function LoadsList() {
 
             {trackedLoadId === load.loadId && (
               <JobCardSection>
-                <LoadRouteMap origin={load.origin} destination={load.destination} />
+                <LoadRouteMap
+                  origin={load.origin}
+                  destination={load.destination}
+                  loadId={load.loadId}
+                  shipperTenantId={shipperTenantId}
+                />
               </JobCardSection>
             )}
           </JobCard>

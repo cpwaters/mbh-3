@@ -278,3 +278,29 @@ export async function seedInvite(inviteId: string): Promise<void> {
     expiresAt: '2099-01-01T00:00:00.000Z',
   });
 }
+
+// A breadcrumb on whichever job a load became, written the way
+// recordRoutePoint writes one. The job id is generated at acceptance, so it
+// is looked up rather than assumed. Returns the job id it wrote to.
+export async function seedRoutePoint(
+  loadId: string,
+  point: { lat: number; lng: number; at: string }
+): Promise<string> {
+  app();
+  const db = getFirestore();
+  const jobs = await db.collection('jobs').where('loadId', '==', loadId).get();
+  const jobDoc = jobs.docs[0];
+  if (jobDoc === undefined) throw new Error(`no job for load ${loadId}`);
+  const jobId = jobDoc.id;
+  const eventId = `evt-trail-${Date.now()}`;
+  await db.doc(`jobs/${jobId}/events/${eventId}`).set({
+    eventId,
+    jobId,
+    type: 'job.routePoint',
+    at: point.at,
+    actorId: E2E.joblessUid,
+    source: 'member',
+    detail: { lat: point.lat, lng: point.lng },
+  });
+  return jobId;
+}

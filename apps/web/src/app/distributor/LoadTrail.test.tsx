@@ -1,0 +1,103 @@
+import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { JobTrail } from '@mbh/provider-interfaces';
+import { TrailStatus, isStale, lastSeenLabel } from './LoadTrail';
+
+const NOW = Date.parse('2026-08-01T12:00:00.000Z');
+const ago = (ms: number): string => new Date(NOW - ms).toISOString();
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+
+function trailWith(lastSeenAt: string | null, pointCount = 3): JobTrail {
+  return {
+    jobId: 'job-1',
+    status: 'in_transit',
+    points: Array.from({ length: pointCount }, (_, i) => ({
+      lat: 53 + i * 0.1,
+      lng: -2,
+      at: ago((pointCount - i) * MINUTE),
+    })),
+    lastSeenAt,
+  };
+}
+
+describe('lastSeenLabel', () => {
+  it('reads in the units a person would use', () => {
+    expect(lastSeenLabel(ago(30_000), NOW)).toBe('Last seen just now');
+    expect(lastSeenLabel(ago(MINUTE), NOW)).toBe('Last seen 1 minute ago');
+    expect(lastSeenLabel(ago(7 * MINUTE), NOW)).toBe('Last seen 7 minutes ago');
+    expect(lastSeenLabel(ago(HOUR), NOW)).toBe('Last seen 1 hour ago');
+    expect(lastSeenLabel(ago(5 * HOUR), NOW)).toBe('Last seen 5 hours ago');
+    expect(lastSeenLabel(ago(50 * HOUR), NOW)).toBe('Last seen 2 days ago');
+  });
+
+  it('says so plainly when nothing has been recorded', () => {
+    expect(lastSeenLabel(null, NOW)).toBe('No position recorded yet');
+    expect(lastSeenLabel('not a date', NOW)).toBe('No position recorded yet');
+  });
+});
+
+describe('isStale', () => {
+  it('treats a recent fix as current and an old one as not', () => {
+    expect(isStale(ago(5 * MINUTE), NOW)).toBe(false);
+    expect(isStale(ago(25 * MINUTE), NOW)).toBe(true);
+  });
+
+  it('treats no fix, and an unparseable one, as stale', () => {
+    expect(isStale(null, NOW)).toBe(true);
+    expect(isStale('nonsense', NOW)).toBe(true);
+  });
+});
+
+describe('TrailStatus', () => {
+  const noop = (): void => {};
+
+  it('never claims a position is live — only when it was last seen', () => {
+    render(<TrailStatus trail={trailWith(ago(2 * MINUTE))} loading={false} error={null} now={NOW} onRefresh={noop} />);
+    expect(screen.getByText(/last seen 2 minutes ago/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\blive\b/i)).not.toBeInTheDocument();
+  });
+
+  it('warns that an old fix is where the load WAS', () => {
+    // The failure this guards: a shipper reads a stale dot as current and
+    // promises their own customer a delivery time on the strength of it.
+    render(<TrailStatus trail={trailWith(ago(45 * MINUTE))} loading={false} error={null} now={NOW} onRefresh={noop} />);
+    expect(screen.getByText(/where the load was, not necessarily where it is now/i)).toBeInTheDocument();
+  });
+
+  it('explains an empty trail rather than showing an empty map with no comment', () => {
+    render(<TrailStatus trail={trailWith(null, 0)} loading={false} error={null} now={NOW} onRefresh={noop} />);
+    expect(screen.getByText(/no position recorded yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/tracking starts once they collect/i)).toBeInTheDocument();
+  });
+
+  it('says when no carrier has the load yet', () => {
+    render(<TrailStatus trail={null} loading={false} error={null} now={NOW} onRefresh={noop} />);
+    expect(screen.getByText(/no carrier has accepted this load yet/i)).toBeInTheDocument();
+  });
+
+  it('keeps showing the trail when a refresh fails, and says so', () => {
+    render(
+      <TrailStatus
+        trail={trailWith(ago(3 * MINUTE))}
+        loading={false}
+        error="Could not refresh the location just now."
+        now={NOW}
+        onRefresh={noop}
+      />
+    );
+    expect(screen.getByText(/last seen 3 minutes ago/i)).toBeInTheDocument();
+    expect(screen.getByText(/could not refresh/i)).toBeInTheDocument();
+  });
+
+  it('can be refreshed by hand', async () => {
+    const user = userEvent.setup();
+    const onRefresh = vi.fn();
+    render(<TrailStatus trail={trailWith(ago(MINUTE))} loading={false} error={null} now={NOW} onRefresh={onRefresh} />);
+
+    await user.click(screen.getByRole('button', { name: /refresh/i }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+});

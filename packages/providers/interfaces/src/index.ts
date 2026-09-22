@@ -5,6 +5,7 @@ export * from './datastore.js';
 export * from './auth-provider.js';
 export * from './auth-client.js';
 export * from './job-reader.js';
+export * from './job-trail-reader.js';
 export * from './vehicle-reader.js';
 export * from './address-book-reader.js';
 export * from './profile-reader.js';
