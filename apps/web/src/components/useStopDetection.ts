@@ -17,7 +17,8 @@ import type { DriverJobView } from '@mbh/provider-interfaces';
 export function useStopDetection(
   job: DriverJobView | null,
   fix: MotionFix | null,
-  enqueue: (type: string, payload: unknown, requestId: string) => Promise<void>
+  enqueue: (type: string, payload: unknown, requestId: string) => Promise<void>,
+  paused = false
 ): void {
   const trackerRef = useRef<MotionTracker>(initialMotion());
   const trackedJobIdRef = useRef<string | null>(null);
@@ -25,6 +26,9 @@ export function useStopDetection(
   useEffect(() => {
     if (job === null || fix === null) return;
     if (job.status !== 'collected' && job.status !== 'in_transit') return;
+    // Paused: a pause already explains the silence, and reporting "stopped"
+    // from a tracker the driver switched off would be a claim we cannot make.
+    if (paused) return;
 
     // A different job starts from scratch, rather than inheriting the last
     // one's state and announcing a stop that belongs to a finished delivery.
@@ -48,5 +52,5 @@ export function useStopDetection(
       },
       genRequestId()
     );
-  }, [job, fix, enqueue]);
+  }, [job, fix, enqueue, paused]);
 }

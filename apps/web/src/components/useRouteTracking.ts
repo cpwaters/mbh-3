@@ -16,7 +16,8 @@ const MILE_METERS = 1609.344;
 export function useRouteTracking(
   job: DriverJobView | null,
   location: GeoPoint | null,
-  enqueue: (type: string, payload: unknown, requestId: string) => Promise<void>
+  enqueue: (type: string, payload: unknown, requestId: string) => Promise<void>,
+  paused = false
 ): void {
   const trackedJobIdRef = useRef<string | null>(null);
   const lastPointRef = useRef<GeoPoint | null>(null);
@@ -24,6 +25,9 @@ export function useRouteTracking(
   useEffect(() => {
     if (job === null || location === null) return;
     if (job.status !== 'collected' && job.status !== 'in_transit') return;
+    // Paused by the driver: keep watching (progress and the delivery gate
+    // need the fixes) but send nothing.
+    if (paused) return;
 
     if (trackedJobIdRef.current !== job.jobId) {
       // A new job (or the first tick for this one) — this fix is the trail's
@@ -41,5 +45,5 @@ export function useRouteTracking(
       { carrierTenantId: job.carrierTenantId, jobId: job.jobId, location },
       genRequestId()
     );
-  }, [job, location, enqueue]);
+  }, [job, location, enqueue, paused]);
 }

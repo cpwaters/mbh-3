@@ -18,6 +18,11 @@ export interface JobTrail {
   status: JobStatus;
   // Oldest first, so it draws as a path.
   points: TrailPoint[];
+  // Set while the driver has paused location recording, with when they did.
+  // Takes precedence over stoppedSince in the UI: a paused tracker is not
+  // reporting movement either way, so calling it "stopped" would be an
+  // inference we have not earned.
+  pausedSince: string | null;
   // Set while the load is stopped, with when the stop began. Cleared once it
   // is moving again. A distance-triggered trail goes quiet when parked, so
   // without this a stop is indistinguishable from a closed app.

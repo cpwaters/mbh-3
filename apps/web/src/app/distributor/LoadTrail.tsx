@@ -1,4 +1,4 @@
-import { MapPin, PauseCircle, RefreshCw } from 'lucide-react';
+import { EyeOff, MapPin, PauseCircle, RefreshCw } from 'lucide-react';
 import type { JobTrail } from '@mbh/provider-interfaces';
 
 // How old a fix has to be before the wording changes from "moving" to
@@ -39,6 +39,19 @@ export function stoppedForLabel(stoppedSince: string, now: number): string {
   return `Stopped for ${days} day${days === 1 ? '' : 's'}`;
 }
 
+// A pause is the driver's decision, so it is reported as one — named, dated,
+// and not dressed up as a fault. "Not reporting" would imply something broke.
+export function pausedForLabel(pausedSince: string, now: number): string {
+  const ms = now - Date.parse(pausedSince);
+  if (Number.isNaN(ms) || ms < MINUTE) return 'Driver paused tracking';
+  const minutes = Math.floor(ms / MINUTE);
+  if (minutes < 60) return `Driver paused tracking ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Driver paused tracking ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `Driver paused tracking ${days} day${days === 1 ? '' : 's'} ago`;
+}
+
 export function isStale(lastSeenAt: string | null, now: number): boolean {
   if (lastSeenAt === null) return true;
   const ageMs = now - Date.parse(lastSeenAt);
@@ -74,11 +87,20 @@ export function TrailStatus({
 
   const stale = isStale(trail.lastSeenAt, now);
   const none = trail.points.length === 0;
+  const paused = trail.pausedSince;
   const stopped = trail.stoppedSince;
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      {stopped !== null ? (
+      {paused !== null ? (
+        // Named as a choice the driver made, because that is what it is, and
+        // because the alternative — a dot that quietly stops moving — is read
+        // as "stuck in traffic" and is worse than saying nothing.
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700">
+          <EyeOff className="w-4 h-4" />
+          {pausedForLabel(paused, now)}
+        </span>
+      ) : stopped !== null ? (
         // A stop is a fact the driver's device reported, so it is stated
         // plainly rather than inferred from an absence of breadcrumbs.
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700">
@@ -92,7 +114,13 @@ export function TrailStatus({
         </span>
       )}
 
-      {stopped !== null && <span className="text-sm text-gray-500">{lastSeenLabel(trail.lastSeenAt, now)}</span>}
+      {(stopped !== null || paused !== null) && (
+        <span className="text-sm text-gray-500">{lastSeenLabel(trail.lastSeenAt, now)}</span>
+      )}
+
+      {paused !== null && (
+        <span className="text-sm text-gray-500">Tracking resumes when the load is moving again.</span>
+      )}
 
       {none && (
         <span className="text-sm text-gray-500">
@@ -100,7 +128,7 @@ export function TrailStatus({
         </span>
       )}
 
-      {stale && !none && stopped === null && (
+      {stale && !none && stopped === null && paused === null && (
         <span className="text-sm text-gray-500">
           This is where the load was, not necessarily where it is now.
         </span>

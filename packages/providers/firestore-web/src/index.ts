@@ -185,12 +185,21 @@ export class FirestoreReader
     // Newest first, so the FIRST motion event seen is the current state.
     let stoppedSince: string | null = null;
     let motionSeen = false;
+    let pausedSince: string | null = null;
+    let pauseSeen = false;
     for (const e of events.docs) {
       const data = e.data() as {
         type?: string;
         at?: string;
         detail?: { lat?: number; lng?: number; since?: string };
       };
+      if (data.type === 'job.trackingPaused' || data.type === 'job.trackingResumed') {
+        if (!pauseSeen) {
+          pauseSeen = true;
+          pausedSince = data.type === 'job.trackingPaused' ? (data.at ?? null) : null;
+        }
+        continue;
+      }
       if (data.type === 'job.stopped' || data.type === 'job.resumed') {
         if (!motionSeen) {
           motionSeen = true;
@@ -210,7 +219,10 @@ export class FirestoreReader
       jobId: job.jobId,
       status: job.status,
       points,
-      stoppedSince,
+      pausedSince,
+      // A paused tracker reports no movement, so any stop it was in is not
+      // something we can still vouch for.
+      stoppedSince: pausedSince !== null ? null : stoppedSince,
       lastSeenAt: points.length > 0 ? (points[points.length - 1]?.at ?? null) : null,
     };
   }
