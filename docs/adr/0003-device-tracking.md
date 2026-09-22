@@ -114,6 +114,54 @@ No new platform, no app stores. Closes gaps 2, 3 and 5, and part of 4.
   Wake Lock while a job is active so a cradled phone keeps its watch open.
 - Say plainly in the UI when a position was last fixed. A stale point
   presented as live is worse than an honest "last seen 20 minutes ago".
+- A driver-operated **pause**, and **stop detection** from speed. Both are
+  covered below; both belong to stage 1 and neither substitutes for stage 2.
+
+#### Pausing, and detecting stops
+
+Two mechanisms the founder proposed. Both are worth building, for different
+reasons than they first appear.
+
+**A pause button is the answer to the consent problem**, not a tracking
+improvement. Consent a driver can actually exercise beats a clause in a terms
+page. Three conditions make it worth having:
+
+- It must be legible to the shipper. A dot that silently stops moving is
+  worse than no tracking at all, because it reads as "stuck in traffic"
+  rather than "not being tracked". "Paused by driver, 14:32" is honest.
+- It must auto-resume. Drivers will pause at the services and forget, leaving
+  an unexplained hole at exactly the point a dispute would care about.
+- It is modelled as ordinary JobEvents — `job.trackingPaused` /
+  `job.trackingResumed` — append-only, same collection, same rules, nothing
+  new. The record then states that tracking was off and who turned it off,
+  which is better evidence than a silent gap, not worse.
+
+Sequencing: this must land AFTER the shipper live view, or the paused state
+is something nothing can display — the same write-only mistake as gap 2.
+
+**Speed gating cuts writes, not battery.** To know the speed you must already
+be sampling GPS, so it reduces what is recorded and transmitted, not what is
+sampled; the radio stays on either way. Life360's saving comes from the
+opposite direction — activity recognition on a low-power motion co-processor
+deciding when to turn GPS on — and the browser has no equivalent. What it
+does buy is a cleaner trail and far fewer writes, which matters against the
+per-job event volume noted below.
+
+Two design notes on it:
+
+- **Walking pace is the wrong threshold.** A truck crawling in a queue at
+  3mph is below it and unambiguously working, so a naive cutoff goes silent
+  exactly when a shipper most wants to know why their load is not moving. Use
+  hysteresis instead: moving above ~5mph sustained, stopped below ~1mph for
+  several minutes.
+- **Record the stop; do not go silent.** "Stopped, Keele services,
+  14:10–14:52" tells a shipper something. A gap tells them nothing. Same
+  mechanism, better output, and closer to what telematics does.
+
+`coords.speed` has been available across browsers since mid-2020 but is null
+whenever the device cannot measure it (common on WiFi- or cell-derived
+fixes), so this needs a fallback to distance-over-time between fixes, with
+smoothing.
 
 ### Stage 2 — native background tracking (Capacitor)
 
@@ -162,9 +210,11 @@ foreground trail that plainly runs while a job is open, and in the UK it
 engages employment and data-protection expectations (ICO guidance on
 monitoring workers). At minimum: track only between collection and delivery,
 say so plainly in the app, and make stopping possible without ringing the
-office. An owner-driver tracking their own phone is an easier case than a
-haulier tracking an employee's; the product has both. Worth taking advice on
-before shipping, not after.
+office — which is what the stage 1 pause button is for, and why it is worth
+building before there is any background tracking to pause. An owner-driver
+tracking their own phone is an easier case than a haulier tracking an
+employee's; the product has both. Worth taking advice on before shipping, not
+after.
 
 **The phone is the tracker, deliberately — so its limits are accepted, not
 solved later.** It follows the driver rather than the trailer: it goes with
