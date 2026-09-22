@@ -7,6 +7,8 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  limit,
+  orderBy,
   query,
   where,
   type Firestore,
@@ -29,6 +31,7 @@ import {
   type Invite,
 } from '@mbh/domain';
 import {
+  jobEventsCollection,
   jobsCollection,
   listingsCollection,
   loadsCollection,
@@ -47,12 +50,15 @@ import type {
   CompletedJobView,
   DriverJobView,
   JobReader,
+  JobTrail,
+  JobTrailReader,
   ListingReader,
   Membership,
   MembershipReader,
   OutboxTaskReader,
   ProfileReader,
   ShipperLoad,
+  TrailPoint,
   ShipperLoadReader,
   TestEmailTaskView,
   VehicleReader,
@@ -81,6 +87,9 @@ const emptyContact: ProfileContact = { name: '', email: '', phone: '' };
 
 interface JobDoc {
   jobId: string;
+  // The load this job was created from — how a shipper gets from the listing
+  // they posted to the job it became.
+  loadId: string;
   carrierTenantId: string;
   status: JobStatus;
   origin: Address;
@@ -92,9 +101,14 @@ interface JobDoc {
   deliveredAt?: string;
 }
 
+// A long job's trail is bounded so one read cannot balloon: 500 points is
+// ~500 miles at today's one-mile breadcrumbs, and the newest are kept.
+const MAX_TRAIL_EVENTS = 500;
+
 export class FirestoreReader
   implements
     JobReader,
+    JobTrailReader,
     ListingReader,
     MembershipReader,
     VehicleReader,
@@ -138,6 +152,51 @@ export class FirestoreReader
       }
     }
     return null;
+  }
+
+  // A load's trail, for the shipper who posted it. Two reads: find the job
+  // this load became, then read that job's breadcrumb events.
+  //
+  // Rules authorize both — `jobs` by the shipperTenantId match, and
+  // `jobs/{id}/events` by membership of either side — so nothing here needs
+  // new rules. The events read is ordered ONLY (no type filter) and narrowed
+  // client-side, the same index-avoiding idiom completedJobsForDriver uses: a
+  // where+orderBy pair would need a composite index, and a missing index is
+  // the one failure mode the emulator cannot catch (docs/HANDOFF.md).
+  async trailForLoad(loadId: string, shipperTenantId: string): Promise<JobTrail | null> {
+    // Constrained by shipperTenantId, NOT by loadId. The rules refuse the
+    // latter: a list has to prove ownership from the query itself, and
+    // `where('loadId','==',...)` proves nothing about who owns the job. Same
+    // shape as activeJobForDriver — authorized list, narrowed client-side.
+    const jobs = await getDocs(
+      query(collection(this.db, jobsCollection()), where('shipperTenantId', '==', shipperTenantId))
+    );
+    const jobDoc = jobs.docs.find((d) => (d.data() as JobDoc).loadId === loadId);
+    if (jobDoc === undefined) return null; // not accepted yet — no job exists
+    const job = jobDoc.data() as JobDoc;
+
+    // Newest first with a ceiling, so a long job returns its RECENT trail
+    // rather than being truncated at the yard; reversed below to draw.
+    const events = await getDocs(
+      query(collection(this.db, jobEventsCollection(job.jobId)), orderBy('at', 'desc'), limit(MAX_TRAIL_EVENTS))
+    );
+
+    const points: TrailPoint[] = [];
+    for (const e of events.docs) {
+      const data = e.data() as { type?: string; at?: string; detail?: { lat?: number; lng?: number } };
+      if (data.type !== 'job.routePoint') continue;
+      const { lat, lng } = data.detail ?? {};
+      if (typeof lat !== 'number' || typeof lng !== 'number' || typeof data.at !== 'string') continue;
+      points.push({ lat, lng, at: data.at });
+    }
+    points.reverse(); // oldest first, so it draws as a path
+
+    return {
+      jobId: job.jobId,
+      status: job.status,
+      points,
+      lastSeenAt: points.length > 0 ? (points[points.length - 1]?.at ?? null) : null,
+    };
   }
 
   async completedJobsForDriver(actorId: string): Promise<CompletedJobView[]> {

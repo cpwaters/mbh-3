@@ -61,10 +61,22 @@ interface LiveLocationMapProps {
   /** Actual road-following route geometry (e.g. from OSRM). Falls back to a
    *  straight dashed line between origin/destination when not provided. */
   routeGeometry?: Pin[];
+  /** Where the load has actually been — the driver's recorded breadcrumbs,
+   *  oldest first. Drawn distinctly from routeGeometry on purpose: one is the
+   *  plan and the other is what happened, and a shipper looking at a delayed
+   *  load needs to tell them apart at a glance. */
+  trail?: Pin[];
 }
 
-export default function LiveLocationMap({ currentLocation, origin, destination, routeGeometry }: LiveLocationMapProps) {
+export default function LiveLocationMap({
+  currentLocation,
+  origin,
+  destination,
+  routeGeometry,
+  trail,
+}: LiveLocationMapProps) {
   const hasRoute = routeGeometry !== undefined && routeGeometry.length > 1;
+  const hasTrail = trail !== undefined && trail.length > 1;
   const points = hasRoute
     ? [...routeGeometry, currentLocation].filter((p): p is Pin => p !== undefined)
     : [origin, destination, currentLocation].filter((p): p is Pin => p !== undefined);
@@ -101,6 +113,13 @@ export default function LiveLocationMap({ currentLocation, origin, destination, 
             pathOptions={{ color: '#2563eb', weight: 3, dashArray: '8 8' }}
           />
         )
+      )}
+
+      {hasTrail && (
+        <Polyline
+          positions={trail.map((p) => [p.lat, p.lng] as [number, number])}
+          pathOptions={{ color: '#16a34a', weight: 5, opacity: 0.9 }}
+        />
       )}
 
       {origin !== undefined && (

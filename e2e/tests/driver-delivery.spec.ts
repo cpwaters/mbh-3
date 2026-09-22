@@ -5,6 +5,7 @@ import {
   getJobStatus,
   getLoadStatus,
   seedInvite,
+  seedRoutePoint,
   storageObjectExists,
 } from '../support/admin.js';
 
@@ -323,6 +324,22 @@ test('a shipper cancels an available load and views a matched one\'s route', asy
   await expect(matchedRow.getByRole('button', { name: 'Hide Route' })).toBeVisible();
   await matchedRow.getByRole('button', { name: 'Hide Route' }).click();
   await expect(matchedRow.getByRole('button', { name: 'View Route' })).toBeVisible();
+});
+
+test('a shipper sees where their load actually got to, and when it was last seen', async ({ page }) => {
+  // The whole read path against real Firestore and real rules — which is
+  // where this breaks if it breaks: a `jobs` query the rules refuse passes
+  // every unit test and fails for every real shipper.
+  const recordedAt = new Date().toISOString();
+  await seedRoutePoint(E2E.browseLoadId, { lat: 51.49, lng: -2.69, at: recordedAt });
+
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'All Loads' }).click();
+  const matchedRow = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
+  await matchedRow.getByRole('button', { name: 'View Route' }).click();
+
+  // Not "live" — when it was last seen.
+  await expect(matchedRow.getByText(/last seen/i)).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {

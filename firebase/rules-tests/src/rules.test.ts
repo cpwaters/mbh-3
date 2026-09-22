@@ -6,7 +6,18 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { collection, collectionGroup, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
+import {
+  collection,
+  collectionGroup,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 
 // Every collection gets explicit allow AND deny cases. A client is an actor
 // (auth.uid == actorId). All writes are server-only, so client writes must
@@ -50,6 +61,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'loads/load-1'), { loadId: 'load-1', tenantId: 'shipper-1', status: 'available', priceGbpPence: 68000 });
     await setDoc(doc(db, 'jobs/job-1'), { jobId: 'job-1', loadId: 'load-1', shipperTenantId: 'shipper-1', carrierTenantId: 'carrier-1', driverActorId: CAR_DRIVER, status: 'accepted' });
     await setDoc(doc(db, 'jobs/job-1/events/evt-1'), { eventId: 'evt-1', jobId: 'job-1', type: 'job.accepted', source: 'member', actorId: CAR_DRIVER });
+    await setDoc(doc(db, 'jobs/job-1/events/evt-2'), { eventId: 'evt-2', jobId: 'job-1', type: 'job.routePoint', at: '2026-08-01T10:00:00.000Z', source: 'member', actorId: CAR_DRIVER, detail: { lat: 53.4, lng: -2.2 } });
     await setDoc(doc(db, 'jobs/job-1/evidence/evd-1'), { evidenceId: 'evd-1', jobId: 'job-1', kind: 'delivery', recipientName: 'J. Smith', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'audit/audit-1'), { auditId: 'audit-1', action: 'acceptLoad', actorId: CAR_DRIVER });
     await setDoc(doc(db, 'requests/req-1'), { requestId: 'req-1', actionType: 'acceptLoad', result: { jobId: 'job-1' } });
@@ -324,5 +336,47 @@ describe('deny-by-default', () => {
   it('an unknown collection is denied read and write', async () => {
     await assertFails(getDoc(doc(db(SHIP_OWNER), 'secrets/s1')));
     await assertFails(setDoc(doc(db(SHIP_OWNER), 'secrets/s1'), { x: 1 }));
+  });
+});
+
+// The two reads the shipper's live view makes, exactly as
+// FirestoreReader.trailForLoad issues them. These are the reason that view
+// needs no rules change — but "needs no change" is a claim worth a test,
+// since getting it wrong means either a broken feature or a leak.
+describe('a load owner following their load', () => {
+  it('can find their jobs and read a trail, with the query constrained by their tenant', async () => {
+    await assertSucceeds(
+      getDocs(query(collection(db(SHIP_OWNER), 'jobs'), where('shipperTenantId', '==', 'shipper-1')))
+    );
+    await assertSucceeds(
+      getDocs(query(collection(db(SHIP_OWNER), 'jobs/job-1/events'), orderBy('at', 'desc'), limit(500)))
+    );
+  });
+
+  it('CANNOT find the job by loadId alone — which is why the reader is shaped as it is', async () => {
+    // A list has to prove ownership from the query itself; filtering on
+    // loadId proves nothing about who owns the job that comes back. This is
+    // load-bearing: FirestoreReader.trailForLoad queries by shipperTenantId
+    // and narrows to the load client-side BECAUSE of this, and without this
+    // test the next person would "simplify" it straight back into a feature
+    // that works against the emulator and fails for every real shipper.
+    await assertFails(getDocs(query(collection(db(SHIP_OWNER), 'jobs'), where('loadId', '==', 'load-1'))));
+  });
+
+  it('the carrier side can read the same trail', async () => {
+    await assertSucceeds(
+      getDocs(query(collection(db(CAR_DRIVER), 'jobs/job-1/events'), orderBy('at', 'desc'), limit(500)))
+    );
+  });
+
+  it('a stranger to both companies can do neither', async () => {
+    await assertFails(getDocs(query(collection(db(OUTSIDER), 'jobs'), where('loadId', '==', 'load-1'))));
+    await assertFails(
+      getDocs(query(collection(db(OUTSIDER), 'jobs/job-1/events'), orderBy('at', 'desc'), limit(500)))
+    );
+  });
+
+  it('a disabled member of the shipper cannot follow it either', async () => {
+    await assertFails(getDocs(query(collection(db(DISABLED), 'jobs/job-1/events'), orderBy('at', 'desc'))));
   });
 });
