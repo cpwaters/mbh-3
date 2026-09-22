@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { MotionFix } from '@mbh/domain';
 import type { GeoPoint } from '../lib/geocode';
 
 // The device's live GPS position, owned once at the app root and shared through
@@ -6,6 +7,11 @@ import type { GeoPoint } from '../lib/geocode';
 // the driver is only ever prompted for location permission once.
 export interface DeviceLocationView {
   location: GeoPoint | null;
+  // The same fix with what the motion detector needs: when it was taken, and
+  // the device's own speed reading where it has one. Kept alongside
+  // `location` rather than replacing it so the map, progress and the
+  // delivery gate carry on reading the simple shape.
+  fix: MotionFix | null;
   tracking: boolean;
   // Permission was CONFIRMED already granted before anything on this page
   // asked for it — i.e. the mount-time auto-resume (a returning user from an
@@ -55,6 +61,7 @@ const MAX_CONSECUTIVE_COARSE_FIXES = 2;
 
 export function useDeviceLocation(): DeviceLocationView {
   const [location, setLocation] = useState<GeoPoint | null>(null);
+  const [fix, setFix] = useState<MotionFix | null>(null);
   const [tracking, setTracking] = useState(false);
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +89,16 @@ export function useDeviceLocation(): DeviceLocationView {
         coarseStreakRef.current = 0;
         hasLocationRef.current = true;
         setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setFix({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          // The device's clock for the fix, not ours: what matters is when
+          // the position was TAKEN, which on a delayed fix is not now.
+          at: new Date(position.timestamp).toISOString(),
+          // Frequently null — a WiFi- or cell-derived fix carries no
+          // Doppler. The domain falls back to distance over time.
+          speedMps: position.coords.speed,
+        });
         setTracking(true);
         setError(null);
       },
@@ -141,5 +158,5 @@ export function useDeviceLocation(): DeviceLocationView {
     };
   }, []);
 
-  return { location, tracking, watching, error, requestLocation };
+  return { location, fix, tracking, watching, error, requestLocation };
 }

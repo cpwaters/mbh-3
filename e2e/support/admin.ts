@@ -304,3 +304,23 @@ export async function seedRoutePoint(
   });
   return jobId;
 }
+
+// A confirmed stop on whichever job a load became, written the way
+// recordMotion writes one.
+export async function seedStop(loadId: string, since: string): Promise<void> {
+  app();
+  const db = getFirestore();
+  const jobs = await db.collection('jobs').where('loadId', '==', loadId).get();
+  const jobDoc = jobs.docs[0];
+  if (jobDoc === undefined) throw new Error(`no job for load ${loadId}`);
+  const eventId = `evt-stop-${Date.now()}`;
+  await db.doc(`jobs/${jobDoc.id}/events/${eventId}`).set({
+    eventId,
+    jobId: jobDoc.id,
+    type: 'job.stopped',
+    at: new Date().toISOString(),
+    actorId: E2E.joblessUid,
+    source: 'member',
+    detail: { lat: 51.49, lng: -2.69, since },
+  });
+}

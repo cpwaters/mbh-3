@@ -1,24 +1,42 @@
-import { MapPin, RefreshCw } from 'lucide-react';
+import { MapPin, PauseCircle, RefreshCw } from 'lucide-react';
 import type { JobTrail } from '@mbh/provider-interfaces';
 
 // How old a fix has to be before the wording changes from "moving" to
 // something more careful. A breadcrumb lands roughly once a mile, so at
 // motorway speed that is about a minute; twenty minutes of nothing means
 // stopped, out of signal, or the app closed — and we cannot tell which.
-const STALE_MS = 20 * 60 * 1000;
+const MINUTE = 60_000;
+const STALE_MS = 20 * MINUTE;
 
 export function lastSeenLabel(lastSeenAt: string | null, now: number): string {
   if (lastSeenAt === null) return 'No position recorded yet';
   const ageMs = now - Date.parse(lastSeenAt);
   if (Number.isNaN(ageMs)) return 'No position recorded yet';
-  if (ageMs < 60_000) return 'Last seen just now';
+  if (ageMs < MINUTE) return 'Last seen just now';
 
-  const minutes = Math.floor(ageMs / 60_000);
+  const minutes = Math.floor(ageMs / MINUTE);
   if (minutes < 60) return `Last seen ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `Last seen ${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.floor(hours / 24);
   return `Last seen ${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+// How long a stop has been going, in the units a person would say it in.
+export function stoppedForLabel(stoppedSince: string, now: number): string {
+  const ms = now - Date.parse(stoppedSince);
+  if (Number.isNaN(ms) || ms < MINUTE) return 'Stopped';
+  const minutes = Math.floor(ms / MINUTE);
+  if (minutes < 60) return `Stopped for ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours < 24) {
+    return rest === 0
+      ? `Stopped for ${hours} hour${hours === 1 ? '' : 's'}`
+      : `Stopped for ${hours}h ${rest}m`;
+  }
+  const days = Math.floor(hours / 24);
+  return `Stopped for ${days} day${days === 1 ? '' : 's'}`;
 }
 
 export function isStale(lastSeenAt: string | null, now: number): boolean {
@@ -56,13 +74,25 @@ export function TrailStatus({
 
   const stale = isStale(trail.lastSeenAt, now);
   const none = trail.points.length === 0;
+  const stopped = trail.stoppedSince;
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className={`inline-flex items-center gap-1.5 text-sm ${stale ? 'text-amber-700' : 'text-green-700'}`}>
-        <MapPin className="w-4 h-4" />
-        {lastSeenLabel(trail.lastSeenAt, now)}
-      </span>
+      {stopped !== null ? (
+        // A stop is a fact the driver's device reported, so it is stated
+        // plainly rather than inferred from an absence of breadcrumbs.
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700">
+          <PauseCircle className="w-4 h-4" />
+          {stoppedForLabel(stopped, now)}
+        </span>
+      ) : (
+        <span className={`inline-flex items-center gap-1.5 text-sm ${stale ? 'text-amber-700' : 'text-green-700'}`}>
+          <MapPin className="w-4 h-4" />
+          {lastSeenLabel(trail.lastSeenAt, now)}
+        </span>
+      )}
+
+      {stopped !== null && <span className="text-sm text-gray-500">{lastSeenLabel(trail.lastSeenAt, now)}</span>}
 
       {none && (
         <span className="text-sm text-gray-500">
@@ -70,7 +100,7 @@ export function TrailStatus({
         </span>
       )}
 
-      {stale && !none && (
+      {stale && !none && stopped === null && (
         <span className="text-sm text-gray-500">
           This is where the load was, not necessarily where it is now.
         </span>

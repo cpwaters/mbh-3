@@ -6,6 +6,7 @@ import {
   getLoadStatus,
   seedInvite,
   seedRoutePoint,
+  seedStop,
   storageObjectExists,
 } from '../support/admin.js';
 
@@ -340,6 +341,21 @@ test('a shipper sees where their load actually got to, and when it was last seen
 
   // Not "live" — when it was last seen.
   await expect(matchedRow.getByText(/last seen/i)).toBeVisible();
+});
+
+test('a stopped load says so, instead of just going quiet', async ({ page }) => {
+  // Breadcrumbs are distance-triggered, so a parked vehicle produces none —
+  // the stop has to be stated or it looks like a driver who closed the app.
+  const since = new Date(Date.now() - 42 * 60 * 1000).toISOString();
+  await seedRoutePoint(E2E.browseLoadId, { lat: 51.49, lng: -2.69, at: since });
+  await seedStop(E2E.browseLoadId, since);
+
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'All Loads' }).click();
+  const matchedRow = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
+  await matchedRow.getByRole('button', { name: 'View Route' }).click();
+
+  await expect(matchedRow.getByText(/stopped for 42 minutes/i)).toBeVisible();
 });
 
 test('the active job is read from Firestore and shows its route', async ({ page }) => {
