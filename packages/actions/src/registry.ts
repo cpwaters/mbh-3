@@ -6,6 +6,7 @@ import { deliverJobHandler } from './actions/deliver-job.js';
 import { relistJobHandler } from './actions/relist-job.js';
 import { addVehicleHandler, retireVehicleHandler } from './actions/vehicles.js';
 import { setCompanyLogoHandler, clearCompanyLogoHandler } from './actions/company-logo.js';
+import { recordMotionHandler } from './actions/record-motion.js';
 import { updateProfileHandler } from './actions/update-profile.js';
 import { createTenantHandler } from './actions/create-tenant.js';
 import { createInviteHandler, revokeInviteHandler } from './actions/invites.js';
@@ -43,6 +44,7 @@ const HANDLERS: readonly AnyHandler[] = [
   archiveAddressBookEntryHandler,
   setCompanyLogoHandler,
   clearCompanyLogoHandler,
+  recordMotionHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -81,6 +83,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'revokeInvite',
   'setCompanyLogo',
   'clearCompanyLogo',
+  'recordMotion',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

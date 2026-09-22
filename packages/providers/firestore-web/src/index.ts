@@ -182,8 +182,23 @@ export class FirestoreReader
     );
 
     const points: TrailPoint[] = [];
+    // Newest first, so the FIRST motion event seen is the current state.
+    let stoppedSince: string | null = null;
+    let motionSeen = false;
     for (const e of events.docs) {
-      const data = e.data() as { type?: string; at?: string; detail?: { lat?: number; lng?: number } };
+      const data = e.data() as {
+        type?: string;
+        at?: string;
+        detail?: { lat?: number; lng?: number; since?: string };
+      };
+      if (data.type === 'job.stopped' || data.type === 'job.resumed') {
+        if (!motionSeen) {
+          motionSeen = true;
+          stoppedSince =
+            data.type === 'job.stopped' ? (data.detail?.since ?? data.at ?? null) : null;
+        }
+        continue;
+      }
       if (data.type !== 'job.routePoint') continue;
       const { lat, lng } = data.detail ?? {};
       if (typeof lat !== 'number' || typeof lng !== 'number' || typeof data.at !== 'string') continue;
@@ -195,6 +210,7 @@ export class FirestoreReader
       jobId: job.jobId,
       status: job.status,
       points,
+      stoppedSince,
       lastSeenAt: points.length > 0 ? (points[points.length - 1]?.at ?? null) : null,
     };
   }

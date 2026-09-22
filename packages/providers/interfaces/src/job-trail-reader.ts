@@ -18,6 +18,10 @@ export interface JobTrail {
   status: JobStatus;
   // Oldest first, so it draws as a path.
   points: TrailPoint[];
+  // Set while the load is stopped, with when the stop began. Cleared once it
+  // is moving again. A distance-triggered trail goes quiet when parked, so
+  // without this a stop is indistinguishable from a closed app.
+  stoppedSince: string | null;
   // When the most recent point was recorded, or null when there are none yet.
   // The UI shows this rather than implying the last point is live: a driver
   // out of signal, or with the app closed, leaves a position that is true but

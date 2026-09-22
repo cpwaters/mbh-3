@@ -10,6 +10,7 @@ import { useDeviceLocation } from './useDeviceLocation';
 import { useJobEndpoints } from './useJobEndpoints';
 import { useJobProgressSync } from './useJobProgressSync';
 import { useRouteTracking } from './useRouteTracking';
+import { useStopDetection } from './useStopDetection';
 import { useDrivingTimers } from './useDrivingTimers';
 import { haversineMeters, journeyProgress } from '../lib/progress';
 import Login from '../app/Login';
@@ -111,6 +112,10 @@ export default function DriverApp() {
   // Breadcrumbs the full laden route at ~1-mile intervals, through the same
   // offline queue a delivery capture uses.
   useRouteTracking(job, device.location, queue.enqueue);
+
+  // ...and says so when it stops, because a distance-triggered breadcrumb
+  // trail goes quiet when parked and silence reads the same as a closed app.
+  useStopDetection(job, device.fix, queue.enqueue);
 
   // HGV driving-hours/break countdowns — resolved once here (like device
   // location) so they survive navigating away from the Driving Time page.

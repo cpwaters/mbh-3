@@ -16,4 +16,5 @@ export * from './errors.js';
 export * from './evidence.js';
 export * from './invoice.js';
 export * from './company-logo.js';
+export * from './motion.js';
 export * from './brand.js';

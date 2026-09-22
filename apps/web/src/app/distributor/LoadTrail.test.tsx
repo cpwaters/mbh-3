@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { JobTrail } from '@mbh/provider-interfaces';
-import { TrailStatus, isStale, lastSeenLabel } from './LoadTrail';
+import { TrailStatus, isStale, lastSeenLabel, stoppedForLabel } from './LoadTrail';
 
 const NOW = Date.parse('2026-08-01T12:00:00.000Z');
 const ago = (ms: number): string => new Date(NOW - ms).toISOString();
@@ -10,7 +10,7 @@ const ago = (ms: number): string => new Date(NOW - ms).toISOString();
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
-function trailWith(lastSeenAt: string | null, pointCount = 3): JobTrail {
+function trailWith(lastSeenAt: string | null, pointCount = 3, stoppedSince: string | null = null): JobTrail {
   return {
     jobId: 'job-1',
     status: 'in_transit',
@@ -19,6 +19,7 @@ function trailWith(lastSeenAt: string | null, pointCount = 3): JobTrail {
       lng: -2,
       at: ago((pointCount - i) * MINUTE),
     })),
+    stoppedSince,
     lastSeenAt,
   };
 }
@@ -48,6 +49,17 @@ describe('isStale', () => {
   it('treats no fix, and an unparseable one, as stale', () => {
     expect(isStale(null, NOW)).toBe(true);
     expect(isStale('nonsense', NOW)).toBe(true);
+  });
+});
+
+describe('stoppedForLabel', () => {
+  it('reads in the units a person would use', () => {
+    expect(stoppedForLabel(ago(30_000), NOW)).toBe('Stopped');
+    expect(stoppedForLabel(ago(MINUTE), NOW)).toBe('Stopped for 1 minute');
+    expect(stoppedForLabel(ago(42 * MINUTE), NOW)).toBe('Stopped for 42 minutes');
+    expect(stoppedForLabel(ago(2 * HOUR), NOW)).toBe('Stopped for 2 hours');
+    expect(stoppedForLabel(ago(2 * HOUR + 15 * MINUTE), NOW)).toBe('Stopped for 2h 15m');
+    expect(stoppedForLabel(ago(30 * HOUR), NOW)).toBe('Stopped for 1 day');
   });
 });
 
@@ -90,6 +102,32 @@ describe('TrailStatus', () => {
     );
     expect(screen.getByText(/last seen 3 minutes ago/i)).toBeInTheDocument();
     expect(screen.getByText(/could not refresh/i)).toBeInTheDocument();
+  });
+
+  it('states a stop instead of leaving the shipper to infer it from silence', () => {
+    // The breadcrumb trigger is distance-based, so a parked vehicle produces
+    // no points at all. Without this, a stop looks exactly like a driver who
+    // closed the app.
+    render(
+      <TrailStatus
+        trail={trailWith(ago(40 * MINUTE), 3, ago(40 * MINUTE))}
+        loading={false}
+        error={null}
+        now={NOW}
+        onRefresh={noop}
+      />
+    );
+    expect(screen.getByText(/stopped for 40 minutes/i)).toBeInTheDocument();
+    // ...and does not also nag that the position is stale: the stop explains it.
+    expect(screen.queryByText(/not necessarily where it is now/i)).not.toBeInTheDocument();
+  });
+
+  it('goes back to last-seen once the load is moving again', () => {
+    render(
+      <TrailStatus trail={trailWith(ago(2 * MINUTE), 3, null)} loading={false} error={null} now={NOW} onRefresh={noop} />
+    );
+    expect(screen.queryByText(/stopped for/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/last seen 2 minutes ago/i)).toBeInTheDocument();
   });
 
   it('can be refreshed by hand', async () => {
