@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Truck, User, Clock, LogOut, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, User, Clock, LogOut, TrendingUp, ShieldCheck } from 'lucide-react';
 import { TenantSwitcher } from '../components/TenantSwitcher';
+import { isFounder } from '../lib/founder';
 import { useApp } from './context';
 
 // Ported from the mbh-2 prototype (client/src/components/Navigation.tsx):
@@ -63,6 +64,16 @@ export function Navigation() {
                 <div className="ml-1 lg:ml-2">
                   <TenantSwitcher tenants={app.tenants} selected={app.selected} onSelect={app.selectTenant} />
                 </div>
+              )}
+              {isFounder(app.auth.session) && (
+                <NavLink
+                  to="/admin"
+                  className="flex items-center gap-2 px-2 lg:px-3 py-2 rounded-lg font-medium text-indigo-700 hover:bg-indigo-50 transition-colors ml-1 lg:ml-2"
+                  title="Admin"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="hidden lg:inline">Admin</span>
+                </NavLink>
               )}
               <button
                 onClick={() => void app.auth.signOut()}

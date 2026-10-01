@@ -33,8 +33,9 @@ import Fleet from '../app/distributor/Fleet';
 import FleetImport from '../app/distributor/FleetImport';
 import Invites from '../app/Invites';
 import InviteLanding from '../app/InviteLanding';
-import { FounderBar } from '../app/FounderBar';
-import { isFounder } from '../lib/founder';
+import { AdminLayout } from '../app/admin/AdminLayout';
+import { AdminHome } from '../app/admin/AdminHome';
+import { AdminTools } from '../app/admin/AdminTools';
 
 function LoadingCard() {
   return (
@@ -173,7 +174,6 @@ export default function DriverApp() {
   if (!auth.ready) return <FullPageSpinner />;
 
   const loading = tenants.loading || jobLoading || listings.loading;
-  const founder = isFounder(auth.session);
 
   return (
     <AppProvider value={app}>
@@ -198,12 +198,23 @@ export default function DriverApp() {
             <FullPageSpinner />
           ) : (
             <>
-              {founder && <FounderBar />}
               <Routes>
                 {/* Founder previews (and direct sign-up links): full-screen, no app nav. */}
                 <Route path="/signup/carrier" element={<SignUp auth={auth} role="carrier" />} />
                 <Route path="/signup/shipper" element={<SignUp auth={auth} role="shipper" />} />
                 <Route path="/invite/:inviteId" element={<InviteLanding signedIn />} />
+
+                {/* The founder's back office: its own layout, not the product
+                    chrome. AdminLayout turns anyone else away; the server
+                    checks again on every action behind it. */}
+                <Route path="/admin" element={<AdminLayout />}>
+                  <Route index element={<AdminHome />} />
+                  <Route path="invites" element={<Invites />} />
+                  <Route path="tools" element={<AdminTools />} />
+                </Route>
+                {/* Invitations used to live here, linked from the founder bar.
+                    Kept as a redirect so an old bookmark still lands. */}
+                <Route path="/invites" element={<Navigate to="/admin/invites" replace />} />
                 <Route element={<AppLayout distributor={showDistributor} loading={loading} />}>
                   {showDistributor ? (
                     <>
@@ -215,7 +226,6 @@ export default function DriverApp() {
                       <Route path="/vehicles/add" element={<AddVehicle />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
-                      {founder && <Route path="/invites" element={<Invites />} />}
                     </>
                   ) : (
                     <>
@@ -227,7 +237,6 @@ export default function DriverApp() {
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
                       <Route path="/vehicles/add" element={<AddVehicle />} />
-                      {founder && <Route path="/invites" element={<Invites />} />}
                     </>
                   )}
                   <Route path="*" element={<Navigate to="/" replace />} />
