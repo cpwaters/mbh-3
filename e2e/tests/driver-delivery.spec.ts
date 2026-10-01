@@ -179,7 +179,9 @@ test('a driver keeps their page across a refresh too', async ({ page }) => {
 test('an invitation link lets exactly one company in', async ({ page }) => {
   // The founder mints a link.
   await signIn(page, E2E.founderEmail, E2E.founderPassword);
-  await page.getByRole('link', { name: 'Invitations' }).click();
+  await page.getByRole('link', { name: 'Admin' }).click();
+  // exact: the overview card links here too, and its name carries its blurb.
+  await page.getByRole('link', { name: 'Invitations', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Invitations' })).toBeVisible();
   await page.getByLabel('Who is this for?').fill('Pennine Transport');
   await page.getByRole('button', { name: 'New invitation' }).click();
@@ -563,21 +565,40 @@ test('a new user creates their company and lands on the dashboard', async ({ pag
   await expect(page.getByRole('heading', { name: 'All Loads' })).toBeVisible();
 });
 
-test('the founder sees a nav bar to home and the carrier/shipper sign-up pages', async ({ page }) => {
+test('the founder reaches a back office, and the app itself carries no founder chrome', async ({ page }) => {
   await signIn(page, E2E.founderEmail, E2E.founderPassword);
-  // The founder toolbar sits above the app nav.
-  await expect(page.getByText('Founder')).toBeVisible();
-  const carrier = page.getByRole('link', { name: 'Carrier sign-up' });
-  const shipper = page.getByRole('link', { name: 'Shipper sign-up' });
-  await expect(carrier).toBeVisible();
-  await expect(shipper).toBeVisible();
+
+  // The toolbar that used to sit across every screen is gone.
+  await expect(page.getByText('Founder', { exact: true })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Admin' }).click();
+  await expect(page.getByRole('heading', { name: 'MyBackHaul admin' })).toBeVisible();
   if (process.env.SHOT_PATH) await page.screenshot({ path: process.env.SHOT_PATH, fullPage: true });
 
-  // Each link opens its role-specific sign-up page.
-  await carrier.click();
+  // The sign-up previews live in there now.
+  await page.getByRole('link', { name: 'Carrier sign-up' }).click();
   await expect(page.getByText('Create your carrier account')).toBeVisible();
+
+  await page.goto('/app/admin');
   await page.getByRole('link', { name: 'Shipper sign-up' }).click();
   await expect(page.getByText('Create your shipper account')).toBeVisible();
+});
+
+test('the back office turns away anyone who is not the founder', async ({ page }) => {
+  // The UI gate is convenience — the server checks every action again — but
+  // an ordinary carrier typing the URL should simply land back in their app.
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  // Wait for the session to actually land before navigating: a goto here
+  // races Firebase writing it to IndexedDB and lands on /login instead,
+  // which would prove nothing about the gate.
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+  await page.goto('/app/admin');
+
+  await expect(page.getByRole('heading', { name: 'MyBackHaul admin' })).toHaveCount(0);
+  // Back in their own app: assert the landing rather than a heading, since
+  // which screen '/' is depends on what kind of company they are in.
+  await expect(page).toHaveURL(/\/app\/?$/);
+  await expect(page.getByRole('link', { name: 'Admin' })).toHaveCount(0);
 });
 
 test('the founder completes a job, returning its load to Available Loads', async ({ page }) => {
