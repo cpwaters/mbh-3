@@ -14,6 +14,7 @@
     { "path": "packages/providers/indexeddb" },
     { "path": "packages/providers/firestore" },
     { "path": "packages/providers/postcodes-io" },
+    { "path": "packages/providers/stripe" },
     { "path": "packages/providers/osrm" },
     { "path": "packages/providers/nodemailer" },
     { "path": "packages/providers/firebase-auth-web" },

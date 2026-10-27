@@ -35,6 +35,17 @@ const checks: Check[] = [
     },
   },
   {
+    name: 'POST /api/billing/webhook with a forged signature fails closed (400, or 503 before the secret exists)',
+    run: async () => {
+      const res = await fetch(`${BASE}/api/billing/webhook`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'stripe-signature': `t=${Math.floor(Date.now() / 1000)},v1=${'0'.repeat(64)}` },
+        body: JSON.stringify({ id: 'evt_smoke', type: 'customer.subscription.updated', created: 0, data: { object: {} } }),
+      });
+      assert(res.status === 400 || res.status === 503, `expected 400/503 (fail closed), got ${res.status}`);
+    },
+  },
+  {
     name: 'Landing page 200',
     run: async () => {
       const res = await fetch(`${BASE}/`);

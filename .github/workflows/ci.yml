@@ -117,6 +117,14 @@ jobs:
             echo "SMTP_USER=${{ secrets.SMTP_USER }}" >> functions/.env
             echo "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}" >> functions/.env
           fi
+      # The Stripe webhook signing secret (repo SECRET, same path as SMTP).
+      # Until it is set, POST /api/billing/webhook answers 503 to everything —
+      # the webhook fails closed rather than trusting unsigned bodies.
+      - run: |
+          if [ -n "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
+            echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> functions/.env
+            echo "dispatch -> Stripe webhook configured"
+          fi
       - run: pnpm exec firebase deploy --only functions,hosting,firestore --project mybackhaul-app --non-interactive
       - run: pnpm smoke:prod
         env:

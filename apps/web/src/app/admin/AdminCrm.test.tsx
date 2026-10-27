@@ -10,6 +10,7 @@ import { AdminCompany } from './AdminCompany';
 import { AdminPeople } from './AdminPeople';
 import { AdminLoads } from './AdminLoads';
 import { AdminActivity as ActivityPage } from './AdminActivity';
+import { AdminBilling } from './AdminBilling';
 import { marketplaceStats } from './AdminHome';
 import { AppProvider } from '../context';
 import { makeMockApp } from '../stories/mock';
@@ -90,6 +91,7 @@ vi.mock('../../lib/reader', () => ({
     adminLoads: async () => loads,
     adminJobs: async () => jobs,
     adminActivity: async () => activity,
+    billingConfig: async () => ({ enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} }),
   }),
 }));
 
@@ -121,6 +123,7 @@ function renderAt(path: string) {
             <Route path="people" element={<AdminPeople />} />
             <Route path="loads" element={<AdminLoads />} />
             <Route path="activity" element={<ActivityPage />} />
+            <Route path="billing" element={<AdminBilling />} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -251,5 +254,60 @@ describe('marketplaceStats', () => {
       deliveredThisMonth: 1,
       valueThisMonth: 50_000,
     });
+  });
+});
+
+describe('Billing (founder)', () => {
+  it('will not save a link that is not Stripe’s, and saves real ones through dispatch', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/billing');
+    const growth = await screen.findByRole('textbox', { name: 'Growth payment link' });
+
+    await user.type(growth, 'https://example.test/pay');
+    expect(screen.getByText(/Growth link is not a Stripe payment link/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save billing settings/i })).toBeDisabled();
+
+    await user.clear(growth);
+    await user.type(growth, 'https://buy.stripe.com/test_g');
+    await user.type(screen.getByRole('textbox', { name: 'Growth monthly price' }), '129');
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /save billing settings/i }));
+
+    await waitFor(() => expect(dispatched()).toHaveLength(1));
+    expect(dispatched()[0]).toMatchObject({
+      type: 'setBillingConfig',
+      payload: {
+        enforced: true,
+        paymentLinks: { starter: '', growth: 'https://buy.stripe.com/test_g', fleet: '' },
+        monthlyPricePence: { growth: 12900 },
+      },
+    });
+  });
+
+  it('lists shippers only, with the plan each is on', async () => {
+    renderAt('/admin/billing');
+    expect(await screen.findByText('Acme Foods')).toBeInTheDocument();
+    expect(screen.queryByText('Waters Haulage')).not.toBeInTheDocument();
+    expect(screen.getByText('No subscription')).toBeInTheDocument();
+  });
+
+  it('gives a shipper a plan free from its company page, with a reason', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/companies/acme');
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Plan to give' }), 'fleet');
+    await user.type(screen.getByRole('textbox', { name: 'Why' }), 'Pilot customer');
+    await user.click(screen.getByRole('button', { name: /give plan free/i }));
+    await waitFor(() =>
+      expect(dispatched()[0]).toMatchObject({
+        type: 'setCompanyPlan',
+        payload: { tenantId: 'acme', tier: 'fleet', note: 'Pilot customer' },
+      })
+    );
+  });
+
+  it('does not offer a plan to a carrier — carrying is free', async () => {
+    renderAt('/admin/companies/waters');
+    await screen.findByRole('button', { name: /suspend company/i });
+    expect(screen.queryByRole('combobox', { name: 'Plan to give' })).not.toBeInTheDocument();
   });
 });

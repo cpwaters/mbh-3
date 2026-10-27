@@ -606,6 +606,25 @@ Jobs, Activity (the audit log, newest first), Invitations, Tools.
   reinstateCompany (listings rebuilt), setMemberStatus, setMemberRole, and
   cancelLoad now lets the founder withdraw any company's available load.
 
+## Subscriptions (built — dormant until the founder provisions Stripe)
+
+See docs/adr/0004-subscriptions.md and docs/runbooks/billing.md.
+- domain/billing.ts: tiers (lookup keys `mbh_<tier>_monthly`), allowances
+  (Free 3 / Starter 25 / Growth 100 / Fleet unlimited loads a month),
+  effectiveTier (founder override > entitled Stripe status > free).
+- POST /api/billing/webhook → BillingWebhook (provider-stripe: HMAC verify +
+  wire/stripe.ts Zod map) → `recordBillingEvent` as a SYSTEM action
+  (ctx.source, set only by the boundary), idempotent on the Stripe event id;
+  503 with no STRIPE_WEBHOOK_SECRET; smoke:prod checks a forged signature
+  never gets a 2xx.
+- postLoad enforces the allowance only while `platformConfig/billing.enforced`
+  is on (founder switch in the back office).
+- Shipper Billing page (/app/billing): plan, usage, payment links with
+  client_reference_id, portal login link. Back office: Billing tab
+  (switchboard + every shipper's plan) and Plan on each company page.
+- `pnpm stripe:provision` (founder, own key) creates products/prices/links/
+  portal/webhook via REST; idempotent.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

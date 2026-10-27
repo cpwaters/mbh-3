@@ -12,7 +12,14 @@ export interface ActionContext {
   actorEmail: string | null;
   now: string; // ISO-8601 UTC, fixed for the whole dispatch
   newId(prefix: string): string;
+  // Who is acting: a signed-in member through POST /api/dispatch, or the
+  // system itself (a verified payment-provider webhook). Set by the boundary
+  // that called dispatch, never by anything in the request — so no member
+  // can claim to be the system.
+  source: ActionSource;
 }
+
+export type ActionSource = 'member' | 'system';
 
 // The value an action returns from a successful effect: the caller-visible
 // result (also stored in the idempotency marker) plus what to audit.
@@ -42,7 +49,7 @@ export function buildAuditOp(ctx: ActionContext, action: string, detail: DocData
       action,
       actorId: ctx.actorId,
       at: ctx.now,
-      source: 'member',
+      source: ctx.source,
       ...(detail ?? {}),
     },
   };

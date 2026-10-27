@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, LogOut, User, BookMarked, Truck, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, LogOut, User, BookMarked, Truck, ShieldCheck, CreditCard } from 'lucide-react';
 import { TenantSwitcher } from '../../components/TenantSwitcher';
 import { isFounder } from '../../lib/founder';
 import { useApp } from '../context';
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/create', label: 'Create Load', mobileLabel: 'Create', icon: PlusCircle },
   { path: '/addresses', label: 'Address Book', mobileLabel: 'Addresses', icon: BookMarked },
   { path: '/vehicles', label: 'Fleet', mobileLabel: 'Fleet', icon: Truck },
+  { path: '/billing', label: 'Billing', mobileLabel: 'Billing', icon: CreditCard },
 ];
 
 export default function DistributorNavigation() {

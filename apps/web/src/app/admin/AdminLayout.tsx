@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowLeft,
   Building2,
+  CreditCard,
   LayoutDashboard,
   LogOut,
   Package,
@@ -30,6 +31,7 @@ const tabs = [
   { to: '/admin/loads', label: 'Loads', icon: Package, end: false },
   { to: '/admin/jobs', label: 'Jobs', icon: RouteIcon, end: false },
   { to: '/admin/activity', label: 'Activity', icon: Activity, end: false },
+  { to: '/admin/billing', label: 'Billing', icon: CreditCard, end: false },
   { to: '/admin/invites', label: 'Invitations', icon: Ticket, end: false },
   { to: '/admin/tools', label: 'Tools', icon: Wrench, end: false },
 ];
