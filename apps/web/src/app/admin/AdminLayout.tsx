@@ -1,5 +1,17 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom';
-import { ArrowLeft, LayoutDashboard, LogOut, ShieldCheck, Ticket, Wrench } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  Building2,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Route as RouteIcon,
+  ShieldCheck,
+  Ticket,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useApp } from '../context';
 import { isFounder } from '../../lib/founder';
 
@@ -13,6 +25,11 @@ import { isFounder } from '../../lib/founder';
 // visit; it is not what stops a determined one — same split as lib/founder.ts.
 const tabs = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/companies', label: 'Companies', icon: Building2, end: false },
+  { to: '/admin/people', label: 'People', icon: Users, end: false },
+  { to: '/admin/loads', label: 'Loads', icon: Package, end: false },
+  { to: '/admin/jobs', label: 'Jobs', icon: RouteIcon, end: false },
+  { to: '/admin/activity', label: 'Activity', icon: Activity, end: false },
   { to: '/admin/invites', label: 'Invitations', icon: Ticket, end: false },
   { to: '/admin/tools', label: 'Tools', icon: Wrench, end: false },
 ];

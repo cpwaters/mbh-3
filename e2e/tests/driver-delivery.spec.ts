@@ -584,6 +584,28 @@ test('the founder reaches a back office, and the app itself carries no founder c
   await expect(page.getByText('Create your shipper account')).toBeVisible();
 });
 
+test('the back office reads the whole marketplace through the real rules', async ({ page }) => {
+  // The component tests stub the reader; this is the proof that the
+  // founder's cross-company list reads (tenants, the members collection
+  // group, profiles, loads, jobs, the audit feed) are actually allowed.
+  await signIn(page, E2E.founderEmail, E2E.founderPassword);
+  await page.getByRole('link', { name: 'Admin' }).click();
+
+  await page.getByRole('link', { name: 'Companies', exact: true }).click();
+  await expect(page.getByText('Waters Haulage').first()).toBeVisible();
+  await expect(page.getByText('Acme Distribution').first()).toBeVisible();
+
+  await page.getByText('Waters Haulage').first().click();
+  await expect(page.getByRole('heading', { name: 'Waters Haulage' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Suspend company' })).toBeVisible();
+
+  for (const tab of ['People', 'Loads', 'Jobs', 'Activity']) {
+    await page.getByRole('link', { name: tab, exact: true }).click();
+    await expect(page.getByRole('heading', { name: tab, exact: true })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  }
+});
+
 test('the back office turns away anyone who is not the founder', async ({ page }) => {
   // The UI gate is convenience — the server checks every action again — but
   // an ordinary carrier typing the URL should simply land back in their app.

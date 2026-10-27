@@ -6,6 +6,12 @@ import type { LoadRoute } from './geo.js';
 
 export type TenantCapability = 'shipper' | 'carrier';
 
+// A suspended company keeps its records and can still read them, but none of
+// its members can act and its available loads are withdrawn from the browse
+// until the founder reinstates it. Absent means active — every company
+// created before suspension existed is active.
+export type TenantStatus = 'active' | 'suspended';
+
 export interface Tenant {
   tenantId: string;
   name: string;
@@ -15,6 +21,11 @@ export interface Tenant {
   // sets one, in which case invoices carry the MyBackHaul mark instead.
   logoRef?: string;
   logoContentType?: string;
+  status?: TenantStatus;
+  // Why, as the founder wrote it — shown back to the company's members so a
+  // refused action explains itself. Kept after reinstatement as history.
+  suspendedReason?: string;
+  suspendedAt?: string;
 }
 
 export type Role = 'owner' | 'dispatcher' | 'driver';

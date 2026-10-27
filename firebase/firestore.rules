@@ -33,7 +33,9 @@ service cloud.firestore {
     // listing invitations; it needs an admin-side script to set, which is why
     // it is not the bar today.
     //
-    // This only widens READS. Every write still goes through dispatch.
+    // This only widens READS — the back office sees every company, load, job
+    // and audit entry so it can oversee the marketplace. Every write still
+    // goes through dispatch, where requireFounder applies the same test.
     function isFounder() {
       return isSignedIn()
         && request.auth.token.email.lower() == 'nvwebdevelopers@gmail.com';
@@ -60,18 +62,18 @@ service cloud.firestore {
 
     // Tenants + members: readable by active members of the same tenant.
     match /tenants/{tenantId} {
-      allow read: if isActiveMember(tenantId);
+      allow read: if isActiveMember(tenantId) || isFounder();
       allow write: if false;
 
       match /members/{actorId} {
-        allow read: if isActiveMember(tenantId);
+        allow read: if isActiveMember(tenantId) || isFounder();
         allow write: if false;
       }
 
       // A carrier's fleet: readable by active members of the tenant; only the
       // server writes it (via addVehicle / retireVehicle).
       match /vehicles/{vehicleId} {
-        allow read: if isActiveMember(tenantId);
+        allow read: if isActiveMember(tenantId) || isFounder();
         allow write: if false;
       }
 
@@ -80,7 +82,7 @@ service cloud.firestore {
       // writes it (via saveAddressBookEntry / updateAddressBookEntry /
       // archiveAddressBookEntry).
       match /addressBook/{entryId} {
-        allow read: if isActiveMember(tenantId);
+        allow read: if isActiveMember(tenantId) || isFounder();
         allow write: if false;
       }
     }
@@ -89,7 +91,7 @@ service cloud.firestore {
     // owning shipper tenant may read the raw load. Carriers browse the listing
     // projection below instead.
     match /loads/{loadId} {
-      allow read: if isActiveMember(resource.data.tenantId);
+      allow read: if isActiveMember(resource.data.tenantId) || isFounder();
       allow write: if false;
     }
 
@@ -109,11 +111,13 @@ service cloud.firestore {
     match /jobs/{jobId} {
       allow read: if resource.data.driverActorId == request.auth.uid
         || isActiveMember(resource.data.shipperTenantId)
-        || isActiveMember(resource.data.carrierTenantId);
+        || isActiveMember(resource.data.carrierTenantId)
+        || isFounder();
       allow write: if false;
 
       match /events/{eventId} {
-        allow read: if isActiveMember(jobData(jobId).shipperTenantId)
+        allow read: if isFounder()
+          || isActiveMember(jobData(jobId).shipperTenantId)
           || isActiveMember(jobData(jobId).carrierTenantId);
         allow write: if false;
       }
@@ -121,7 +125,8 @@ service cloud.firestore {
       // Evidence (Proof of Delivery, collection photos) — the legal
       // artifacts. Readable by both sides; never client-written.
       match /evidence/{evidenceId} {
-        allow read: if isActiveMember(jobData(jobId).shipperTenantId)
+        allow read: if isFounder()
+          || isActiveMember(jobData(jobId).shipperTenantId)
           || isActiveMember(jobData(jobId).carrierTenantId);
         allow write: if false;
       }
@@ -130,14 +135,16 @@ service cloud.firestore {
     // A user's own account profile: they read their own (doc id == their uid);
     // only the server writes it (via updateProfile).
     match /userProfiles/{actorId} {
-      allow read: if isSignedIn() && request.auth.uid == actorId;
+      allow read: if (isSignedIn() && request.auth.uid == actorId) || isFounder();
       allow write: if false;
     }
 
-    // Audit is the internal attribution log — server-reviewed only, never
-    // client-readable. (User-visible history is the job events above.)
+    // Audit is the internal attribution log — never readable by members.
+    // (Their history is the job events above.) The founder reads it as the
+    // back office's activity feed.
     match /audit/{auditId} {
-      allow read, write: if false;
+      allow read: if isFounder();
+      allow write: if false;
     }
 
     // Idempotency markers: never client-readable or writable.
@@ -164,7 +171,7 @@ service cloud.firestore {
     // id). Field-aligned with `actorId == uid` so the collection-group query is
     // authorized; writes stay server-only (denied above under /tenants).
     match /{path=**}/members/{memberId} {
-      allow read: if isSignedIn() && resource.data.actorId == request.auth.uid;
+      allow read: if (isSignedIn() && resource.data.actorId == request.auth.uid) || isFounder();
     }
 
     // Deny everything not explicitly allowed above.

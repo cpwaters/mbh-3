@@ -20,6 +20,12 @@ import {
   updateAddressBookEntryHandler,
 } from './actions/address-book.js';
 import { backfillCloseJobsHandler } from './actions/backfill-close-jobs.js';
+import {
+  reinstateCompanyHandler,
+  setMemberRoleHandler,
+  setMemberStatusHandler,
+  suspendCompanyHandler,
+} from './actions/founder-controls.js';
 
 // Every action the dispatch function can run. Adding an action means adding
 // it here — nothing else discovers handlers.
@@ -47,6 +53,10 @@ const HANDLERS: readonly AnyHandler[] = [
   clearCompanyLogoHandler,
   recordMotionHandler,
   setJobTrackingHandler,
+  suspendCompanyHandler,
+  reinstateCompanyHandler,
+  setMemberStatusHandler,
+  setMemberRoleHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -87,6 +97,10 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'clearCompanyLogo',
   'recordMotion',
   'setJobTracking',
+  'suspendCompany',
+  'reinstateCompany',
+  'setMemberStatus',
+  'setMemberRole',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

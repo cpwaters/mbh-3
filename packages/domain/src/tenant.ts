@@ -1,4 +1,4 @@
-import type { TenantCapability } from './entities.js';
+import type { Tenant, TenantCapability } from './entities.js';
 
 // Creating a company: what a valid setup requires. A company does at least one
 // of the two things the marketplace supports.
@@ -36,4 +36,14 @@ export function validateTenantSetup(input: TenantSetupInput): TenantSetupCheck {
     return { ok: false, field: 'capabilities', message: 'Choose at least one thing your company does.' };
   }
   return { ok: true };
+}
+
+// Absent status is active: suspension was added after companies existed.
+export function isTenantSuspended(tenant: Pick<Tenant, 'status'>): boolean {
+  return tenant.status === 'suspended';
+}
+
+export function isValidSuspensionReason(reason: string): boolean {
+  const r = reason.trim();
+  return r.length >= 3 && r.length <= 300;
 }

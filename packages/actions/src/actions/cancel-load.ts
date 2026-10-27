@@ -1,13 +1,15 @@
 import { z } from 'zod';
-import { AppError, canTransitionLoad, type Load, type LoadStatus, type Role } from '@mbh/domain';
+import { AppError, canTransitionLoad, isFounderEmail, type Load, type LoadStatus, type Role } from '@mbh/domain';
 import { listingDoc, loadDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
 import { zodParse } from '../parse.js';
 
-// A shipper cancels one of their own still-available loads. Roles allowed to
-// manage the shipper's loads.
+// A shipper cancels one of their own still-available loads — or the founder
+// withdraws any company's, from the back office (a duplicate, a test post, a
+// load that should not be on the marketplace). Roles allowed to manage the
+// shipper's loads.
 const CANCEL_ROLES: readonly Role[] = ['owner', 'dispatcher'];
 
 const cancelLoadSchema = z.object({
@@ -26,7 +28,12 @@ export const cancelLoadHandler: ActionHandler<CancelLoadPayload, CancelLoadResul
   idempotent: true,
   parse: zodParse(cancelLoadSchema),
   async execute(tx, ctx, payload) {
-    await requireMember(tx, payload.shipperTenantId, ctx.actorId, CANCEL_ROLES);
+    // The founder is not a member of the shipper and does not need to be; the
+    // ownership check below still applies, so the payload cannot name the
+    // wrong company.
+    if (!isFounderEmail(ctx.actorEmail)) {
+      await requireMember(tx, payload.shipperTenantId, ctx.actorId, CANCEL_ROLES);
+    }
 
     const data = await tx.get(loadDoc(payload.loadId));
     if (data === null) {

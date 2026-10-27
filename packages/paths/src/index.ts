@@ -27,6 +27,10 @@ export const COLLECTIONS = {
   userProfiles: 'userProfiles',
 } as const;
 
+export function tenantsCollection(): string {
+  return COLLECTIONS.tenants;
+}
+
 export function tenantDoc(tenantId: string): string {
   return `${COLLECTIONS.tenants}/${tenantId}`;
 }
@@ -97,6 +101,10 @@ export function jobEvidenceCollection(jobId: string): string {
 
 export function jobEvidenceDoc(jobId: string, evidenceId: string): string {
   return `${jobEvidenceCollection(jobId)}/${evidenceId}`;
+}
+
+export function auditCollection(): string {
+  return COLLECTIONS.audit;
 }
 
 export function auditDoc(auditId: string): string {

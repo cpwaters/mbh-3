@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidCapabilities, validateTenantSetup } from './tenant.js';
+import { isTenantSuspended, isValidCapabilities, isValidSuspensionReason, validateTenantSetup } from './tenant.js';
 
 describe('tenant setup', () => {
   it('accepts a named company with at least one capability', () => {
@@ -23,5 +23,19 @@ describe('tenant setup', () => {
       ok: false,
       field: 'capabilities',
     });
+  });
+});
+
+describe('tenant suspension', () => {
+  it('treats a company with no status as active, since most predate the field', () => {
+    expect(isTenantSuspended({})).toBe(false);
+    expect(isTenantSuspended({ status: 'active' })).toBe(false);
+    expect(isTenantSuspended({ status: 'suspended' })).toBe(true);
+  });
+
+  it('wants a reason a member could actually read', () => {
+    expect(isValidSuspensionReason('  ')).toBe(false);
+    expect(isValidSuspensionReason('Unpaid invoices')).toBe(true);
+    expect(isValidSuspensionReason('x'.repeat(301))).toBe(false);
   });
 });

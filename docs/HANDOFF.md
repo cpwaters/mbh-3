@@ -589,6 +589,23 @@ marked complete or reused.
   fulfilled" button appears directly on the affected load's card — scoped
   to just that one job (`backfillCloseJobs`'s optional `loadId`).
 
+## Founder back office — CRM (built)
+
+`/app/admin` (founder-gated in the UI, re-checked on every action):
+Overview (live counts), Companies (+ a page per company), People, Loads,
+Jobs, Activity (the audit log, newest first), Invitations, Tools.
+- Reads: `AdminReader` (provider-interfaces) implemented by FirestoreReader;
+  firestore.rules widen READS only with `|| isFounder()` on tenants, members
+  (incl. the collection group), vehicles, addressBook, loads, jobs, events,
+  evidence, userProfiles and audit. Rules tests cover each list read and
+  that writes stay denied. Lists are unordered + bounded (ADMIN_LIST_LIMIT)
+  and sorted in memory, so nothing needs a composite index.
+- Controls (all through dispatch, founder-only, audited): suspendCompany
+  (reason required; requireMember then refuses every member action; its
+  available listings are withdrawn; acceptLoad/relistJob respect it),
+  reinstateCompany (listings rebuilt), setMemberStatus, setMemberRole, and
+  cancelLoad now lets the founder withdraw any company's available load.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
