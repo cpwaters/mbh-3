@@ -6,11 +6,14 @@ delivery record, not the listing, as the product's legal core.
 
 ## 1. Who pays
 
-Distributors (shippers) pay; drivers ride free. Subscription tiers via
-Stripe (Starter / Growth / Fleet), tier derived from the Price id. No
-per-load commission in v1 — holding money in the flow drags in
-payment-institution compliance we don't want yet. A driver-side premium
-tier is a later option, not architecture.
+Every sign-up gets a 14-day free trial of the whole product. After it,
+both sides subscribe through Stripe: shippers on Starter / Growth / Fleet
+(how many loads they can post), and drivers on the Driver plan — priced
+well below the shipper plans, because a driver is an individual rather
+than a company (founder decision, October 2026, superseding "drivers ride
+free"; see ADR-0004). Tier is derived from the Price. No per-load commission
+in v1 — holding money in the flow drags in payment-institution compliance
+we don't want yet.
 
 ## 2. What job it does
 

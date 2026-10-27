@@ -1,4 +1,4 @@
-import { PLAN_LABELS, PLAN_LOOKUP_KEYS, PLAN_TIERS, type PlanTier } from '@mbh/domain';
+import { PLAN_LABELS, PLAN_LOOKUP_KEYS, PLAN_TIERS, SHIPPER_TIERS, type PlanTier } from '@mbh/domain';
 
 // Sets up Stripe for MyBackHaul through the REST API, not by clicking around
 // the dashboard (architecture.md, Payments): one product + monthly price per
@@ -58,6 +58,8 @@ export const DEFAULT_MONTHLY_PENCE: Record<PlanTier, number> = {
   starter: 4_900,
   growth: 12_900,
   fleet: 29_900,
+  // A person, not a company — priced well under the cheapest shipper plan.
+  driver: 999,
 };
 
 const WEBHOOK_EVENTS = [
@@ -168,7 +170,10 @@ export async function provision(stripe: StripeFetch, options: ProvisionOptions):
     'login_page[enabled]': 'true',
     'metadata[mbh]': 'portal',
   };
-  PLAN_TIERS.forEach((tier, i) => {
+  // Switching in the portal is between the shipper plans only: the Driver
+  // plan has nothing to switch to, and a driver should not be offered a
+  // shipper plan they do not need from a cancel-or-update-card screen.
+  SHIPPER_TIERS.forEach((tier, i) => {
     portalForm[`features[subscription_update][products][${i}][product]`] = products[tier];
     portalForm[`features[subscription_update][products][${i}][prices][0]`] = prices[tier];
   });
@@ -223,6 +228,7 @@ async function main(): Promise<void> {
     starter: penceFromEnv('STARTER_PENCE', DEFAULT_MONTHLY_PENCE.starter),
     growth: penceFromEnv('GROWTH_PENCE', DEFAULT_MONTHLY_PENCE.growth),
     fleet: penceFromEnv('FLEET_PENCE', DEFAULT_MONTHLY_PENCE.fleet),
+    driver: penceFromEnv('DRIVER_PENCE', DEFAULT_MONTHLY_PENCE.driver),
   };
 
   console.log(`Provisioning Stripe (${key.startsWith('sk_live_') || key.startsWith('rk_live_') ? 'LIVE' : 'test'} mode) for ${siteUrl}`);

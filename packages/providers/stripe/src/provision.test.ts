@@ -77,8 +77,9 @@ describe('provision', () => {
       'mbh_starter_monthly',
       'mbh_growth_monthly',
       'mbh_fleet_monthly',
+      'mbh_driver_monthly',
     ]);
-    expect(Object.values(result.paymentLinks)).toHaveLength(3);
+    expect(Object.values(result.paymentLinks)).toHaveLength(4);
     expect(result.portalUrl).toBe('https://billing.stripe.com/p/login/test_x');
     expect(store.webhooks[0]?.url).toBe('https://example.test/api/billing/webhook');
     expect(result.webhook).toMatchObject({ created: true, secret: 'whsec_fake' });
@@ -90,8 +91,8 @@ describe('provision', () => {
     const firstPosts = posts.length;
     const again = await provision(stripe, options);
 
-    expect(store.prices).toHaveLength(3);
-    expect(store.links).toHaveLength(3);
+    expect(store.prices).toHaveLength(4);
+    expect(store.links).toHaveLength(4);
     expect(store.webhooks).toHaveLength(1);
     // Only the two in-place updates (portal settings, webhook events) post again.
     expect(posts.slice(firstPosts)).toEqual([`/v1/billing_portal/configurations/${store.portals[0]?.id as string}`, `/v1/webhook_endpoints/${store.webhooks[0]?.id as string}`]);

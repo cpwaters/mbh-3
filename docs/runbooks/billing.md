@@ -12,10 +12,11 @@ Never put them in a chat, an issue, a commit or a file in the repo.
 ## 1. Set the prices (optional)
 
 The provisioning script creates these monthly GBP prices unless told
-otherwise: Starter £49, Growth £129, Fleet £299. **They are placeholders.**
-To use your own, set them in pence when you run step 2:
+otherwise: Starter £49, Growth £129, Fleet £299 for shippers, and Driver
+£9.99 for drivers. **They are placeholders.** To use your own, set them in
+pence when you run step 2:
 
-    STARTER_PENCE=3900 GROWTH_PENCE=9900 FLEET_PENCE=24900
+    STARTER_PENCE=3900 GROWTH_PENCE=9900 FLEET_PENCE=24900 DRIVER_PENCE=799
 
 A Stripe price's amount cannot change once created. To change a price later,
 create a new one in the dashboard and move its lookup key
@@ -55,9 +56,9 @@ Webhooks → the endpoint → Roll secret) and update the GitHub secret.
 
 ## 4. Paste the links into the back office
 
-In /app/admin → Billing, paste the three payment links and the portal link the
-script printed, along with the monthly prices to display. Save, leaving
-"Enforce plans" off.
+In /app/admin → Billing, paste the four payment links (three shipper plans
+and the Driver plan) and the portal link the script printed, along with the
+monthly prices to display. Save, leaving "Enforce plans" off.
 
 ## 5. Prove it end to end (test mode)
 
@@ -72,10 +73,17 @@ script printed, along with the monthly prices to display. Save, leaving
 
 ## 6. Enforce
 
-Tick "Enforce plans" in the back office and save. From then on a shipper past
-their monthly allowance (Free 3, Starter 25, Growth 100, Fleet unlimited) is
-told to upgrade when they post. To give a pilot customer a plan without
-payment, open their company page → Plan → "Give plan free".
+Tick "Enforce plans" in the back office and save. From then on:
+- Every company is free for 14 days from sign-up. Companies created before
+  trials existed count 14 days from when they were created, so most will
+  already be past it. Give any you want to keep a plan first (below).
+- After the trial, a shipper past its monthly allowance (Free 3, Starter 25,
+  Growth 100, Fleet unlimited) is told to upgrade when it posts.
+- After the trial, a driver needs the Driver plan to accept loads. Jobs
+  already accepted carry on regardless.
+
+To give a pilot customer a plan without payment, open their company page →
+Plan → "Give plan free".
 
 ## Going live
 

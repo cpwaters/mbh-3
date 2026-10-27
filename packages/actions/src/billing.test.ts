@@ -287,7 +287,7 @@ describe('setCompanyPlan', () => {
     );
   });
 
-  it('refuses a carrier-only company — carrying is free', async () => {
+  it('refuses a shipper plan for a carrier-only company', async () => {
     const h = await makeHarness();
     await expectAppError(
       h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'fleet' }, requestId: 'r-1' }),
@@ -300,5 +300,103 @@ describe('setCompanyPlan', () => {
     await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'shipper-1', tier: 'growth' }, requestId: 'r-1' });
     await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'shipper-1', tier: null }, requestId: 'r-2' });
     expect(await h.store.getDoc('tenants/shipper-1')).toMatchObject({ billing: { override: null } });
+  });
+});
+
+describe('the 14-day free trial', () => {
+  it('starts when a company is created', async () => {
+    const h = await makeHarness();
+    const { tenantId } = (await h.run('newcomer', {
+      type: 'createTenant',
+      payload: { name: 'New Haulage', capabilities: ['carrier'] },
+      requestId: 'r-create',
+    })) as { tenantId: string };
+    // FIXED_NOW is 2026-08-01T09:00Z.
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ trialEndsAt: '2026-08-15T09:00:00.000Z' });
+  });
+
+  it('lets a shipper in its trial post past the free allowance', async () => {
+    const h = await makeHarness();
+    await enforce(h);
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/shipper-1', data: { trialEndsAt: '2026-08-10T00:00:00.000Z' } },
+    ]);
+    for (let i = 0; i < 5; i += 1) await post(h, `r-${i}`);
+  });
+});
+
+describe('accepting loads after the trial', () => {
+  async function postedLoad(h: Harness): Promise<string> {
+    return ((await post(h, 'r-post')) as { loadId: string }).loadId;
+  }
+  const accept = (h: Harness, loadId: string) =>
+    h.run('driver-1', { type: 'acceptLoad', payload: { carrierTenantId: 'carrier-1', loadId }, requestId: 'r-accept' });
+
+  it('is open to anyone while plans are not enforced', async () => {
+    const h = await makeHarness();
+    await expect(accept(h, await postedLoad(h))).resolves.toBeTruthy();
+  });
+
+  it('is refused to a carrier whose trial has ended with no plan, saying how to fix it', async () => {
+    const h = await makeHarness();
+    const loadId = await postedLoad(h);
+    await enforce(h);
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/carrier-1', data: { trialEndsAt: '2026-07-31T00:00:00.000Z' } },
+    ]);
+    const err = await expectAppError(accept(h, loadId), 'forbidden');
+    expect(err.message).toMatch(/trial has ended.*Driver plan/);
+  });
+
+  it('is open in the trial, and on the Driver plan after it', async () => {
+    const h = await makeHarness();
+    const loadId = await postedLoad(h);
+    await enforce(h);
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/carrier-1', data: { trialEndsAt: '2026-08-10T00:00:00.000Z' } },
+    ]);
+    await expect(accept(h, loadId)).resolves.toBeTruthy();
+
+    const h2 = await makeHarness();
+    const loadId2 = await postedLoad(h2);
+    await enforce(h2);
+    await h2.store.runBatch([
+      {
+        kind: 'update',
+        path: 'tenants/carrier-1',
+        data: { billing: { tier: 'driver', status: 'active', override: null } },
+      },
+    ]);
+    await expect(accept(h2, loadId2)).resolves.toBeTruthy();
+  });
+
+  it('never stops a job already accepted from being collected', async () => {
+    const h = await makeHarness();
+    const loadId = await postedLoad(h);
+    const { jobId } = (await accept(h, loadId)) as { jobId: string };
+    await enforce(h);
+    await expect(
+      h.run('driver-1', { type: 'collectJob', payload: { carrierTenantId: 'carrier-1', jobId }, requestId: 'r-collect' })
+    ).resolves.toBeTruthy();
+  });
+});
+
+describe('setCompanyPlan fits the plan to the company', () => {
+  it('gives a carrier the Driver plan', async () => {
+    const h = await makeHarness();
+    await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'driver' }, requestId: 'r-1' });
+    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({ billing: { override: { tier: 'driver' } } });
+  });
+
+  it('refuses a shipper plan for a carrier-only company, and the Driver plan for a shipper-only one', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'fleet' }, requestId: 'r-1' }),
+      'conflict'
+    );
+    await expectAppError(
+      h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'shipper-1', tier: 'driver' }, requestId: 'r-2' }),
+      'conflict'
+    );
   });
 });

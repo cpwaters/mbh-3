@@ -640,6 +640,16 @@ for one driver at one carrier — back office, company page and People.
 - The driver app sends nothing on an untracked job and says so in place of
   the pause button; the shipper's trail says tracking is switched off.
 
+## Free trial + Driver plan (built — dormant until enforcement is on)
+
+ADR-0004 addendum. Every company gets 14 days (`trialEndsAt`, set in
+createTenant; older companies: createdAt + 14d). `effectivePlan`: override >
+entitled Stripe tier > trial > free. Driver tier (`mbh_driver_monthly`)
+gates acceptLoad after the trial (`requireAcceptPlan`); shipper tiers gate
+posting as before. Billing page is shared (/billing in both apps; drivers
+reach it from Profile on mobile). Back office Billing lists every company,
+and Plan offers only the tiers a company can use.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

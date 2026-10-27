@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AppError,
+  trialEndsAtFor,
   validateTenantSetup,
   type Member,
   type Tenant,
@@ -53,6 +54,8 @@ export const createTenantHandler: ActionHandler<CreateTenantPayload, CreateTenan
       name: payload.name.trim(),
       capabilities,
       createdAt: ctx.now,
+      // Every sign-up starts with the full product free for 14 days.
+      trialEndsAt: trialEndsAtFor(ctx.now),
     };
     const member: Member = {
       tenantId,

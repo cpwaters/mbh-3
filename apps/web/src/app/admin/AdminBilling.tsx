@@ -4,8 +4,10 @@ import {
   MONTHLY_LOAD_ALLOWANCE,
   PLAN_LABELS,
   PLAN_TIERS,
-  effectiveTier,
+  effectivePlan,
   formatGbp,
+  isShipperTier,
+  trialDaysLeft,
   isStripePaymentLink,
   isStripePortalUrl,
   monthStartUtc,
@@ -16,7 +18,7 @@ import {
 import { getReader } from '../../lib/reader';
 import { Pill, formatDay, useAdminAction, useAdminData, type AdminData } from './adminData';
 
-// The founder's billing switchboard and the plan every shipper is on.
+// The founder's billing switchboard and the plan every company is on.
 //
 // Everything here is public Stripe configuration — payment links, the portal
 // login page, display prices. The webhook signing secret is deliberately not
@@ -31,8 +33,8 @@ interface Form {
 }
 
 function toForm(config: BillingConfig): Form {
-  const links = { starter: '', growth: '', fleet: '' };
-  const prices = { starter: '', growth: '', fleet: '' };
+  const links: Record<PlanTier, string> = { starter: '', growth: '', fleet: '', driver: '' };
+  const prices: Record<PlanTier, string> = { starter: '', growth: '', fleet: '', driver: '' };
   for (const tier of PLAN_TIERS) {
     links[tier] = config.paymentLinks[tier] ?? '';
     const pence = config.monthlyPricePence[tier];
@@ -86,7 +88,13 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
             <span className="font-medium text-gray-800">
               {PLAN_LABELS[tier]}{' '}
               <span className="text-xs text-gray-500">
-                ({MONTHLY_LOAD_ALLOWANCE[tier] === null ? 'unlimited' : `${MONTHLY_LOAD_ALLOWANCE[tier]}/mo`})
+                (
+                {!isShipperTier(tier)
+                  ? 'accepts loads'
+                  : MONTHLY_LOAD_ALLOWANCE[tier] === null
+                    ? 'unlimited'
+                    : `${MONTHLY_LOAD_ALLOWANCE[tier]}/mo`}
+                )
               </span>
             </span>
             <input
@@ -165,6 +173,9 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
 export function PlanSource({ company }: { company: Tenant }) {
   const b = company.billing;
   if (b?.override) return <Pill className="bg-indigo-100 text-indigo-800">Given by you</Pill>;
+  if (b?.status === undefined && effectivePlan(company, new Date().toISOString()) === 'trial') {
+    return <Pill className="bg-sky-100 text-sky-800">Trial</Pill>;
+  }
   if (b?.status === undefined) return <Pill className="bg-gray-100 text-gray-600">No subscription</Pill>;
   const styles: Record<string, string> = {
     active: 'bg-emerald-100 text-emerald-800',
@@ -174,35 +185,39 @@ export function PlanSource({ company }: { company: Tenant }) {
   return <Pill className={styles[b.status] ?? 'bg-red-100 text-red-800'}>Stripe: {b.status.replace('_', ' ')}</Pill>;
 }
 
-function Shippers({ data }: { data: AdminData }) {
-  const monthStart = monthStartUtc(new Date().toISOString());
+function Companies({ data }: { data: AdminData }) {
+  const now = new Date().toISOString();
+  const monthStart = monthStartUtc(now);
   const rows = useMemo(
     () =>
-      data.companies
-        .filter((c) => c.capabilities.includes('shipper'))
+      [...data.companies]
         .map((company) => ({
           company,
-          tier: effectiveTier(company.billing),
+          tier: effectivePlan(company, now),
           posted: data.loads.filter((l) => l.tenantId === company.tenantId && (l.createdAt ?? '') >= monthStart).length,
         }))
         .sort((a, b) => a.company.name.localeCompare(b.company.name)),
-    [data, monthStart]
+    [data, now, monthStart]
   );
 
-  const paying = rows.filter((r) => r.company.billing?.override == null && r.tier !== 'free').length;
+  const paying = rows.filter(
+    (r) => r.company.billing?.override == null && r.tier !== 'free' && r.tier !== 'trial'
+  ).length;
+  const inTrial = rows.filter((r) => r.tier === 'trial').length;
 
   return (
     <section className="bg-white rounded-2xl shadow-md border border-gray-100">
       <div className="p-4">
-        <h3 className="text-lg font-bold text-gray-900">Shippers</h3>
+        <h3 className="text-lg font-bold text-gray-900">Companies</h3>
         <p className="text-sm text-gray-600">
-          {rows.length} shipper{rows.length === 1 ? '' : 's'} · {paying} paying through Stripe. Open one to give or take
-          away a plan.
+          {rows.length} compan{rows.length === 1 ? 'y' : 'ies'} · {paying} paying through Stripe · {inTrial} in their
+          free trial. Open one to give or take away a plan.
         </p>
       </div>
       <ul className="divide-y divide-gray-100">
         {rows.map(({ company, tier, posted }) => {
           const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
+          const ships = company.capabilities.includes('shipper');
           return (
             <li key={company.tenantId} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -213,16 +228,20 @@ function Shippers({ data }: { data: AdminData }) {
                   <span className="font-semibold text-gray-900">{PLAN_LABELS[tier]}</span>
                   <PlanSource company={company} />
                 </div>
-                {company.billing?.currentPeriodEnd !== undefined && company.billing.override == null && (
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {company.billing.cancelAtPeriodEnd ? 'Ends' : 'Renews'} {formatDay(company.billing.currentPeriodEnd)}
-                  </p>
-                )}
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {ships && company.capabilities.includes('carrier') ? 'Shipper and carrier' : ships ? 'Shipper' : 'Driver'}
+                  {tier === 'trial' && ` · trial ends in ${trialDaysLeft(company, now)} days`}
+                  {company.billing?.currentPeriodEnd !== undefined &&
+                    company.billing.override == null &&
+                    ` · ${company.billing.cancelAtPeriodEnd ? 'ends' : 'renews'} ${formatDay(company.billing.currentPeriodEnd)}`}
+                </p>
               </div>
-              <span className="text-sm text-gray-700 tabular-nums">
-                {posted}
-                {allowance !== null ? ` / ${allowance}` : ''} loads this month
-              </span>
+              {ships && (
+                <span className="text-sm text-gray-700 tabular-nums">
+                  {posted}
+                  {allowance !== null ? ` / ${allowance}` : ''} loads this month
+                </span>
+              )}
             </li>
           );
         })}
@@ -259,7 +278,7 @@ export function AdminBilling() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
         <p className="text-gray-600 mt-1">
-          Shippers pay; carrying is free.{' '}
+          Everyone gets a 14-day free trial; then shippers pay to post and drivers pay to accept.{' '}
           {config !== null &&
             (config.enforced ? (
               <strong className="text-emerald-700">Plans are enforced.</strong>
@@ -280,7 +299,7 @@ export function AdminBilling() {
       {/* Not re-keyed on save: the form already shows what was saved, and
           remounting it would throw away the "Saved." confirmation. */}
       {config !== null && <Switchboard config={config} onSaved={() => setVersion((v) => v + 1)} />}
-      {state.kind === 'ready' && <Shippers data={state.data} />}
+      {state.kind === 'ready' && <Companies data={state.data} />}
     </div>
   );
 }

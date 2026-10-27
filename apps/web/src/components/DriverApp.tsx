@@ -44,7 +44,7 @@ import { AdminLoads } from '../app/admin/AdminLoads';
 import { AdminJobs } from '../app/admin/AdminJobs';
 import { AdminActivity } from '../app/admin/AdminActivity';
 import { AdminBilling } from '../app/admin/AdminBilling';
-import Billing from '../app/distributor/Billing';
+import Billing from '../app/Billing';
 
 function LoadingCard() {
   return (
@@ -255,6 +255,7 @@ export default function DriverApp() {
                       <Route path="/map" element={<MapView />} />
                       <Route path="/driving" element={<DrivingTime />} />
                       <Route path="/earnings" element={<Earnings />} />
+                      <Route path="/billing" element={<Billing />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/profile/edit" element={<EditProfile />} />
                       <Route path="/vehicles/add" element={<AddVehicle />} />

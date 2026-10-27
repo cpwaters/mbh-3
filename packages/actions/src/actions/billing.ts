@@ -5,6 +5,7 @@ import {
   SUBSCRIPTION_STATUSES,
   isStripePaymentLink,
   isStripePortalUrl,
+  isShipperTier,
   type BillingEvent,
   type PlanTier,
   type SubscriptionStatus,
@@ -165,6 +166,8 @@ const setBillingConfigSchema = z.object({
     starter: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).'),
     growth: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).'),
     fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).'),
+    // Optional so a client saved before the Driver plan existed still parses.
+    driver: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
   }),
   portalUrl: httpsUrlOrEmpty(
     isStripePortalUrl,
@@ -174,6 +177,7 @@ const setBillingConfigSchema = z.object({
     starter: z.number().int().positive().max(1_000_000).optional(),
     growth: z.number().int().positive().max(1_000_000).optional(),
     fleet: z.number().int().positive().max(1_000_000).optional(),
+    driver: z.number().int().positive().max(1_000_000).optional(),
   }),
 });
 
@@ -193,7 +197,7 @@ export const setBillingConfigHandler: ActionHandler<SetBillingConfigPayload, Set
     requireFounder(ctx);
     // Switching enforcement on with nowhere to pay would lock shippers out
     // with no way back in.
-    const links = Object.values(payload.paymentLinks).filter((l) => l !== '');
+    const links = Object.values(payload.paymentLinks).filter((l) => l !== undefined && l !== '');
     if (payload.enforced && links.length === 0) {
       throw new AppError(
         'invalid-payload',
@@ -201,7 +205,9 @@ export const setBillingConfigHandler: ActionHandler<SetBillingConfigPayload, Set
         { field: 'enforced' }
       );
     }
-    const paymentLinks = Object.fromEntries(Object.entries(payload.paymentLinks).filter(([, l]) => l !== ''));
+    const paymentLinks = Object.fromEntries(
+      Object.entries(payload.paymentLinks).filter(([, l]) => l !== undefined && l !== '')
+    );
     const monthlyPricePence = Object.fromEntries(
       Object.entries(payload.monthlyPricePence).filter(([, p]) => p !== undefined)
     );
@@ -253,8 +259,21 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
   async execute(tx, ctx, payload) {
     requireFounder(ctx);
     const tenant = await readTenant(tx, payload.tenantId);
-    if (!tenant.capabilities.includes('shipper')) {
-      throw new AppError('conflict', 'Only shippers have plans — carrying loads is free.', { recoverable: false });
+    // A plan has to be one the company can use: shipper plans for a company
+    // that posts, the Driver plan for one that carries.
+    if (payload.tier !== null) {
+      const fits = isShipperTier(payload.tier)
+        ? tenant.capabilities.includes('shipper')
+        : tenant.capabilities.includes('carrier');
+      if (!fits) {
+        throw new AppError(
+          'conflict',
+          isShipperTier(payload.tier)
+            ? 'That company does not post loads, so a shipper plan would do nothing for it.'
+            : 'That company does not carry loads, so the Driver plan would do nothing for it.',
+          { recoverable: false }
+        );
+      }
     }
     const note = payload.note ?? '';
     const override = payload.tier === null ? null : { tier: payload.tier, note, setAt: ctx.now };
