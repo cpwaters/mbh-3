@@ -7,6 +7,7 @@ import {
   PLAN_LABELS,
   SHIPPER_TIERS,
   TRIAL_DAYS,
+  activeOverride,
   effectivePlan,
   formatGbp,
   isShipperTier,
@@ -87,6 +88,7 @@ export default function Billing() {
   const plan = state.kind === 'ready' ? state.plan : {};
   const billing = plan.billing;
   const tier = effectivePlan(plan, now);
+  const gift = activeOverride(billing, now);
   const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
   const tiers: PlanTier[] = [...(ships ? SHIPPER_TIERS : []), ...(carries ? DRIVER_TIERS : [])];
 
@@ -134,8 +136,12 @@ export default function Billing() {
                 <p className="text-sm text-gray-500">Your plan</p>
                 <p className="text-2xl font-bold text-gray-900">{PLAN_LABELS[tier]}</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  {billing?.override ? (
-                    <>Provided by MyBackHaul{billing.override.note ? ` — ${billing.override.note}` : ''}.</>
+                  {gift !== null ? (
+                    <>
+                      Provided by MyBackHaul
+                      {gift.expiresAt != null ? ` until ${formatDay(gift.expiresAt)}` : ''}
+                      {gift.note ? ` — ${gift.note}` : ''}.
+                    </>
                   ) : tier === 'trial' ? (
                     <>
                       Ends on {formatDay(trialEndsAt(plan))} — {trialDaysLeft(plan, now)} day

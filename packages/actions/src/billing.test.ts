@@ -400,3 +400,40 @@ describe('setCompanyPlan fits the plan to the company', () => {
     );
   });
 });
+
+describe('a free plan for a number of days', () => {
+  it('ends after the days given, and records when', async () => {
+    const h = await makeHarness();
+    await h.run(founder, {
+      type: 'setCompanyPlan',
+      payload: { tenantId: 'carrier-1', tier: 'driver', note: 'Trial extension', days: 7 },
+      requestId: 'r-1',
+    });
+    // FIXED_NOW is 2026-08-01T09:00Z.
+    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({
+      billing: { override: { tier: 'driver', expiresAt: '2026-08-08T09:00:00.000Z' } },
+    });
+  });
+
+  it('has no end date when none is chosen', async () => {
+    const h = await makeHarness();
+    await h.run(founder, {
+      type: 'setCompanyPlan',
+      payload: { tenantId: 'carrier-1', tier: 'driver', days: null },
+      requestId: 'r-1',
+    });
+    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({ billing: { override: { expiresAt: null } } });
+  });
+
+  it('refuses a length that is not offered', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run(founder, {
+        type: 'setCompanyPlan',
+        payload: { tenantId: 'carrier-1', tier: 'driver', days: 365 },
+        requestId: 'r-1',
+      }),
+      'invalid-payload'
+    );
+  });
+});

@@ -168,3 +168,18 @@ describe('the switches are the founder’s alone', () => {
     expect(await h.store.getDoc('tenants/carrier-1/members/nobody')).toBeNull();
   });
 });
+
+describe('a new account', () => {
+  it('starts with tracking off, so nobody is followed until the founder switches it on', async () => {
+    const h = await makeHarness();
+    const { tenantId } = (await h.run('newcomer', {
+      type: 'createTenant',
+      payload: { name: 'New Haulage', capabilities: ['carrier'] },
+      requestId: 'r-create',
+    })) as { tenantId: string };
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ trackingDisabled: true });
+
+    await companySwitch(h, tenantId, true, 'r-on');
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ trackingDisabled: false });
+  });
+});

@@ -10,6 +10,8 @@ import {
   monthStartUtc,
   paymentLinkFor,
   tierFromLookupKey,
+  activeOverride,
+  freePlanExpiry,
 } from './billing.js';
 
 const NOW = '2026-10-27T12:00:00.000Z';
@@ -123,5 +125,31 @@ describe('the Stripe edges', () => {
     expect(paymentLinkFor('https://buy.stripe.com/abc', 'tenant-1', null)).toBe(
       'https://buy.stripe.com/abc?client_reference_id=tenant-1'
     );
+  });
+});
+
+describe('a free plan with an end date', () => {
+  const setAt = '2026-10-20T12:00:00.000Z';
+  const given = (days: number | null) => ({
+    ...old,
+    billing: { override: { tier: 'driver' as const, note: '', setAt, expiresAt: freePlanExpiry(setAt, days) } },
+  });
+
+  it('lasts the days given, then the company falls back on its own', () => {
+    expect(freePlanExpiry(setAt, 7)).toBe('2026-10-27T12:00:00.000Z');
+    expect(effectivePlan(given(14), NOW)).toBe('driver');
+    expect(effectivePlan(given(7), '2026-10-27T11:59:59.000Z')).toBe('driver');
+    expect(effectivePlan(given(7), '2026-10-27T12:00:00.000Z')).toBe('free');
+  });
+
+  it('falls back to what the company pays for, not to nothing', () => {
+    const lapsed = { ...given(7), billing: { ...given(7).billing, tier: 'driver' as const, status: 'active' as const } };
+    expect(activeOverride(lapsed.billing, '2026-11-01T00:00:00.000Z')).toBeNull();
+    expect(effectivePlan(lapsed, '2026-11-01T00:00:00.000Z')).toBe('driver');
+  });
+
+  it('has no end when given with none, as before', () => {
+    expect(freePlanExpiry(setAt, null)).toBeNull();
+    expect(effectivePlan(given(null), '2030-01-01T00:00:00.000Z')).toBe('driver');
   });
 });

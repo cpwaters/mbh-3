@@ -100,11 +100,30 @@ export function isEntitledStatus(status: SubscriptionStatus | undefined): boolea
 }
 
 // The founder's hand on the scale: a plan given rather than bought (a pilot
-// customer, a partner). It outranks whatever Stripe says.
+// customer, a partner). It outranks whatever Stripe says while it lasts.
 export interface PlanOverride {
   tier: PlanTier;
   note: string;
   setAt: string;
+  // When the free plan ends. Absent or null: until the founder removes it.
+  expiresAt?: string | null;
+}
+
+// How long the founder can give a plan for, in days. null = no end date.
+export const FREE_PLAN_DAYS: readonly (number | null)[] = [7, 14, 30, null];
+
+export function freePlanExpiry(setAtIso: string, days: number | null): string | null {
+  return days === null ? null : new Date(Date.parse(setAtIso) + days * 86_400_000).toISOString();
+}
+
+// The override in force now, or null if there is none or it has run out —
+// at which point the company falls back to what it pays for (or its trial,
+// or free) without anyone having to remove it.
+export function activeOverride(billing: TenantBilling | undefined, nowIso: string): PlanOverride | null {
+  const override = billing?.override ?? null;
+  if (override === null) return null;
+  if (override.expiresAt != null && nowIso >= override.expiresAt) return null;
+  return override;
 }
 
 // Held on the tenant doc as `billing`, so members read their own plan with
@@ -139,7 +158,8 @@ export function trialEndsAtFor(createdAtIso: string): string {
 // subscription Stripe says is good, the free trial, then free.
 export function effectivePlan(tenant: PlanSubject, nowIso: string): EffectiveTier {
   const billing = tenant.billing;
-  if (billing?.override !== undefined && billing.override !== null) return billing.override.tier;
+  const override = activeOverride(billing, nowIso);
+  if (override !== null) return override.tier;
   if (billing?.tier !== undefined && billing.tier !== null && isEntitledStatus(billing.status)) return billing.tier;
   const trialEnd = trialEndsAt(tenant);
   if (trialEnd !== null && nowIso < trialEnd) return 'trial';

@@ -83,7 +83,9 @@ Tick "Enforce plans" in the back office and save. From then on:
   already accepted carry on regardless.
 
 To give a pilot customer a plan without payment, open their company page →
-Plan → "Give plan free".
+Plan, choose the plan and how long (7, 14 or 30 days, or no end date), then
+"Give plan free". When it runs out, the company falls back to whatever it
+pays for, or to its trial or free.
 
 ## Going live
 
