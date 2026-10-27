@@ -29,6 +29,9 @@ import {
   type Vehicle,
   type AddressBookEntry,
   type Invite,
+  type Job,
+  type Member,
+  type Tenant,
 } from '@mbh/domain';
 import {
   jobEventsCollection,
@@ -43,7 +46,16 @@ import {
   addressBookCollection,
   inviteDoc,
   invitesCollection,
+  auditCollection,
+  tenantsCollection,
+  userProfilesCollection,
 } from '@mbh/paths';
+import {
+  ADMIN_LIST_LIMIT,
+  type AdminActivity,
+  type AdminPerson,
+  type AdminReader,
+} from '@mbh/provider-interfaces';
 import type {
   AddressBookReader,
   InviteReader,
@@ -116,7 +128,8 @@ export class FirestoreReader
     ShipperLoadReader,
     OutboxTaskReader,
     AddressBookReader,
-    InviteReader
+    InviteReader,
+    AdminReader
 {
   private readonly db: Firestore;
 
@@ -374,5 +387,60 @@ export class FirestoreReader
     if (!snap.exists()) return null;
     const data = snap.data() as { status: TestEmailTaskView['status']; lastError?: string };
     return { status: data.status, ...(data.lastError !== undefined ? { lastError: data.lastError } : {}) };
+  }
+
+  // ── The founder's back office ─────────────────────────────────────────────
+  // Every read below is authorized by isFounder() in the rules and refused to
+  // anyone else. No orderBy except on audit (single-field, auto-indexed):
+  // sorting happens in memory, so nothing here waits on a composite index.
+
+  async adminCompanies(): Promise<Tenant[]> {
+    const snap = await getDocs(query(collection(this.db, tenantsCollection()), limit(ADMIN_LIST_LIMIT)));
+    return snap.docs.map((d) => ({ ...(d.data() as Tenant), tenantId: d.id }));
+  }
+
+  async adminMembers(): Promise<Member[]> {
+    const snap = await getDocs(
+      query(collectionGroup(this.db, MEMBERS_SUBCOLLECTION), limit(ADMIN_LIST_LIMIT))
+    );
+    return snap.docs.map((d) => d.data() as Member);
+  }
+
+  async adminPeople(): Promise<AdminPerson[]> {
+    const snap = await getDocs(query(collection(this.db, userProfilesCollection()), limit(ADMIN_LIST_LIMIT)));
+    return snap.docs.map((d) => {
+      const p = d.data() as Partial<UserProfile> & { phone?: string };
+      return {
+        actorId: d.id,
+        displayName: p.displayName ?? '',
+        email: p.email ?? '',
+        phone: p.companyContact?.phone ?? p.phone ?? '',
+      };
+    });
+  }
+
+  async adminLoads(): Promise<Load[]> {
+    const snap = await getDocs(query(collection(this.db, loadsCollection()), limit(ADMIN_LIST_LIMIT)));
+    return snap.docs.map((d) => d.data() as Load);
+  }
+
+  async adminJobs(): Promise<Job[]> {
+    const snap = await getDocs(query(collection(this.db, jobsCollection()), limit(ADMIN_LIST_LIMIT)));
+    return snap.docs.map((d) => d.data() as Job);
+  }
+
+  async adminActivity(max: number): Promise<AdminActivity[]> {
+    const snap = await getDocs(query(collection(this.db, auditCollection()), orderBy('at', 'desc'), limit(max)));
+    return snap.docs.map((d) => {
+      const { auditId, action, actorId, at, source, ...detail } = d.data() as Record<string, unknown>;
+      return {
+        auditId: typeof auditId === 'string' ? auditId : d.id,
+        action: String(action ?? ''),
+        actorId: String(actorId ?? ''),
+        at: String(at ?? ''),
+        source: String(source ?? ''),
+        detail,
+      };
+    });
   }
 }

@@ -261,8 +261,8 @@ describe('jobs + events (shared cross-tenant record)', () => {
   });
 });
 
-describe('audit + request markers (never client-readable)', () => {
-  it('no one reads audit', async () => {
+describe('audit + request markers (never member-readable)', () => {
+  it('no member reads audit', async () => {
     await assertFails(getDoc(doc(db(SHIP_OWNER), 'audit/audit-1')));
     await assertFails(getDoc(doc(db(CAR_DRIVER), 'audit/audit-1')));
   });
@@ -378,5 +378,54 @@ describe('a load owner following their load', () => {
 
   it('a disabled member of the shipper cannot follow it either', async () => {
     await assertFails(getDocs(query(collection(db(DISABLED), 'jobs/job-1/events'), orderBy('at', 'desc'))));
+  });
+});
+
+// The back office oversees the whole marketplace, so the founder reads across
+// every company. Each read is one the back office actually makes — a list,
+// not just a get — because list rules are where a widening usually fails.
+describe('the founder’s back office reads', () => {
+  it('lists every company and every member, across tenants', async () => {
+    await assertSucceeds(getDocs(collection(founderDb(), 'tenants')));
+    await assertSucceeds(getDocs(collectionGroup(founderDb(), 'members')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'tenants/carrier-1/members')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'tenants/carrier-1/vehicles')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'tenants/shipper-1/addressBook')));
+  });
+
+  it('lists every load and job, and follows a job’s events and evidence', async () => {
+    await assertSucceeds(getDocs(collection(founderDb(), 'loads')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'jobs')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'jobs/job-1/events')));
+    await assertSucceeds(getDocs(collection(founderDb(), 'jobs/job-1/evidence')));
+  });
+
+  it('lists user profiles, to put names and emails to members', async () => {
+    await assertSucceeds(getDocs(collection(founderDb(), 'userProfiles')));
+  });
+
+  it('reads the audit log newest first, as the activity feed does', async () => {
+    await assertSucceeds(getDocs(query(collection(founderDb(), 'audit'), orderBy('at', 'desc'), limit(200))));
+  });
+
+  it('still cannot read idempotency markers or the drain’s work', async () => {
+    await assertFails(getDoc(doc(founderDb(), 'requests/req-1')));
+    await assertFails(getDoc(doc(founderDb(), 'outbox/task-1')));
+  });
+
+  it('writes nothing directly — every change goes through dispatch', async () => {
+    await assertFails(setDoc(doc(founderDb(), 'tenants/shipper-1'), { status: 'suspended' }));
+    await assertFails(setDoc(doc(founderDb(), 'tenants/shipper-1/members/ship-owner'), { status: 'disabled' }));
+    await assertFails(setDoc(doc(founderDb(), 'loads/load-1'), { status: 'cancelled' }));
+    await assertFails(setDoc(doc(founderDb(), 'audit/audit-x'), { action: 'forged' }));
+  });
+
+  it('does not extend to a lookalike address, or to an ordinary member', async () => {
+    await assertFails(getDocs(collection(founderDb('nvwebdevelopers@gmail.com.attacker.test'), 'tenants')));
+    await assertFails(getDocs(collection(db(SHIP_OWNER), 'tenants')));
+    await assertFails(getDocs(collection(db(SHIP_OWNER), 'loads')));
+    await assertFails(getDocs(collection(db(SHIP_OWNER), 'userProfiles')));
+    await assertFails(getDocs(collectionGroup(db(SHIP_OWNER), 'members')));
+    await assertFails(getDocs(query(collection(db(SHIP_OWNER), 'audit'), orderBy('at', 'desc'), limit(10))));
   });
 });

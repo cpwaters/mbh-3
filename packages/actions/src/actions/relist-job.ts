@@ -3,11 +3,13 @@ import {
   AppError,
   canTransitionLoad,
   isActiveJobStatus,
+  isTenantSuspended,
   listingFromLoad,
   type JobEvent,
   type Load,
+  type Tenant,
 } from '@mbh/domain';
-import { jobDoc, jobEventDoc, listingDoc, loadDoc } from '@mbh/paths';
+import { jobDoc, jobEventDoc, listingDoc, loadDoc, tenantDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { loadJobForDriver } from '../job-access.js';
@@ -52,11 +54,18 @@ export const relistJobHandler: ActionHandler<RelistJobPayload, RelistJobResult> 
       });
     }
     const relisted: Load = { ...load, status: 'available' };
+    // A suspended shipper's loads are withdrawn from the browse; this one goes
+    // back to available but stays hidden until the company is reinstated,
+    // which re-creates the listing then.
+    const shipper = (await tx.get(tenantDoc(load.tenantId))) as unknown as Tenant | null;
+    const shipperSuspended = shipper !== null && isTenantSuspended(shipper);
 
     // Load back to available + re-create the carrier browse projection (accept
     // had deleted it) + drop the job, all in one batch.
     tx.write({ kind: 'update', path: loadDoc(load.loadId), data: { status: 'available' } });
-    tx.write({ kind: 'create', path: listingDoc(load.loadId), data: { ...listingFromLoad(relisted) } });
+    if (!shipperSuspended) {
+      tx.write({ kind: 'create', path: listingDoc(load.loadId), data: { ...listingFromLoad(relisted) } });
+    }
     tx.write({ kind: 'delete', path: jobDoc(job.jobId) });
 
     const eventId = ctx.newId('evt');

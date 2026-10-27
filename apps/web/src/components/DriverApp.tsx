@@ -36,6 +36,12 @@ import InviteLanding from '../app/InviteLanding';
 import { AdminLayout } from '../app/admin/AdminLayout';
 import { AdminHome } from '../app/admin/AdminHome';
 import { AdminTools } from '../app/admin/AdminTools';
+import { AdminCompanies } from '../app/admin/AdminCompanies';
+import { AdminCompany } from '../app/admin/AdminCompany';
+import { AdminPeople } from '../app/admin/AdminPeople';
+import { AdminLoads } from '../app/admin/AdminLoads';
+import { AdminJobs } from '../app/admin/AdminJobs';
+import { AdminActivity } from '../app/admin/AdminActivity';
 
 function LoadingCard() {
   return (
@@ -209,6 +215,12 @@ export default function DriverApp() {
                     checks again on every action behind it. */}
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminHome />} />
+                  <Route path="companies" element={<AdminCompanies />} />
+                  <Route path="companies/:tenantId" element={<AdminCompany />} />
+                  <Route path="people" element={<AdminPeople />} />
+                  <Route path="loads" element={<AdminLoads />} />
+                  <Route path="jobs" element={<AdminJobs />} />
+                  <Route path="activity" element={<AdminActivity />} />
                   <Route path="invites" element={<Invites />} />
                   <Route path="tools" element={<AdminTools />} />
                 </Route>

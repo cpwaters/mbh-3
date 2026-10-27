@@ -3,14 +3,16 @@ import {
   AppError,
   canTransitionLoad,
   isActiveJobStatus,
+  isTenantSuspended,
   type Job,
   type JobEvent,
   type JobStatus,
   type Load,
   type LoadStatus,
   type Role,
+  type Tenant,
 } from '@mbh/domain';
-import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc } from '@mbh/paths';
+import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc, tenantDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
@@ -49,6 +51,12 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
     const load = loadData as unknown as Load;
     if (load.status !== ('available' satisfies LoadStatus) || !canTransitionLoad(load.status, 'matched')) {
       throw new AppError('conflict', 'That load has already been taken.', { recoverable: false });
+    }
+    // Suspending a shipper withdraws its listings, but a carrier holding a
+    // stale browse could still try — the load is not on offer, so say so.
+    const shipper = (await tx.get(tenantDoc(load.tenantId))) as unknown as Tenant | null;
+    if (shipper !== null && isTenantSuspended(shipper)) {
+      throw new AppError('conflict', 'That load is no longer available.', { recoverable: false });
     }
 
     // One active job per driver — checked against committed state in the tx.
