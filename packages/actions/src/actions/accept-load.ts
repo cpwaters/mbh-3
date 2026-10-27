@@ -18,6 +18,7 @@ import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
 import { requireTenantCapability } from '../require-capability.js';
+import { requireAcceptPlan } from '../require-plan.js';
 import { zodParse } from '../parse.js';
 
 // Carriers accept loads. Roles allowed to accept.
@@ -44,6 +45,7 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
   async execute(tx, ctx, payload) {
     const driver = await requireMember(tx, payload.carrierTenantId, ctx.actorId, ACCEPT_ROLES);
     const carrier = await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
+    await requireAcceptPlan(tx, carrier, ctx.now);
 
     const loadData = await tx.get(loadDoc(payload.loadId));
     if (loadData === null) {

@@ -144,6 +144,16 @@ export default function Profile() {
                 >
                   Edit Profile
                 </button>
+                {/* On a phone the tab bar has no room for Billing, so the
+                    way to the plan and trial is from here. */}
+                {tenantId !== null && (
+                  <button
+                    onClick={() => navigate('/billing')}
+                    className="w-full border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Plan &amp; billing
+                  </button>
+                )}
                 {tenantId !== null && (
                   <div className="w-full">
                     <button

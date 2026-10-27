@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Truck, User, Clock, LogOut, TrendingUp, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, User, Clock, LogOut, TrendingUp, ShieldCheck, CreditCard } from 'lucide-react';
 import { TenantSwitcher } from '../components/TenantSwitcher';
 import { isFounder } from '../lib/founder';
 import { useApp } from './context';
@@ -8,14 +8,25 @@ import { useApp } from './context';
 // desktop top-bar pills + Logout; mobile bottom tab bar. Wired to mbh-3's app
 // context (sign-out + the tenant switcher, shown only for multi-tenant users
 // so the single-tenant look stays exactly like the prototype).
-const navItems = [
+const navItems: {
+  path: string;
+  label: string;
+  mobileLabel: string;
+  icon: typeof LayoutDashboard;
+  desktopOnly?: boolean;
+}[] = [
   { path: '/', label: 'Dashboard', mobileLabel: 'Home', icon: LayoutDashboard },
   { path: '/active', label: 'Active Jobs', mobileLabel: 'Jobs', icon: Truck },
   { path: '/map', label: 'Map', mobileLabel: 'Map', icon: Map },
   { path: '/driving', label: 'Driving Time', mobileLabel: 'Time', icon: Clock },
   { path: '/earnings', label: 'Earnings', mobileLabel: 'Earn', icon: TrendingUp },
+  // Desktop only: six tabs already fill a phone's bottom bar, so on mobile
+  // Billing is reached from Profile instead.
+  { path: '/billing', label: 'Billing', mobileLabel: 'Billing', icon: CreditCard, desktopOnly: true },
   { path: '/profile', label: 'Profile', mobileLabel: 'Profile', icon: User },
 ];
+
+const mobileItems = navItems.filter((item) => item.desktopOnly !== true);
 
 export function Navigation() {
   const app = useApp();
@@ -93,8 +104,8 @@ export function Navigation() {
         className="lg:hidden fixed bottom-0 inset-x-0 z-[1100] bg-white border-t border-gray-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
-          {navItems.map((item) => {
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${mobileItems.length}, minmax(0, 1fr))` }}>
+          {mobileItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

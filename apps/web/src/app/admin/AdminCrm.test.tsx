@@ -284,11 +284,12 @@ describe('Billing (founder)', () => {
     });
   });
 
-  it('lists shippers only, with the plan each is on', async () => {
+  it('lists every company with its plan, drivers included', async () => {
     renderAt('/admin/billing');
     expect(await screen.findByText('Acme Foods')).toBeInTheDocument();
-    expect(screen.queryByText('Waters Haulage')).not.toBeInTheDocument();
-    expect(screen.getByText('No subscription')).toBeInTheDocument();
+    expect(screen.getByText('Waters Haulage')).toBeInTheDocument();
+    // Fixtures signed up in September, so their trials are long over.
+    expect(screen.getAllByText('No subscription').length).toBeGreaterThan(0);
   });
 
   it('gives a shipper a plan free from its company page, with a reason', async () => {
@@ -305,10 +306,11 @@ describe('Billing (founder)', () => {
     );
   });
 
-  it('does not offer a plan to a carrier — carrying is free', async () => {
+  it('offers a carrier the Driver plan, and only that', async () => {
     renderAt('/admin/companies/waters');
-    await screen.findByRole('button', { name: /suspend company/i });
-    expect(screen.queryByRole('combobox', { name: 'Plan to give' })).not.toBeInTheDocument();
+    const select = await screen.findByRole('combobox', { name: 'Plan to give' });
+    const options = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toEqual(['driver']);
   });
 });
 

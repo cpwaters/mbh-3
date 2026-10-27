@@ -4,8 +4,10 @@ import { ArrowLeft, Eye, EyeOff, PauseCircle, PlayCircle } from 'lucide-react';
 import {
   PLAN_LABELS,
   PLAN_TIERS,
-  effectiveTier,
+  effectivePlan,
+  isShipperTier,
   isTenantSuspended,
+  trialDaysLeft,
   isValidSuspensionReason,
   type PlanTier,
   type Tenant,
@@ -128,14 +130,20 @@ function Standing({ company, data, onChanged }: { company: Tenant; data: AdminDa
   );
 }
 
-// A shipper's plan, and the founder's override: give a plan without payment
-// (a pilot customer) or take that back, leaving whatever Stripe says.
+// A company's plan, and the founder's override: give a plan without payment
+// (a pilot customer) or take that back, leaving whatever Stripe says. Only
+// the plans the company can use are offered — shipper plans to a company
+// that posts, the Driver plan to one that carries.
 function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }) {
   const { run, busy, error } = useAdminAction(onChanged);
   const override = company.billing?.override ?? null;
-  const [tier, setTier] = useState<PlanTier>(override?.tier ?? 'growth');
+  const options = PLAN_TIERS.filter((t) =>
+    isShipperTier(t) ? company.capabilities.includes('shipper') : company.capabilities.includes('carrier')
+  );
+  const [tier, setTier] = useState<PlanTier>(override?.tier ?? options[0] ?? 'driver');
   const [note, setNote] = useState('');
-  const effective = effectiveTier(company.billing);
+  const now = new Date().toISOString();
+  const effective = effectivePlan(company, now);
 
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 space-y-3">
@@ -143,6 +151,9 @@ function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }
         <h3 className="font-bold text-gray-900">Plan</h3>
         <span className="font-semibold text-gray-900">{PLAN_LABELS[effective]}</span>
         <PlanSource company={company} />
+        {effective === 'trial' && (
+          <span className="text-sm text-gray-600">ends in {trialDaysLeft(company, now)} days</span>
+        )}
       </div>
       {override !== null ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -167,7 +178,7 @@ function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }
             onChange={(e) => setTier(e.target.value as PlanTier)}
             className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
           >
-            {PLAN_TIERS.map((t) => (
+            {options.map((t) => (
               <option key={t} value={t}>
                 {PLAN_LABELS[t]}
               </option>
@@ -276,7 +287,7 @@ function Company({ company, data, reload }: { company: Tenant; data: AdminData; 
 
       <Standing company={company} data={data} onChanged={reload} />
 
-      {company.capabilities.includes('shipper') && <Plan company={company} onChanged={reload} />}
+      <Plan company={company} onChanged={reload} />
 
       <Tracking company={company} data={data} onChanged={reload} />
 

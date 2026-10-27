@@ -78,3 +78,27 @@ Two non-negotiables constrain how:
 - The webhook secret follows the SMTP stopgap (a GitHub Actions secret written
   to functions/.env at deploy) until the Secret Manager migration lands for
   both.
+
+## Addendum (October 2026): a free trial for everyone, and a Driver plan
+
+The founder extended the model: **every sign-up gets a 14-day free trial,
+and drivers subscribe too**, at a lower individual price.
+
+- **Trial.** `createTenant` stamps `trialEndsAt` (now + 14 days). Companies
+  from before trials existed count 14 days from `createdAt`. A trial is full
+  access: unlimited posting, and accepting loads. `effectivePlan` decides
+  in this order: the founder's override, then a Stripe subscription in good
+  standing, then the trial, then free. No card is taken for the trial.
+  Subscribing during it starts billing then, so the Billing page says
+  "choose a plan any time before then".
+- **Driver plan** (`mbh_driver_monthly`, placeholder £9.99/month). Signing up
+  as a carrier creates a one-person carrier company, so the plan sits on the
+  company like any other plan. That means the same webhook, payment links
+  and portal, with no per-person billing machinery. It buys **accepting
+  loads**; for posting, it is the free allowance.
+- **Accept gate.** Once the trial is over, `acceptLoad` needs any plan, a
+  shipper plan included (a company that does both is covered by it). Work
+  already accepted is never stopped: collecting and delivering stay free.
+- Both gates still wait on the founder's enforcement switch.
+- The portal's plan-switching offers the shipper plans only. The Driver plan
+  has nothing to switch to.

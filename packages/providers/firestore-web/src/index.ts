@@ -33,7 +33,7 @@ import {
   type Member,
   type Tenant,
   type BillingConfig,
-  type TenantBilling,
+  type PlanSubject,
   DEFAULT_BILLING_CONFIG,
 } from '@mbh/domain';
 import {
@@ -461,10 +461,11 @@ export class FirestoreReader
     return { ...DEFAULT_BILLING_CONFIG, ...(snap.data() as Partial<BillingConfig>) };
   }
 
-  async tenantBilling(tenantId: string): Promise<TenantBilling | null> {
+  async tenantPlan(tenantId: string): Promise<PlanSubject | null> {
     const snap = await getDoc(doc(this.db, tenantDoc(tenantId)));
     if (!snap.exists()) return null;
-    return (snap.data() as Tenant).billing ?? null;
+    const { billing, createdAt, trialEndsAt } = snap.data() as Tenant;
+    return { billing, createdAt, trialEndsAt };
   }
 
   async loadsPostedSince(tenantId: string, sinceIso: string): Promise<number> {

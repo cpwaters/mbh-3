@@ -648,6 +648,18 @@ test('a shipper sees their plan and this month’s usage, read through the real 
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
+test('a driver reaches their plan from Profile, and is offered the Driver plan', async ({ page }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Profile' }).first().click();
+  await page.getByRole('button', { name: 'Plan & billing' }).click();
+  await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Driver', exact: true })).toBeVisible();
+  // A driver does not post, so there is no posting meter or shipper plans.
+  await expect(page.getByText('Loads posted this month')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Starter' })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('the founder sets up billing links from the back office, through dispatch', async ({ page }) => {
   await signIn(page, E2E.founderEmail, E2E.founderPassword);
   await page.getByRole('link', { name: 'Admin' }).click();
