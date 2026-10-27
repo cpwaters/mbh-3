@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError, type JobEvent } from '@mbh/domain';
+import { AppError, isJobTracked, type JobEvent } from '@mbh/domain';
 import { jobEventDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
@@ -31,7 +31,9 @@ export type RecordMotionPayload = z.infer<typeof recordMotionSchema>;
 
 export interface RecordMotionResult extends DocData {
   jobId: string;
-  eventId: string;
+  // null when nothing was recorded because tracking is switched off.
+  eventId: string | null;
+  recorded: boolean;
 }
 
 export const recordMotionHandler: ActionHandler<RecordMotionPayload, RecordMotionResult> = {
@@ -44,6 +46,18 @@ export const recordMotionHandler: ActionHandler<RecordMotionPayload, RecordMotio
       throw new AppError('conflict', 'Movement is only recorded during an active delivery.', {
         recoverable: false,
       });
+    }
+
+    // Tracking switched off for this job (by the founder, for its shipper,
+    // carrier or driver). Accepted and dropped rather than refused: a
+    // position already queued on the phone when the switch flipped must not
+    // surface to the driver as a failed upload. No position is stored —
+    // not on the job, and not in the audit entry either.
+    if (!isJobTracked(job)) {
+      return {
+        result: { jobId: job.jobId, eventId: null, recorded: false },
+        auditDetail: { jobId: job.jobId, recorded: false, reason: 'tracking switched off' },
+      };
     }
 
     const eventId = ctx.newId('evt');
@@ -63,7 +77,7 @@ export const recordMotionHandler: ActionHandler<RecordMotionPayload, RecordMotio
     tx.write({ kind: 'create', path: jobEventDoc(job.jobId, eventId), data: { ...event } });
 
     return {
-      result: { jobId: job.jobId, eventId },
+      result: { jobId: job.jobId, eventId, recorded: true },
       auditDetail: { jobId: job.jobId, moving: payload.moving },
     };
   },

@@ -625,6 +625,21 @@ See docs/adr/0004-subscriptions.md and docs/runbooks/billing.md.
 - `pnpm stripe:provision` (founder, own key) creates products/prices/links/
   portal/webhook via REST; idempotent.
 
+## Tracking switches (built)
+
+The founder can switch location tracking off for a whole company (shipper:
+its loads are not followed; carrier: its drivers' phones report nothing) or
+for one driver at one carrier — back office, company page and People.
+- domain/tracking.ts: a job is tracked only while its shipper, carrier AND
+  driver all allow it. `job.trackingAllowed` is decided in acceptLoad and
+  re-decided for active jobs by `setCompanyTracking` / `setMemberTracking`
+  in the same transaction; finished jobs keep how they were run.
+- recordRoutePoint / recordMotion accept-and-drop on an untracked job
+  (`recorded: false`, no event, no position in the audit) so a point already
+  queued on the phone never surfaces as a failed upload.
+- The driver app sends nothing on an untracked job and says so in place of
+  the pause button; the shipper's trail says tracking is switched off.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

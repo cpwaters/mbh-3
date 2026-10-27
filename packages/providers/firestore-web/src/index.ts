@@ -116,6 +116,7 @@ interface JobDoc {
   priceGbpPence: number;
   route?: LoadRoute;
   deliveredAt?: string;
+  trackingAllowed?: boolean;
 }
 
 // A long job's trail is bounded so one read cannot balloon: 500 points is
@@ -167,6 +168,7 @@ export class FirestoreReader
             : {}),
           priceGbpPence: data.priceGbpPence,
           ...(data.route !== undefined ? { route: data.route } : {}),
+          ...(data.trackingAllowed !== undefined ? { trackingAllowed: data.trackingAllowed } : {}),
         };
       }
     }
@@ -243,6 +245,7 @@ export class FirestoreReader
       // something we can still vouch for.
       stoppedSince: pausedSince !== null ? null : stoppedSince,
       lastSeenAt: points.length > 0 ? (points[points.length - 1]?.at ?? null) : null,
+      ...(job.trackingAllowed !== undefined ? { trackingAllowed: job.trackingAllowed } : {}),
     };
   }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, PauseCircle, PlayCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, PauseCircle, PlayCircle } from 'lucide-react';
 import {
   PLAN_LABELS,
   PLAN_TIERS,
@@ -199,6 +199,55 @@ function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }
   );
 }
 
+// Location tracking for the whole company. What "off" means depends on what
+// the company does, so it is spelt out for each side it trades on.
+function Tracking({ company, data, onChanged }: { company: Tenant; data: AdminData; onChanged: () => void }) {
+  const { run, busy, error } = useAdminAction(onChanged);
+  const on = company.trackingDisabled !== true;
+  const underWay = data.jobs.filter(
+    (j) => (j.carrierTenantId === company.tenantId || j.shipperTenantId === company.tenantId) && LIVE_JOB.includes(j.status)
+  ).length;
+  const effects = [
+    company.capabilities.includes('shipper') ? 'its loads are not followed on a map' : null,
+    company.capabilities.includes('carrier') ? 'its drivers’ phones report no position' : null,
+  ].filter((e): e is string => e !== null);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="font-bold text-gray-900 inline-flex items-center gap-2">
+            {on ? <Eye className="w-4 h-4 text-emerald-600" /> : <EyeOff className="w-4 h-4 text-gray-500" />}
+            Location tracking {on ? 'on' : 'off'}
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            Off: {effects.join(', and ')}.
+            {underWay > 0 && ` Applies straight away to the ${underWay} job${underWay === 1 ? '' : 's'} under way.`}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={`Location tracking for ${company.name}`}
+          disabled={busy}
+          onClick={() => void run('setCompanyTracking', { tenantId: company.tenantId, enabled: !on })}
+          className={`px-4 py-2 rounded-lg font-medium disabled:opacity-60 ${
+            on ? 'border border-gray-300 text-gray-700 hover:bg-gray-50' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+          }`}
+        >
+          {busy ? 'Saving…' : on ? 'Switch tracking off' : 'Switch tracking on'}
+        </button>
+      </div>
+      {error !== null && (
+        <p role="alert" className="text-sm text-red-700 font-medium">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-2xl shadow-md border border-gray-100">
@@ -228,6 +277,8 @@ function Company({ company, data, reload }: { company: Tenant; data: AdminData; 
       <Standing company={company} data={data} onChanged={reload} />
 
       {company.capabilities.includes('shipper') && <Plan company={company} onChanged={reload} />}
+
+      <Tracking company={company} data={data} onChanged={reload} />
 
       <Section title={`People (${members.length})`}>
         <MemberList members={members} data={data} onChanged={reload} showCompany={false} />

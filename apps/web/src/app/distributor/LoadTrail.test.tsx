@@ -185,3 +185,19 @@ describe('TrailStatus', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('TrailStatus when tracking is switched off', () => {
+  it('says so outright instead of showing a trail that has simply stopped', () => {
+    render(
+      <TrailStatus
+        trail={{ ...trailWith(ago(5 * HOUR)), trackingAllowed: false }}
+        loading={false}
+        error={null}
+        now={NOW}
+        onRefresh={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/tracking is switched off for this load/i)).toBeInTheDocument();
+    expect(screen.queryByText(/last seen/i)).not.toBeInTheDocument();
+  });
+});

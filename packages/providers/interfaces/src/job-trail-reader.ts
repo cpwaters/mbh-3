@@ -32,6 +32,10 @@ export interface JobTrail {
   // out of signal, or with the app closed, leaves a position that is true but
   // old, and presenting it as current is worse than saying nothing.
   lastSeenAt: string | null;
+  // false when tracking is switched off for this job (by MyBackHaul, for the
+  // shipper, the carrier or the driver). The UI says so instead of showing
+  // a trail that has simply stopped. Absent means tracked.
+  trackingAllowed?: boolean;
 }
 
 export interface JobTrailReader {

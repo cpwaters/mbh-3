@@ -16,6 +16,10 @@ export interface DriverJobView {
   destinationCompanyName?: string;
   priceGbpPence: number;
   route?: LoadRoute;
+  // false when the founder has switched tracking off for this job's shipper,
+  // carrier or driver: the phone then reports no position at all. Absent
+  // means tracked (see isJobTracked).
+  trackingAllowed?: boolean;
 }
 
 // A finished job the driver earned on — the row the earnings summary sums and

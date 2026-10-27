@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle, Navigation, MapPin, Loader2, RotateCcw, Eye, EyeOff } from 'lucide-react';
-import { formatGbp } from '@mbh/domain';
+import { formatGbp, isJobTracked } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { AvailableLoads } from '../components/AvailableLoads';
 import { PostLoad } from '../components/PostLoad';
@@ -314,28 +314,39 @@ export function ActiveJobsPage() {
                 are stepping out of the cab. The line under it is the whole
                 bargain stated plainly — what stops, what does not, and that
                 it ends by itself. */}
-            <JobCardSection>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <button
-                  type="button"
-                  onClick={app.trackingPause.toggle}
-                  disabled={app.trackingPause.busy}
-                  className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 ${
-                    app.trackingPause.paused
-                      ? 'bg-gray-900 text-white hover:bg-gray-800'
-                      : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {app.trackingPause.paused ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  {app.trackingPause.paused ? 'Resume tracking' : 'Pause tracking'}
-                </button>
-                <p className="text-sm text-gray-600">
-                  {app.trackingPause.paused
-                    ? 'Your location is not being recorded. It starts again by itself once you are moving.'
-                    : 'Stops recording your location while you are away from the cab. Your job and delivery record carry on.'}
+            {!isJobTracked(job) ? (
+              // Switched off by MyBackHaul, so there is nothing to pause —
+              // and the driver should know nobody is following this job.
+              <JobCardSection>
+                <p className="inline-flex items-center gap-2 text-sm text-gray-600">
+                  <EyeOff className="w-4 h-4 shrink-0" />
+                  Location tracking is switched off for this job. Your position is not being recorded.
                 </p>
-              </div>
-            </JobCardSection>
+              </JobCardSection>
+            ) : (
+              <JobCardSection>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={app.trackingPause.toggle}
+                    disabled={app.trackingPause.busy}
+                    className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 ${
+                      app.trackingPause.paused
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {app.trackingPause.paused ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    {app.trackingPause.paused ? 'Resume tracking' : 'Pause tracking'}
+                  </button>
+                  <p className="text-sm text-gray-600">
+                    {app.trackingPause.paused
+                      ? 'Your location is not being recorded. It starts again by itself once you are moving.'
+                      : 'Stops recording your location while you are away from the cab. Your job and delivery record carry on.'}
+                  </p>
+                </div>
+              </JobCardSection>
+            )}
 
             <JobCardActions>
               <button

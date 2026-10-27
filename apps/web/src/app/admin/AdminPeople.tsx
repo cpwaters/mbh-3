@@ -46,6 +46,11 @@ export function MemberList({
           const person = data.people.find((p) => p.actorId === member.actorId);
           const name = person?.displayName || member.displayName || member.actorId;
           const disabled = member.status !== 'active';
+          // Only a carrier's people carry loads, so only they have a phone
+          // worth switching off.
+          const carries =
+            data.companies.find((c) => c.tenantId === member.tenantId)?.capabilities.includes('carrier') ?? false;
+          const tracked = member.trackingDisabled !== true;
           return (
             <li
               key={`${member.tenantId}/${member.actorId}`}
@@ -55,6 +60,7 @@ export function MemberList({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`font-medium ${disabled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{name}</span>
                   {disabled && <Pill className="bg-gray-100 text-gray-600">Disabled</Pill>}
+                  {carries && !tracked && <Pill className="bg-gray-100 text-gray-600">Not tracked</Pill>}
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5 break-all">
                   {showCompany && (
@@ -69,7 +75,26 @@ export function MemberList({
                   {person?.phone ? ` · ${person.phone}` : ''} · joined {formatDay(member.createdAt)}
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {carries && (
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={tracked}
+                    aria-label={`Location tracking for ${name}`}
+                    disabled={busy}
+                    onClick={() =>
+                      void run('setMemberTracking', {
+                        tenantId: member.tenantId,
+                        actorId: member.actorId,
+                        enabled: !tracked,
+                      })
+                    }
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    {tracked ? 'Tracking on' : 'Tracking off'}
+                  </button>
+                )}
                 <select
                   aria-label={`Role for ${name}`}
                   value={member.role}

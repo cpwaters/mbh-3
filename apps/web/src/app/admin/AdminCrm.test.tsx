@@ -311,3 +311,33 @@ describe('Billing (founder)', () => {
     expect(screen.queryByRole('combobox', { name: 'Plan to give' })).not.toBeInTheDocument();
   });
 });
+
+describe('Tracking switches', () => {
+  it('switches a whole company off from its page, saying what that means for a carrier', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/companies/waters');
+    const toggle = await screen.findByRole('switch', { name: 'Location tracking for Waters Haulage' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/drivers’ phones report no position/)).toBeInTheDocument();
+    expect(screen.getByText(/1 job under way/)).toBeInTheDocument();
+
+    await user.click(toggle);
+    await waitFor(() =>
+      expect(dispatched()[0]).toMatchObject({ type: 'setCompanyTracking', payload: { tenantId: 'waters', enabled: false } })
+    );
+  });
+
+  it('switches one driver off, and offers no switch to people who do not carry loads', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/people');
+    await user.click(await screen.findByRole('switch', { name: 'Location tracking for Chris Waters' }));
+    await waitFor(() =>
+      expect(dispatched()[0]).toMatchObject({
+        type: 'setMemberTracking',
+        payload: { tenantId: 'waters', actorId: 'chris', enabled: false },
+      })
+    );
+    // Ann works for a shipper-only company.
+    expect(screen.queryByRole('switch', { name: 'Location tracking for Ann Acme' })).not.toBeInTheDocument();
+  });
+});
