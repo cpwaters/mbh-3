@@ -85,6 +85,16 @@ export function TrailStatus({
     return <p className="text-sm text-gray-500">No carrier has accepted this load yet.</p>;
   }
 
+  if (trail.trackingAllowed === false) {
+    // Said outright: a map that simply never fills in reads as a fault.
+    return (
+      <p className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+        <EyeOff className="w-4 h-4" />
+        Tracking is switched off for this load, so its position is not shown.
+      </p>
+    );
+  }
+
   const stale = isStale(trail.lastSeenAt, now);
   const none = trail.points.length === 0;
   const paused = trail.pausedSince;

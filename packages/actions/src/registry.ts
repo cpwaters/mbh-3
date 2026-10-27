@@ -22,6 +22,8 @@ import {
 import { backfillCloseJobsHandler } from './actions/backfill-close-jobs.js';
 import {
   reinstateCompanyHandler,
+  setCompanyTrackingHandler,
+  setMemberTrackingHandler,
   setMemberRoleHandler,
   setMemberStatusHandler,
   suspendCompanyHandler,
@@ -61,6 +63,8 @@ const HANDLERS: readonly AnyHandler[] = [
   recordBillingEventHandler,
   setBillingConfigHandler,
   setCompanyPlanHandler,
+  setCompanyTrackingHandler,
+  setMemberTrackingHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -108,6 +112,8 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'recordBillingEvent',
   'setBillingConfig',
   'setCompanyPlan',
+  'setCompanyTracking',
+  'setMemberTracking',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

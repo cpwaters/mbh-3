@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError, type JobEvent } from '@mbh/domain';
+import { AppError, isJobTracked, type JobEvent } from '@mbh/domain';
 import { jobEventDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
@@ -21,7 +21,9 @@ export type RecordRoutePointPayload = z.infer<typeof recordRoutePointSchema>;
 
 export interface RecordRoutePointResult extends DocData {
   jobId: string;
-  eventId: string;
+  // null when nothing was recorded because tracking is switched off.
+  eventId: string | null;
+  recorded: boolean;
 }
 
 export const recordRoutePointHandler: ActionHandler<RecordRoutePointPayload, RecordRoutePointResult> = {
@@ -34,6 +36,18 @@ export const recordRoutePointHandler: ActionHandler<RecordRoutePointPayload, Rec
       throw new AppError('conflict', 'Route points are only recorded during an active delivery.', {
         recoverable: false,
       });
+    }
+
+    // Tracking switched off for this job (by the founder, for its shipper,
+    // carrier or driver). Accepted and dropped rather than refused: a
+    // position already queued on the phone when the switch flipped must not
+    // surface to the driver as a failed upload. No position is stored —
+    // not on the job, and not in the audit entry either.
+    if (!isJobTracked(job)) {
+      return {
+        result: { jobId: job.jobId, eventId: null, recorded: false },
+        auditDetail: { jobId: job.jobId, recorded: false, reason: 'tracking switched off' },
+      };
     }
 
     const eventId = ctx.newId('evt');
@@ -49,7 +63,7 @@ export const recordRoutePointHandler: ActionHandler<RecordRoutePointPayload, Rec
     tx.write({ kind: 'create', path: jobEventDoc(job.jobId, eventId), data: { ...event } });
 
     return {
-      result: { jobId: job.jobId, eventId },
+      result: { jobId: job.jobId, eventId, recorded: true },
       auditDetail: { jobId: job.jobId, lat: payload.location.lat, lng: payload.location.lng },
     };
   },

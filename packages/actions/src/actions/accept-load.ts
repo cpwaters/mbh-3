@@ -4,6 +4,7 @@ import {
   canTransitionLoad,
   isActiveJobStatus,
   isTenantSuspended,
+  isTrackingAllowed,
   type Job,
   type JobEvent,
   type JobStatus,
@@ -41,8 +42,8 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
   idempotent: true,
   parse: zodParse(acceptLoadSchema),
   async execute(tx, ctx, payload) {
-    await requireMember(tx, payload.carrierTenantId, ctx.actorId, ACCEPT_ROLES);
-    await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
+    const driver = await requireMember(tx, payload.carrierTenantId, ctx.actorId, ACCEPT_ROLES);
+    const carrier = await requireTenantCapability(tx, payload.carrierTenantId, 'carrier');
 
     const loadData = await tx.get(loadDoc(payload.loadId));
     if (loadData === null) {
@@ -92,6 +93,9 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
         : {}),
       priceGbpPence: load.priceGbpPence,
       ...(load.route !== undefined ? { route: load.route } : {}),
+      // Decided now from all three parties' switches; the founder's controls
+      // re-decide it if one is flipped while the job is under way.
+      trackingAllowed: isTrackingAllowed({ shipper, carrier, driver }),
     };
     const eventId = ctx.newId('evt');
     const event: JobEvent = {

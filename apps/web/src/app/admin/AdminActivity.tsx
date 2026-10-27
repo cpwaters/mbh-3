@@ -35,6 +35,8 @@ export const ACTION_LABELS: Record<string, string> = {
   reinstateCompany: 'Reinstated a company',
   setMemberStatus: 'Changed someone’s access',
   setMemberRole: 'Changed someone’s role',
+  setCompanyTracking: 'Switched a company’s tracking',
+  setMemberTracking: 'Switched someone’s tracking',
 };
 
 // Location breadcrumbs are most of the log by volume and say little on their
@@ -49,6 +51,7 @@ function summary(entry: Activity, data: AdminData): string {
   else if (typeof tenantId === 'string') parts.push(companyName(data.companies, tenantId));
   if (typeof d.displayName === 'string') parts.push(d.displayName);
   if (typeof d.from === 'string' && typeof d.to === 'string') parts.push(`${d.from} → ${d.to}`);
+  else if (typeof d.to === 'string') parts.push(d.to);
   if (typeof d.reason === 'string') parts.push(`“${d.reason}”`);
   if (typeof d.note === 'string' && d.note !== '') parts.push(`“${d.note}”`);
   return parts.join(' · ');

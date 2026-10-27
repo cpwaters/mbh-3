@@ -387,6 +387,39 @@ test('a driver can pause and resume tracking on their active job', async ({ page
   await expect(page.getByRole('button', { name: 'Pause tracking' })).toBeVisible();
 });
 
+test('the founder switches a carrier’s tracking off, and its driver’s job says so', async ({ page }) => {
+  const trackingSwitch = () => page.getByRole('switch', { name: 'Location tracking for Waters Haulage' });
+  // Wait for the sign-in screen: navigating before sign-out lands reloads
+  // the app still signed in as the previous user.
+  const signOut = async () => {
+    await page.getByRole('button', { name: 'Logout' }).click();
+    await expect(page.getByText('Sign in to your driver account')).toBeVisible();
+  };
+  const openWaters = async () => {
+    await signIn(page, E2E.founderEmail, E2E.founderPassword);
+    await page.getByRole('link', { name: 'Admin' }).click();
+    await page.getByRole('link', { name: 'Companies', exact: true }).click();
+    await page.getByText('Waters Haulage').first().click();
+  };
+
+  await openWaters();
+  await trackingSwitch().click();
+  await expect(trackingSwitch()).toHaveAttribute('aria-checked', 'false');
+  await signOut();
+
+  await signIn(page, E2E.email, E2E.password);
+  await goToActiveJobs(page);
+  await expect(page.getByText(/tracking is switched off for this job/i)).toBeVisible();
+  // Nothing to pause when nothing is being recorded.
+  await expect(page.getByRole('button', { name: 'Pause tracking' })).toHaveCount(0);
+  await signOut();
+
+  // Back on, so the journeys after this one run on a tracked job.
+  await openWaters();
+  await trackingSwitch().click();
+  await expect(trackingSwitch()).toHaveAttribute('aria-checked', 'true');
+});
+
 test('the active job is read from Firestore and shows its route', async ({ page }) => {
   await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
   await signIn(page, E2E.email, E2E.password);
@@ -739,6 +772,9 @@ async function seedFailedQueueItem(page: Page, requestId: string, jobId: string)
 
 test('a failed offline record can be discarded', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
+  // Let the session land before the reload below: reloading first races
+  // Firebase persisting it, and lands on the sign-in screen instead.
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
   await seedFailedQueueItem(page, 'e2e-failed-discard', E2E.jobId);
   // The queue's React state is only read from storage on mount/interval; a
   // reload picks up the item just written directly to IndexedDB.
@@ -755,6 +791,9 @@ test('a failed offline record can be discarded', async ({ page }) => {
 
 test('a failed offline record can be retried and delivered', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
+  // Let the session land before the reload below: reloading first races
+  // Firebase persisting it, and lands on the sign-in screen instead.
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
   await seedFailedQueueItem(page, 'e2e-failed-retry', E2E.jobId);
   // The queue's React state is only read from storage on mount/interval; a
   // reload picks up the item just written directly to IndexedDB.

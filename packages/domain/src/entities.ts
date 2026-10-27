@@ -27,6 +27,10 @@ export interface Tenant {
   // refused action explains itself. Kept after reinstatement as history.
   suspendedReason?: string;
   suspendedAt?: string;
+  // Set by the founder to switch location tracking off for this company:
+  // as a shipper, its loads are not followed; as a carrier, its drivers'
+  // phones report nothing. Absent means on. See tracking.ts.
+  trackingDisabled?: boolean;
   // The company's plan — see billing.ts. Absent until it first subscribes or
   // the founder gives it one; absent means the free allowance.
   billing?: TenantBilling;
@@ -43,6 +47,9 @@ export interface Member {
   role: Role;
   status: MemberStatus;
   createdAt: string;
+  // Set by the founder to switch location tracking off for this one person
+  // at this one company. Absent means on.
+  trackingDisabled?: boolean;
 }
 
 export interface Address {
@@ -126,6 +133,11 @@ export interface Job {
   // the shipper-private load.
   priceGbpPence: number;
   route?: LoadRoute;
+  // Whether the driver's phone may report position on this job. Decided at
+  // acceptance from the shipper's, the carrier's and the driver's switches,
+  // and re-decided whenever the founder flips one of them while the job is
+  // active. Absent (older jobs) means allowed.
+  trackingAllowed?: boolean;
   // Set when the job transitions to `delivered` — the timestamp earnings are
   // bucketed by. Absent until then.
   deliveredAt?: string;

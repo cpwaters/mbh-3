@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import type { DeliverCapture } from '@mbh/client';
+import { isJobTracked } from '@mbh/domain';
 import { useSyncQueue } from './useSyncQueue';
 import { useAuth } from './useAuth';
 import { useTenants } from './useTenants';
@@ -124,12 +125,16 @@ export default function DriverApp() {
   // The driver's own switch for location recording. Owned here, above both
   // recorders, so one gate covers everything that reports a position.
   const trackingPause = useTrackingPause(job, device.fix, queue.enqueue);
+  // Switched off by MyBackHaul for this job's shipper, carrier or driver:
+  // nothing is sent at all — not paused, off. The server drops anything
+  // already queued, but the phone should not be sending it in the first place.
+  const recordingOff = trackingPause.paused || (job !== null && !isJobTracked(job));
 
-  useRouteTracking(job, device.location, queue.enqueue, trackingPause.paused);
+  useRouteTracking(job, device.location, queue.enqueue, recordingOff);
 
   // ...and says so when it stops, because a distance-triggered breadcrumb
   // trail goes quiet when parked and silence reads the same as a closed app.
-  useStopDetection(job, device.fix, queue.enqueue, trackingPause.paused);
+  useStopDetection(job, device.fix, queue.enqueue, recordingOff);
 
   // HGV driving-hours/break countdowns — resolved once here (like device
   // location) so they survive navigating away from the Driving Time page.
