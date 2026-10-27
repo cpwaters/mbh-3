@@ -154,3 +154,22 @@ export function invitesCollection(): string {
 export function inviteDoc(inviteId: string): string {
   return `${INVITES_COLLECTION}/${inviteId}`;
 }
+
+// Platform-wide settings the founder controls from the back office. Readable
+// by any signed-in user (nothing in them is secret), written only via
+// dispatch.
+const PLATFORM_CONFIG_COLLECTION = 'platformConfig';
+
+export function billingConfigDoc(): string {
+  return `${PLATFORM_CONFIG_COLLECTION}/billing`;
+}
+
+// One per Stripe customer: what the webhooks have told us about it, kept even
+// before we know which company it belongs to, because Stripe does not promise
+// to deliver checkout.session.completed before the subscription events.
+// Server-internal — never client-readable.
+const BILLING_CUSTOMERS_COLLECTION = 'billingCustomers';
+
+export function billingCustomerDoc(customerId: string): string {
+  return `${BILLING_CUSTOMERS_COLLECTION}/${customerId}`;
+}

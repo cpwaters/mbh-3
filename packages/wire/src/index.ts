@@ -3,3 +3,4 @@
 // and the mapping to domain types, so the boundary is in exactly one place.
 export * from './postcodes-io.js';
 export * from './osrm.js';
+export * from './stripe.js';

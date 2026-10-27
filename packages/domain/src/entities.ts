@@ -3,6 +3,7 @@
 // GBP pence. Every tenant-scoped document carries a denormalized tenantId.
 
 import type { LoadRoute } from './geo.js';
+import type { TenantBilling } from './billing.js';
 
 export type TenantCapability = 'shipper' | 'carrier';
 
@@ -26,6 +27,9 @@ export interface Tenant {
   // refused action explains itself. Kept after reinstatement as history.
   suspendedReason?: string;
   suspendedAt?: string;
+  // The company's plan — see billing.ts. Absent until it first subscribes or
+  // the founder gives it one; absent means the free allowance.
+  billing?: TenantBilling;
 }
 
 export type Role = 'owner' | 'dispatcher' | 'driver';

@@ -29,6 +29,9 @@ importers:
       '@mbh/provider-postcodes-io':
         specifier: workspace:*
         version: link:packages/providers/postcodes-io
+      '@mbh/provider-stripe':
+        specifier: workspace:*
+        version: link:packages/providers/stripe
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.1
@@ -434,6 +437,22 @@ importers:
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.32.0)
 
   packages/providers/postcodes-io:
+    dependencies:
+      '@mbh/domain':
+        specifier: workspace:*
+        version: link:../../domain
+      '@mbh/provider-interfaces':
+        specifier: workspace:*
+        version: link:../interfaces
+      '@mbh/wire':
+        specifier: workspace:*
+        version: link:../../wire
+    devDependencies:
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)(lightningcss@1.32.0)
+
+  packages/providers/stripe:
     dependencies:
       '@mbh/domain':
         specifier: workspace:*

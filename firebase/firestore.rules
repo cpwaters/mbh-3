@@ -147,6 +147,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Platform settings the founder controls from the back office — today
+    // the billing switchboard (public Stripe payment links, the portal link,
+    // whether plan allowances are enforced). Nothing secret lives here, and
+    // every shipper's Billing page reads it, so any signed-in user may.
+    match /platformConfig/{configId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // What Stripe has told us about each customer, before and after it is
+    // tied to a company. Server-internal: the company-facing view is the
+    // `billing` map on the tenant doc. The founder may read it to trace a
+    // payment that never reached a company.
+    match /billingCustomers/{customerId} {
+      allow read: if isFounder();
+      allow write: if false;
+    }
+
     // Idempotency markers: never client-readable or writable.
     match /requests/{requestId} {
       allow read, write: if false;

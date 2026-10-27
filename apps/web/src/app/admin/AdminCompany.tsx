@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, PauseCircle, PlayCircle } from 'lucide-react';
-import { isTenantSuspended, isValidSuspensionReason, type Tenant } from '@mbh/domain';
+import {
+  PLAN_LABELS,
+  PLAN_TIERS,
+  effectiveTier,
+  isTenantSuspended,
+  isValidSuspensionReason,
+  type PlanTier,
+  type Tenant,
+} from '@mbh/domain';
+import { PlanSource } from './AdminBilling';
 import { byNewest, formatDay, formatWhen, useAdminAction, useAdminData, type AdminData } from './adminData';
 import { CapabilityPills } from './AdminCompanies';
 import { MemberList } from './AdminPeople';
@@ -119,6 +128,77 @@ function Standing({ company, data, onChanged }: { company: Tenant; data: AdminDa
   );
 }
 
+// A shipper's plan, and the founder's override: give a plan without payment
+// (a pilot customer) or take that back, leaving whatever Stripe says.
+function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }) {
+  const { run, busy, error } = useAdminAction(onChanged);
+  const override = company.billing?.override ?? null;
+  const [tier, setTier] = useState<PlanTier>(override?.tier ?? 'growth');
+  const [note, setNote] = useState('');
+  const effective = effectiveTier(company.billing);
+
+  return (
+    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-bold text-gray-900">Plan</h3>
+        <span className="font-semibold text-gray-900">{PLAN_LABELS[effective]}</span>
+        <PlanSource company={company} />
+      </div>
+      {override !== null ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-gray-600">
+            Given by you on {formatDay(override.setAt)}
+            {override.note !== '' ? ` — “${override.note}”` : ''}.
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run('setCompanyPlan', { tenantId: company.tenantId, tier: null })}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
+          >
+            Remove — back to what they pay for
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Plan to give"
+            value={tier}
+            onChange={(e) => setTier(e.target.value as PlanTier)}
+            className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+          >
+            {PLAN_TIERS.map((t) => (
+              <option key={t} value={t}>
+                {PLAN_LABELS[t]}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Why"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Why (e.g. pilot customer)"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-0 flex-1"
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run('setCompanyPlan', { tenantId: company.tenantId, tier, note: note.trim() })}
+            className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
+          >
+            Give plan free
+          </button>
+        </div>
+      )}
+      {error !== null && (
+        <p role="alert" className="text-sm text-red-700 font-medium">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-white rounded-2xl shadow-md border border-gray-100">
@@ -146,6 +226,8 @@ function Company({ company, data, reload }: { company: Tenant; data: AdminData; 
       </div>
 
       <Standing company={company} data={data} onChanged={reload} />
+
+      {company.capabilities.includes('shipper') && <Plan company={company} onChanged={reload} />}
 
       <Section title={`People (${members.length})`}>
         <MemberList members={members} data={data} onChanged={reload} showCompany={false} />

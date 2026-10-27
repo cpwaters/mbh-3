@@ -606,6 +606,29 @@ test('the back office reads the whole marketplace through the real rules', async
   }
 });
 
+test('a shipper sees their plan and this month’s usage, read through the real rules', async ({ page }) => {
+  await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
+  await page.getByRole('link', { name: 'Billing' }).click();
+  await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
+  await expect(page.getByText('Loads posted this month')).toBeVisible();
+  await expect(page.getByText(/not being enforced yet/)).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('the founder sets up billing links from the back office, through dispatch', async ({ page }) => {
+  await signIn(page, E2E.founderEmail, E2E.founderPassword);
+  await page.getByRole('link', { name: 'Admin' }).click();
+  await page.getByRole('link', { name: 'Billing', exact: true }).click();
+  await expect(page.getByText('Plans are not enforced yet.')).toBeVisible();
+
+  await page.getByRole('textbox', { name: 'Growth payment link' }).fill('https://buy.stripe.com/test_e2e_growth');
+  await page.getByRole('textbox', { name: 'Growth monthly price' }).fill('129');
+  await page.getByRole('button', { name: 'Save billing settings' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+  // Still not enforced — saving links alone must not lock anyone out.
+  await expect(page.getByText('Plans are not enforced yet.')).toBeVisible();
+});
+
 test('the back office turns away anyone who is not the founder', async ({ page }) => {
   // The UI gate is convenience — the server checks every action again — but
   // an ordinary carrier typing the URL should simply land back in their app.

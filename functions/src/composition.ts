@@ -7,6 +7,7 @@ import { PostcodesIoGeocoder } from '@mbh/provider-postcodes-io';
 import { OsrmRouteProvider } from '@mbh/provider-osrm';
 import { NodemailerMailer } from '@mbh/provider-nodemailer';
 import { FirebaseStorageReader } from '@mbh/provider-firebase-storage-admin';
+import { StripeBillingWebhook } from '@mbh/provider-stripe';
 import { buildRegistry, type DrainDeps, type HttpDispatchDeps } from '@mbh/actions';
 import type { AuthProvider, VerifiedActor } from '@mbh/provider-interfaces';
 
@@ -34,6 +35,12 @@ const prefixedId = (prefix: string): string => `${prefix}-${randomUUID()}`;
 
 let cached: HttpDispatchDeps | null = null;
 
+// The Stripe webhook signing secret. Same stopgap path as SMTP_USER below:
+// a GitHub Actions repository SECRET written to functions/.env at deploy —
+// never committed, never in chat. Absent means the webhook route answers 503
+// to everything (fail closed): no secret, no trust.
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? '';
+
 export function getDeps(): HttpDispatchDeps {
   if (cached !== null) return cached;
   ensureApp();
@@ -43,6 +50,7 @@ export function getDeps(): HttpDispatchDeps {
     registry: buildRegistry(),
     now: isoNow,
     newId: prefixedId,
+    billingWebhook: stripeWebhookSecret !== '' ? new StripeBillingWebhook(stripeWebhookSecret) : null,
   };
   return cached;
 }

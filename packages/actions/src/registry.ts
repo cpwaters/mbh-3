@@ -26,6 +26,7 @@ import {
   setMemberStatusHandler,
   suspendCompanyHandler,
 } from './actions/founder-controls.js';
+import { recordBillingEventHandler, setBillingConfigHandler, setCompanyPlanHandler } from './actions/billing.js';
 
 // Every action the dispatch function can run. Adding an action means adding
 // it here — nothing else discovers handlers.
@@ -57,6 +58,9 @@ const HANDLERS: readonly AnyHandler[] = [
   reinstateCompanyHandler,
   setMemberStatusHandler,
   setMemberRoleHandler,
+  recordBillingEventHandler,
+  setBillingConfigHandler,
+  setCompanyPlanHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -101,6 +105,9 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'reinstateCompany',
   'setMemberStatus',
   'setMemberRole',
+  'recordBillingEvent',
+  'setBillingConfig',
+  'setCompanyPlan',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

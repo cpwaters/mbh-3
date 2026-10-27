@@ -32,6 +32,9 @@ import {
   type Job,
   type Member,
   type Tenant,
+  type BillingConfig,
+  type TenantBilling,
+  DEFAULT_BILLING_CONFIG,
 } from '@mbh/domain';
 import {
   jobEventsCollection,
@@ -49,12 +52,14 @@ import {
   auditCollection,
   tenantsCollection,
   userProfilesCollection,
+  billingConfigDoc,
 } from '@mbh/paths';
 import {
   ADMIN_LIST_LIMIT,
   type AdminActivity,
   type AdminPerson,
   type AdminReader,
+  type BillingReader,
 } from '@mbh/provider-interfaces';
 import type {
   AddressBookReader,
@@ -129,7 +134,8 @@ export class FirestoreReader
     OutboxTaskReader,
     AddressBookReader,
     InviteReader,
-    AdminReader
+    AdminReader,
+    BillingReader
 {
   private readonly db: Firestore;
 
@@ -442,5 +448,26 @@ export class FirestoreReader
         detail,
       };
     });
+  }
+
+  // ── Billing ───────────────────────────────────────────────────────────────
+
+  async billingConfig(): Promise<BillingConfig> {
+    const snap = await getDoc(doc(this.db, billingConfigDoc()));
+    if (!snap.exists()) return DEFAULT_BILLING_CONFIG;
+    return { ...DEFAULT_BILLING_CONFIG, ...(snap.data() as Partial<BillingConfig>) };
+  }
+
+  async tenantBilling(tenantId: string): Promise<TenantBilling | null> {
+    const snap = await getDoc(doc(this.db, tenantDoc(tenantId)));
+    if (!snap.exists()) return null;
+    return (snap.data() as Tenant).billing ?? null;
+  }
+
+  async loadsPostedSince(tenantId: string, sinceIso: string): Promise<number> {
+    // Same shape as the server's count (require-plan.ts): by tenantId, then
+    // narrowed in memory, cancelled loads included.
+    const snap = await getDocs(query(collection(this.db, loadsCollection()), where('tenantId', '==', tenantId)));
+    return snap.docs.filter((d) => ((d.data() as Load).createdAt ?? '') >= sinceIso).length;
   }
 }

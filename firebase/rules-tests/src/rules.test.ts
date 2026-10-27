@@ -69,6 +69,8 @@ beforeEach(async () => {
     await setDoc(doc(db, 'outbox/test-email-1'), { taskId: 'test-email-1', type: 'sendTestInvoiceEmail', status: 'done', tenantId: 'shipper-1', recipientEmail: 'owner@acme.test', actorId: SHIP_OWNER });
     await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
     await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
+    await setDoc(doc(db, 'platformConfig/billing'), { enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} });
+    await setDoc(doc(db, 'billingCustomers/cus_1'), { customerId: 'cus_1', tenantId: 'shipper-1', tier: 'growth', status: 'active' });
     await setDoc(doc(db, 'invites/inv-1'), { inviteId: 'inv-1', status: 'pending', note: 'Waters Haulage', createdAt: '2026-08-19T09:00:00.000Z', createdBy: 'founder-1', expiresAt: '2026-08-26T09:00:00.000Z' });
   });
 });
@@ -427,5 +429,27 @@ describe('the founder’s back office reads', () => {
     await assertFails(getDocs(collection(db(SHIP_OWNER), 'userProfiles')));
     await assertFails(getDocs(collectionGroup(db(SHIP_OWNER), 'members')));
     await assertFails(getDocs(query(collection(db(SHIP_OWNER), 'audit'), orderBy('at', 'desc'), limit(10))));
+  });
+});
+
+describe('billing', () => {
+  it('lets any signed-in user read the billing switchboard, and nobody write it', async () => {
+    await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'platformConfig/billing')));
+    await assertSucceeds(getDoc(doc(db(OUTSIDER), 'platformConfig/billing')));
+    await assertFails(getDoc(doc(db(null), 'platformConfig/billing')));
+    await assertFails(setDoc(doc(db(SHIP_OWNER), 'platformConfig/billing'), { enforced: false }));
+    await assertFails(setDoc(doc(founderDb(), 'platformConfig/billing'), { enforced: false }));
+  });
+
+  it('keeps Stripe customer records from members, and from forging', async () => {
+    await assertFails(getDoc(doc(db(SHIP_OWNER), 'billingCustomers/cus_1')));
+    await assertSucceeds(getDoc(doc(founderDb(), 'billingCustomers/cus_1')));
+    await assertFails(setDoc(doc(db(SHIP_OWNER), 'billingCustomers/cus_1'), { tier: 'fleet', status: 'active' }));
+  });
+
+  it('does not let a member grant themselves a plan by writing their tenant', async () => {
+    await assertFails(
+      setDoc(doc(db(SHIP_OWNER), 'tenants/shipper-1'), { billing: { override: { tier: 'fleet' } } }, { merge: true })
+    );
   });
 });

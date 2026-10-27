@@ -1,7 +1,7 @@
 import { AppError } from '@mbh/domain';
 import { requestMarkerDoc } from '@mbh/paths';
 import type { DataStore, DocData, VerifiedActor } from '@mbh/provider-interfaces';
-import { buildAuditOp, type ActionContext, type ActionHandler } from './context.js';
+import { buildAuditOp, type ActionContext, type ActionHandler, type ActionSource } from './context.js';
 
 export interface DispatchRequest {
   type: string;
@@ -13,6 +13,8 @@ export interface DispatchDeps {
   store: DataStore;
   now: string;
   newId(prefix: string): string;
+  // Defaults to 'member'. Only the webhook boundary passes 'system'.
+  source?: ActionSource;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +48,13 @@ export async function dispatch(
     });
   }
 
-  const ctx: ActionContext = { actorId, actorEmail: actor.email, now: deps.now, newId: deps.newId };
+  const ctx: ActionContext = {
+    actorId,
+    actorEmail: actor.email,
+    now: deps.now,
+    newId: deps.newId,
+    source: deps.source ?? 'member',
+  };
 
   return deps.store.runTransaction(async (tx) => {
     // Idempotency: a replayed requestId returns the ORIGINAL result; a

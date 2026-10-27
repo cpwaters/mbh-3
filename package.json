@@ -23,7 +23,8 @@
     "test:visual": "bash scripts/run-visual.sh",
     "docs:screenshots": "bash scripts/capture-screenshots.sh",
     "seed": "tsx scripts/seed.ts",
-    "smoke:prod": "tsx scripts/smoke-prod.ts"
+    "smoke:prod": "tsx scripts/smoke-prod.ts",
+    "stripe:provision": "tsx packages/providers/stripe/src/provision.ts"
   },
   "devDependencies": {
     "@mbh/actions": "workspace:*",
@@ -33,6 +34,7 @@
     "@mbh/provider-nodemailer": "workspace:*",
     "@mbh/provider-osrm": "workspace:*",
     "@mbh/provider-postcodes-io": "workspace:*",
+    "@mbh/provider-stripe": "workspace:*",
     "@types/node": "^22.10.0",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",

@@ -7,11 +7,16 @@ import { getDeps } from './composition.js';
 // handleHttpRequest in @mbh/actions.
 export const dispatch = onRequest({ region: 'europe-west2', cors: true }, async (req, res) => {
   const authorization = req.headers.authorization;
+  // A webhook signature is over the exact bytes received, so the raw body is
+  // passed alongside the parsed one.
+  const signature = req.headers['stripe-signature'];
   const result = await handleHttpRequest(getDeps(), {
     method: req.method,
     path: req.path,
     ...(authorization !== undefined ? { authorization } : {}),
     body: req.body,
+    ...(req.rawBody !== undefined ? { rawBody: req.rawBody.toString('utf8') } : {}),
+    ...(typeof signature === 'string' ? { webhookSignature: signature } : {}),
   });
   res.status(result.status).json(result.body);
 });

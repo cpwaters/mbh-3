@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Activity, Building2, Package, Route as RouteIcon, Ticket, Truck, Users, Wrench } from 'lucide-react';
+import { Activity, Building2, CreditCard, Package, Route as RouteIcon, Ticket, Truck, Users, Wrench } from 'lucide-react';
 import { formatGbp, isTenantSuspended } from '@mbh/domain';
 import { useAdminData, type AdminData } from './adminData';
 
@@ -41,6 +41,7 @@ const cards = [
   { to: '/admin/loads', icon: Package, title: 'Loads', body: 'Everything posted. Withdraw a load still on offer.' },
   { to: '/admin/jobs', icon: RouteIcon, title: 'Jobs', body: 'Every accepted load, from collection to PoD.' },
   { to: '/admin/activity', icon: Activity, title: 'Activity', body: 'Who did what, when — the audit log, newest first.' },
+  { to: '/admin/billing', icon: CreditCard, title: 'Billing', body: 'Stripe links, prices, enforcement, and every shipper’s plan.' },
   { to: '/admin/invites', icon: Ticket, title: 'Invitations', body: 'Mint a one-use link, or withdraw one sent in error.' },
   { to: '/admin/tools', icon: Wrench, title: 'Tools', body: 'Send yourself a test invoice to prove the email pipeline.' },
 ];
