@@ -6,6 +6,7 @@ import {
   isStripePaymentLink,
   isStripePortalUrl,
   isShipperTier,
+  freePlanExpiry,
   type BillingEvent,
   type PlanTier,
   type SubscriptionStatus,
@@ -234,6 +235,9 @@ const setCompanyPlanSchema = z.object({
   // null removes the override, returning the company to whatever Stripe says.
   tier: tier.nullable(),
   note: z.string().trim().max(200).optional(),
+  // How long the free plan lasts: 7, 14 or 30 days, or null for no end date.
+  // Absent means no end date, as plans given before durations existed.
+  days: z.union([z.literal(7), z.literal(14), z.literal(30)]).nullable().optional(),
 });
 
 export type SetCompanyPlanPayload = z.infer<typeof setCompanyPlanSchema>;
@@ -276,7 +280,9 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
       }
     }
     const note = payload.note ?? '';
-    const override = payload.tier === null ? null : { tier: payload.tier, note, setAt: ctx.now };
+    const expiresAt = freePlanExpiry(ctx.now, payload.days ?? null);
+    const override =
+      payload.tier === null ? null : { tier: payload.tier, note, setAt: ctx.now, expiresAt };
     tx.write({
       kind: 'update',
       path: tenantDoc(payload.tenantId),
@@ -290,6 +296,7 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
         from: tenant.billing?.override?.tier ?? 'none',
         to: payload.tier ?? 'none',
         ...(note !== '' ? { note } : {}),
+        ...(payload.tier !== null ? { until: expiresAt ?? 'no end date' } : {}),
       },
     };
   },

@@ -650,6 +650,15 @@ posting as before. Billing page is shared (/billing in both apps; drivers
 reach it from Profile on mobile). Back office Billing lists every company,
 and Plan offers only the tiers a company can use.
 
+## New accounts untracked by default; timed free plans (built)
+
+- createTenant sets `trackingDisabled: true`: a new company (shipper or
+  carrier) is not tracked until the founder switches it on from its company
+  page. Existing companies are unchanged.
+- The founder's free plan (`setCompanyPlan`) takes `days` (7 / 14 / 30, or
+  null for no end); `override.expiresAt` is checked by `activeOverride`, so
+  an expired gift simply stops counting — no clean-up needed.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

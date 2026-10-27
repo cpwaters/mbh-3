@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff, PauseCircle, PlayCircle } from 'lucide-react';
 import {
+  FREE_PLAN_DAYS,
   PLAN_LABELS,
   PLAN_TIERS,
+  activeOverride,
   effectivePlan,
   isShipperTier,
   isTenantSuspended,
@@ -136,29 +138,34 @@ function Standing({ company, data, onChanged }: { company: Tenant; data: AdminDa
 // that posts, the Driver plan to one that carries.
 function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }) {
   const { run, busy, error } = useAdminAction(onChanged);
-  const override = company.billing?.override ?? null;
+  const now = new Date().toISOString();
+  const override = activeOverride(company.billing, now);
+  const lapsed = override === null ? (company.billing?.override ?? null) : null;
   const options = PLAN_TIERS.filter((t) =>
     isShipperTier(t) ? company.capabilities.includes('shipper') : company.capabilities.includes('carrier')
   );
-  const [tier, setTier] = useState<PlanTier>(override?.tier ?? options[0] ?? 'driver');
+  const [tier, setTier] = useState<PlanTier>(options[0] ?? 'driver');
+  const [days, setDays] = useState<number | null>(14);
   const [note, setNote] = useState('');
-  const now = new Date().toISOString();
   const effective = effectivePlan(company, now);
 
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-5 space-y-4">
+      <div className="space-y-1">
         <h3 className="font-bold text-gray-900">Plan</h3>
-        <span className="font-semibold text-gray-900">{PLAN_LABELS[effective]}</span>
-        <PlanSource company={company} />
-        {effective === 'trial' && (
-          <span className="text-sm text-gray-600">ends in {trialDaysLeft(company, now)} days</span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-gray-900">{PLAN_LABELS[effective]}</span>
+          <PlanSource company={company} />
+          {effective === 'trial' && (
+            <span className="text-sm text-gray-600">ends in {trialDaysLeft(company, now)} days</span>
+          )}
+        </div>
       </div>
       {override !== null ? (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col items-start gap-3">
           <p className="text-sm text-gray-600">
             Given by you on {formatDay(override.setAt)}
+            {override.expiresAt != null ? `, until ${formatDay(override.expiresAt)}` : ', with no end date'}
             {override.note !== '' ? ` — “${override.note}”` : ''}.
           </p>
           <button
@@ -171,31 +178,59 @@ function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="Plan to give"
-            value={tier}
-            onChange={(e) => setTier(e.target.value as PlanTier)}
-            className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-          >
-            {options.map((t) => (
-              <option key={t} value={t}>
-                {PLAN_LABELS[t]}
-              </option>
-            ))}
-          </select>
-          <input
-            aria-label="Why"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Why (e.g. pilot customer)"
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-0 flex-1"
-          />
+        // One field under another: the choices read top to bottom as a
+        // sentence — this plan, for this long, because of this — and stay
+        // usable on a phone.
+        <div className="flex flex-col gap-3 max-w-md">
+          {lapsed !== null && lapsed.expiresAt != null && (
+            <p className="text-sm text-gray-600">
+              The {PLAN_LABELS[lapsed.tier]} plan you gave ended on {formatDay(lapsed.expiresAt)}.
+            </p>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700">Plan to give</span>
+            <select
+              value={tier}
+              onChange={(e) => setTier(e.target.value as PlanTier)}
+              className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            >
+              {options.map((t) => (
+                <option key={t} value={t}>
+                  {PLAN_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700">For how long</span>
+            <select
+              value={days === null ? 'none' : String(days)}
+              onChange={(e) => setDays(e.target.value === 'none' ? null : Number(e.target.value))}
+              className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            >
+              {FREE_PLAN_DAYS.map((d) => (
+                <option key={d ?? 'none'} value={d === null ? 'none' : String(d)}>
+                  {d === null ? 'No end date' : `${d} days`}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-700">Why</span>
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. pilot customer"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </label>
           <button
             type="button"
             disabled={busy}
-            onClick={() => void run('setCompanyPlan', { tenantId: company.tenantId, tier, note: note.trim() })}
-            className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
+            onClick={() =>
+              void run('setCompanyPlan', { tenantId: company.tenantId, tier, days, note: note.trim() })
+            }
+            className="self-start px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60"
           >
             Give plan free
           </button>

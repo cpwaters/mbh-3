@@ -292,18 +292,36 @@ describe('Billing (founder)', () => {
     expect(screen.getAllByText('No subscription').length).toBeGreaterThan(0);
   });
 
-  it('gives a shipper a plan free from its company page, with a reason', async () => {
+  it('gives a shipper a plan free for a chosen number of days, with a reason', async () => {
     const user = userEvent.setup();
     renderAt('/admin/companies/acme');
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Plan to give' }), 'fleet');
+    const length = screen.getByRole('combobox', { name: 'For how long' });
+    // 7, 14 or 30 days, or open-ended; 14 unless changed.
+    expect(Array.from((length as HTMLSelectElement).options).map((o) => o.textContent)).toEqual([
+      '7 days',
+      '14 days',
+      '30 days',
+      'No end date',
+    ]);
+    expect(length).toHaveValue('14');
+    await user.selectOptions(length, '30');
     await user.type(screen.getByRole('textbox', { name: 'Why' }), 'Pilot customer');
     await user.click(screen.getByRole('button', { name: /give plan free/i }));
     await waitFor(() =>
       expect(dispatched()[0]).toMatchObject({
         type: 'setCompanyPlan',
-        payload: { tenantId: 'acme', tier: 'fleet', note: 'Pilot customer' },
+        payload: { tenantId: 'acme', tier: 'fleet', days: 30, note: 'Pilot customer' },
       })
     );
+  });
+
+  it('sends no end date when that is chosen', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/companies/acme');
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'For how long' }), 'none');
+    await user.click(screen.getByRole('button', { name: /give plan free/i }));
+    await waitFor(() => expect(dispatched()[0]).toMatchObject({ type: 'setCompanyPlan', payload: { days: null } }));
   });
 
   it('offers a carrier the Driver plan, and only that', async () => {

@@ -4,6 +4,7 @@ import {
   MONTHLY_LOAD_ALLOWANCE,
   PLAN_LABELS,
   PLAN_TIERS,
+  activeOverride,
   effectivePlan,
   formatGbp,
   isShipperTier,
@@ -172,7 +173,9 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
 
 export function PlanSource({ company }: { company: Tenant }) {
   const b = company.billing;
-  if (b?.override) return <Pill className="bg-indigo-100 text-indigo-800">Given by you</Pill>;
+  if (activeOverride(b, new Date().toISOString()) !== null) {
+    return <Pill className="bg-indigo-100 text-indigo-800">Given by you</Pill>;
+  }
   if (b?.status === undefined && effectivePlan(company, new Date().toISOString()) === 'trial') {
     return <Pill className="bg-sky-100 text-sky-800">Trial</Pill>;
   }
@@ -201,7 +204,7 @@ function Companies({ data }: { data: AdminData }) {
   );
 
   const paying = rows.filter(
-    (r) => r.company.billing?.override == null && r.tier !== 'free' && r.tier !== 'trial'
+    (r) => activeOverride(r.company.billing, now) === null && r.tier !== 'free' && r.tier !== 'trial'
   ).length;
   const inTrial = rows.filter((r) => r.tier === 'trial').length;
 
@@ -232,7 +235,7 @@ function Companies({ data }: { data: AdminData }) {
                   {ships && company.capabilities.includes('carrier') ? 'Shipper and carrier' : ships ? 'Shipper' : 'Driver'}
                   {tier === 'trial' && ` · trial ends in ${trialDaysLeft(company, now)} days`}
                   {company.billing?.currentPeriodEnd !== undefined &&
-                    company.billing.override == null &&
+                    activeOverride(company.billing, now) === null &&
                     ` · ${company.billing.cancelAtPeriodEnd ? 'ends' : 'renews'} ${formatDay(company.billing.currentPeriodEnd)}`}
                 </p>
               </div>
