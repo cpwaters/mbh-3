@@ -1,6 +1,7 @@
-// Subscriptions. Every company starts with a 14-day free trial; after it,
-// shippers pay to post loads beyond a small free allowance, and drivers pay
-// a lower, individual price to keep accepting loads (00-product-brief.md §1,
+// Subscriptions. Every company starts with a 30-day free trial. After it,
+// without a plan, a company may post one load a day and pick up one load a
+// day; shipper plans lift the posting limit and the Driver plan — a lower,
+// individual price — lifts the pick-up limit (00-product-brief.md §1,
 // ADR-0004). Tiers are derived from the Stripe Price — by the price's lookup
 // key, which the provisioning script sets and which travels on every
 // subscription event, so no price-id mapping is configured anywhere.
@@ -43,19 +44,43 @@ export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
   driver: 'Driver',
 };
 
-export const TRIAL_DAYS = 14;
+export const TRIAL_DAYS = 30;
 
-// Loads a company may post per calendar month (UTC). null = unlimited. The
-// Driver plan buys accepting loads, not posting them, so for posting it is
-// the free allowance.
-export const MONTHLY_LOAD_ALLOWANCE: Readonly<Record<EffectiveTier, number | null>> = {
-  free: 3,
+// How many of something a company may do, per day or per calendar month.
+// null = unlimited.
+export interface Allowance {
+  count: number;
+  per: 'day' | 'month';
+}
+
+// Posting loads. Shipper plans buy a monthly allowance; with no plan (or
+// only the Driver plan, which buys picking up, not posting) it is one a day.
+export const POSTING_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>> = {
+  free: { count: 1, per: 'day' },
   trial: null,
-  starter: 25,
-  growth: 100,
+  starter: { count: 25, per: 'month' },
+  growth: { count: 100, per: 'month' },
   fleet: null,
-  driver: 3,
+  driver: { count: 1, per: 'day' },
 };
+
+// Picking up (accepting) loads. Any plan is unlimited — the Driver plan is
+// the cheap one made for it, and a shipper plan covers a company that also
+// carries. With no plan it is one a day.
+export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>> = {
+  free: { count: 1, per: 'day' },
+  trial: null,
+  starter: null,
+  growth: null,
+  fleet: null,
+  driver: null,
+};
+
+export function describeAllowance(allowance: Allowance | null, noun: string): string {
+  if (allowance === null) return `Unlimited ${noun}s`;
+  const what = allowance.count === 1 ? noun : `${noun}s`;
+  return `${allowance.count} ${what} a ${allowance.per}`;
+}
 
 export const PLAN_LOOKUP_KEYS: Readonly<Record<PlanTier, string>> = {
   starter: 'mbh_starter_monthly',
@@ -140,14 +165,18 @@ export interface TenantBilling {
   override?: PlanOverride | null;
 }
 
-// When a company's free trial ends: set when it is created, or — for
-// companies that predate trials — 14 days after it was. null when neither is
-// known, which means no trial.
+// When a company's free trial ends: TRIAL_DAYS after it was created, or the
+// end stamped on it at sign-up if that is later. Taking the later of the two
+// means lengthening the trial reaches companies already in theirs — a sign-up
+// stamped with the old 14 days gets the full 30. null when neither is known,
+// which means no trial.
 export function trialEndsAt(tenant: PlanSubject): string | null {
-  if (tenant.trialEndsAt !== undefined) return tenant.trialEndsAt;
   const created = Date.parse(tenant.createdAt ?? '');
-  if (Number.isNaN(created)) return null;
-  return new Date(created + TRIAL_DAYS * 86_400_000).toISOString();
+  const fromCreated = Number.isNaN(created) ? null : new Date(created + TRIAL_DAYS * 86_400_000).toISOString();
+  const stamped = tenant.trialEndsAt ?? null;
+  if (fromCreated === null) return stamped;
+  if (stamped === null) return fromCreated;
+  return stamped > fromCreated ? stamped : fromCreated;
 }
 
 export function trialEndsAtFor(createdAtIso: string): string {
@@ -179,33 +208,71 @@ export function monthStartUtc(nowIso: string): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
 }
 
+// Minutes the UK clock is ahead of UTC at `instant` (0 in winter, 60 in
+// summer), from the platform's own time-zone data — no library needed.
+function ukOffsetMinutes(instant: number): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? '0');
+  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+  return Math.round((asUtc - Math.floor(instant / 60_000) * 60_000) / 60_000);
+}
+
+// The first instant of today in the UK — when a daily allowance resets. The
+// people using this are in UK yards, so "a day" is midnight to midnight on
+// their clock, not on UTC's.
+export function ukDayStart(nowIso: string): string {
+  const now = Date.parse(nowIso);
+  const local = new Date(now + ukOffsetMinutes(now) * 60_000);
+  const midnightAsUtc = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+  // The offset at midnight itself, which differs from now's on the two days
+  // a year the clocks change.
+  return new Date(midnightAsUtc - ukOffsetMinutes(midnightAsUtc) * 60_000).toISOString();
+}
+
+// Where the current allowance period began, for counting against it.
+export function allowancePeriodStart(allowance: Allowance, nowIso: string): string {
+  return allowance.per === 'day' ? ukDayStart(nowIso) : monthStartUtc(nowIso);
+}
+
 export type AllowanceCheck = { ok: true } | { ok: false; message: string };
 
-// Whether one more load fits this month. Said in the shipper's terms: how
-// many, on which plan, and what to do about it.
-export function checkLoadAllowance(tier: EffectiveTier, postedThisMonth: number): AllowanceCheck {
-  const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
-  if (allowance === null || postedThisMonth < allowance) return { ok: true };
+const PERIOD_WORDS: Record<Allowance['per'], string> = { day: 'today', month: 'this month' };
+
+// Whether one more load may be posted, given how many have been posted in the
+// current period. Said in the shipper's terms: how many, on which plan, and
+// what to do about it.
+export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number): AllowanceCheck {
+  const allowance = POSTING_ALLOWANCE[tier];
+  if (allowance === null || postedInPeriod < allowance.count) return { ok: true };
+  const when = PERIOD_WORDS[allowance.per];
   if (tier === 'free' || tier === 'driver') {
     return {
       ok: false,
-      message: `You've posted your ${allowance} free loads this month. Choose a shipper plan under Billing to post more.`,
+      message: `Without a shipper plan you can post ${describeAllowance(allowance, 'load')}, and you have posted ${when}'s. Choose a shipper plan under Billing to post more.`,
     };
   }
   return {
     ok: false,
-    message: `You've posted all ${allowance} loads in your ${PLAN_LABELS[tier]} plan this month. Upgrade under Billing to post more.`,
+    message: `You've posted all ${allowance.count} loads in your ${PLAN_LABELS[tier]} plan ${when}. Upgrade under Billing to post more.`,
   };
 }
 
-// Whether the company may accept a load. Any plan does — the Driver plan is
-// the cheap one made for it, and a shipper plan covers a company that also
-// carries. Only free, after the trial, does not.
-export function checkAcceptAllowed(tier: EffectiveTier): AllowanceCheck {
-  if (tier !== 'free') return { ok: true };
+// Whether one more load may be picked up, given how many the company has
+// accepted in the current period.
+export function checkAcceptAllowed(tier: EffectiveTier, acceptedInPeriod: number): AllowanceCheck {
+  const allowance = PICKUP_ALLOWANCE[tier];
+  if (allowance === null || acceptedInPeriod < allowance.count) return { ok: true };
   return {
     ok: false,
-    message: `Your ${TRIAL_DAYS}-day free trial has ended. Choose the Driver plan under Billing to accept loads.`,
+    message: `Without a plan you can pick up ${describeAllowance(allowance, 'load')}, and you have picked up ${PERIOD_WORDS[allowance.per]}'s. Choose the Driver plan under Billing to pick up more.`,
   };
 }
 

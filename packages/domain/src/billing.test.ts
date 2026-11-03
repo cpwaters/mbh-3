@@ -3,6 +3,7 @@ import {
   checkAcceptAllowed,
   checkLoadAllowance,
   effectivePlan,
+  ukDayStart,
   trialDaysLeft,
   trialEndsAt,
   isStripePaymentLink,
@@ -44,17 +45,24 @@ describe('effectivePlan', () => {
     expect(plan({ tier: 'growth', status: 'active', override: null })).toBe('growth');
   });
 
-  it('is the trial for 14 days from sign-up, and free after', () => {
-    const signedUp = { createdAt: '2026-10-20T12:00:00.000Z', trialEndsAt: '2026-11-03T12:00:00.000Z' };
+  it('is the trial for 30 days from sign-up, and free after', () => {
+    const signedUp = { createdAt: '2026-10-20T12:00:00.000Z', trialEndsAt: '2026-11-19T12:00:00.000Z' };
     expect(effectivePlan(signedUp, NOW)).toBe('trial');
-    expect(trialDaysLeft(signedUp, NOW)).toBe(7);
-    expect(effectivePlan(signedUp, '2026-11-03T12:00:00.000Z')).toBe('free');
-    expect(trialDaysLeft(signedUp, '2026-11-04T00:00:00.000Z')).toBe(0);
+    expect(trialDaysLeft(signedUp, NOW)).toBe(23);
+    expect(effectivePlan(signedUp, '2026-11-19T12:00:00.000Z')).toBe('free');
+    expect(trialDaysLeft(signedUp, '2026-11-20T00:00:00.000Z')).toBe(0);
   });
 
-  it('gives a company from before trials existed 14 days from when it was created', () => {
-    expect(trialEndsAt({ createdAt: '2026-10-01T00:00:00.000Z' })).toBe('2026-10-15T00:00:00.000Z');
+  it('gives a company from before trials existed 30 days from when it was created', () => {
+    expect(trialEndsAt({ createdAt: '2026-10-01T00:00:00.000Z' })).toBe('2026-10-31T00:00:00.000Z');
     expect(trialEndsAt({})).toBeNull();
+  });
+
+  it('stretches a trial stamped with the old 14 days to the full 30', () => {
+    const stampedShort = { createdAt: '2026-10-20T12:00:00.000Z', trialEndsAt: '2026-11-03T12:00:00.000Z' };
+    expect(trialEndsAt(stampedShort)).toBe('2026-11-19T12:00:00.000Z');
+    // ...but never shortens one stamped longer.
+    expect(trialEndsAt({ ...stampedShort, trialEndsAt: '2026-12-25T00:00:00.000Z' })).toBe('2026-12-25T00:00:00.000Z');
   });
 
   it('prefers a paid plan to the trial, so subscribing early shows the plan bought', () => {
@@ -64,26 +72,30 @@ describe('effectivePlan', () => {
 });
 
 describe('checkAcceptAllowed', () => {
-  it('lets anyone in a trial or on any plan accept, and stops free after the trial', () => {
-    expect(checkAcceptAllowed('trial').ok).toBe(true);
-    expect(checkAcceptAllowed('driver').ok).toBe(true);
-    expect(checkAcceptAllowed('growth').ok).toBe(true);
-    const refused = checkAcceptAllowed('free');
-    expect(!refused.ok && refused.message).toMatch(/14-day free trial has ended.*Driver plan/);
+  it('lets anyone in a trial or on any plan pick up as many as they like', () => {
+    expect(checkAcceptAllowed('trial', 50).ok).toBe(true);
+    expect(checkAcceptAllowed('driver', 50).ok).toBe(true);
+    expect(checkAcceptAllowed('growth', 50).ok).toBe(true);
+  });
+
+  it('allows one pick-up a day without a plan, and says how to get more', () => {
+    expect(checkAcceptAllowed('free', 0).ok).toBe(true);
+    const refused = checkAcceptAllowed('free', 1);
+    expect(!refused.ok && refused.message).toMatch(/1 load a day.*today's.*Driver plan/);
   });
 });
 
 describe('checkLoadAllowance', () => {
-  it('allows up to the allowance and refuses the one after, saying what to do', () => {
-    expect(checkLoadAllowance('free', 2)).toEqual({ ok: true });
-    const refused = checkLoadAllowance('free', 3);
-    expect(refused.ok).toBe(false);
-    expect(!refused.ok && refused.message).toMatch(/3 free loads.*Billing/);
+  it('allows one post a day without a plan, and refuses the second, saying what to do', () => {
+    expect(checkLoadAllowance('free', 0)).toEqual({ ok: true });
+    const refused = checkLoadAllowance('free', 1);
+    expect(!refused.ok && refused.message).toMatch(/1 load a day.*today's.*shipper plan/);
+  });
 
+  it('meters shipper plans by the month', () => {
     expect(checkLoadAllowance('starter', 24)).toEqual({ ok: true });
-    expect(!checkLoadAllowance('starter', 25).ok && (checkLoadAllowance('starter', 25) as { message: string }).message).toMatch(
-      /25 loads in your Starter plan/
-    );
+    const refused = checkLoadAllowance('starter', 25);
+    expect(!refused.ok && refused.message).toMatch(/25 loads in your Starter plan this month/);
   });
 
   it('never meters the Fleet tier or the trial', () => {
@@ -91,9 +103,31 @@ describe('checkLoadAllowance', () => {
     expect(checkLoadAllowance('trial', 10_000)).toEqual({ ok: true });
   });
 
-  it('treats the Driver plan as free for posting — it buys accepting loads', () => {
-    const refused = checkLoadAllowance('driver', 3);
-    expect(!refused.ok && refused.message).toMatch(/shipper plan/);
+  it('treats the Driver plan as free for posting — it buys picking up', () => {
+    expect(checkLoadAllowance('driver', 0).ok).toBe(true);
+    expect(checkLoadAllowance('driver', 1).ok).toBe(false);
+  });
+});
+
+describe('ukDayStart — when a daily allowance resets', () => {
+  it('is midnight UK time: UTC midnight in winter', () => {
+    expect(ukDayStart('2026-12-10T15:00:00.000Z')).toBe('2026-12-10T00:00:00.000Z');
+    expect(ukDayStart('2026-12-10T00:00:00.000Z')).toBe('2026-12-10T00:00:00.000Z');
+  });
+
+  it('is 23:00 UTC the evening before in summer', () => {
+    expect(ukDayStart('2026-07-10T15:00:00.000Z')).toBe('2026-07-09T23:00:00.000Z');
+    // 23:30 UTC on 10 July is already 11 July in the UK.
+    expect(ukDayStart('2026-07-10T23:30:00.000Z')).toBe('2026-07-10T23:00:00.000Z');
+  });
+
+  it('copes with the days the clocks change', () => {
+    // Clocks went forward at 01:00 UTC on 29 March 2026: that UK day began
+    // at midnight GMT.
+    expect(ukDayStart('2026-03-29T12:00:00.000Z')).toBe('2026-03-29T00:00:00.000Z');
+    // They go back at 01:00 UTC on 25 October 2026: that day began at
+    // midnight BST, i.e. 23:00 UTC on the 24th.
+    expect(ukDayStart('2026-10-25T12:00:00.000Z')).toBe('2026-10-24T23:00:00.000Z');
   });
 });
 

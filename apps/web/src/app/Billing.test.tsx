@@ -9,6 +9,7 @@ import { makeMockApp } from './stories/mock';
 let config: BillingConfig = DEFAULT_BILLING_CONFIG;
 let billing: TenantBilling | null = null;
 let posted = 0;
+let pickedUp = 0;
 let trial: { trialEndsAt?: string } = {};
 
 vi.mock('../lib/reader', () => ({
@@ -17,6 +18,7 @@ vi.mock('../lib/reader', () => ({
     // Signed up long ago, so the trial is over unless a test says otherwise.
     tenantPlan: async () => ({ createdAt: '2026-01-01T00:00:00.000Z', billing: billing ?? undefined, ...trial }),
     loadsPostedSince: async () => posted,
+    jobsAcceptedSince: async () => pickedUp,
   }),
 }));
 
@@ -55,15 +57,18 @@ afterEach(() => {
   config = DEFAULT_BILLING_CONFIG;
   billing = null;
   posted = 0;
+  pickedUp = 0;
   trial = {};
 });
 
 describe('Billing', () => {
-  it('shows the free allowance and what is used of it, and says when nothing is enforced yet', async () => {
-    posted = 2;
+  it('shows the free allowance of one load a day and what is used of it, and says when nothing is enforced yet', async () => {
+    posted = 1;
     renderBilling();
     expect(await screen.findByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('/ 3', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/Loads posted today/)).toBeInTheDocument();
+    expect(screen.getByText('/ 1', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('Resets at midnight.')).toBeInTheDocument();
     expect(screen.getByText(/not being enforced yet/)).toBeInTheDocument();
     // No links configured: plans say so rather than offering a dead button.
     expect(screen.getAllByText('Opening soon')).toHaveLength(3);
@@ -128,8 +133,8 @@ describe('Billing — the trial', () => {
     renderBilling();
     expect(await screen.findByText('Free trial')).toBeInTheDocument();
     expect(screen.getByText(/5 days left/)).toBeInTheDocument();
-    // In the trial nothing is metered, so no "/ 3".
-    expect(screen.queryByText('/ 3', { exact: false })).not.toBeInTheDocument();
+    // In the trial nothing is metered.
+    expect(screen.queryByText(/Loads posted/)).not.toBeInTheDocument();
   });
 });
 
@@ -142,13 +147,16 @@ describe('Billing — drivers', () => {
     expect(screen.getByText('£9.99')).toBeInTheDocument();
     expect(screen.queryByText('Starter')).not.toBeInTheDocument();
     // A driver does not post, so there is no posting meter.
-    expect(screen.queryByText('Loads posted this month')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Loads posted/)).not.toBeInTheDocument();
   });
 
-  it('tells a driver whose trial has ended what to do', async () => {
+  it('shows a driver past their trial the one-a-day pick-up allowance', async () => {
     config = LIVE;
+    pickedUp = 1;
     renderBilling('owner', '/billing', ['carrier']);
-    expect(await screen.findByText(/trial has ended\. Choose the Driver plan to accept loads/)).toBeInTheDocument();
+    expect(await screen.findByText(/Loads picked up today/)).toBeInTheDocument();
+    expect(screen.getByText('/ 1', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/Without the Driver plan you can pick up 1 load a day/)).toBeInTheDocument();
   });
 
   it('shows a subscribed driver their plan', async () => {
@@ -157,5 +165,7 @@ describe('Billing — drivers', () => {
     renderBilling('owner', '/billing', ['carrier']);
     expect(await screen.findAllByText('Your plan')).toHaveLength(2);
     expect(screen.queryByRole('link', { name: 'Choose Driver' })).not.toBeInTheDocument();
+    // On the Driver plan pick-ups are unlimited, so there is no meter.
+    expect(screen.queryByText(/Loads picked up/)).not.toBeInTheDocument();
   });
 });

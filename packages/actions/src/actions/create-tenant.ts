@@ -54,7 +54,7 @@ export const createTenantHandler: ActionHandler<CreateTenantPayload, CreateTenan
       name: payload.name.trim(),
       capabilities,
       createdAt: ctx.now,
-      // Every sign-up starts with the full product free for 14 days.
+      // Every sign-up starts with the full product free for 30 days.
       trialEndsAt: trialEndsAtFor(ctx.now),
       // ...and with location tracking off: nobody is followed until the
       // founder switches it on for the company from the back office.

@@ -453,3 +453,11 @@ describe('billing', () => {
     );
   });
 });
+
+describe('the free daily pick-up count', () => {
+  it('lets a carrier’s member list its jobs by carrierTenantId, and nobody else', async () => {
+    await assertSucceeds(getDocs(query(collection(db(CAR_DRIVER), 'jobs'), where('carrierTenantId', '==', 'carrier-1'))));
+    await assertFails(getDocs(query(collection(db(OUTSIDER), 'jobs'), where('carrierTenantId', '==', 'carrier-1'))));
+    await assertFails(getDocs(query(collection(db(DISABLED), 'jobs'), where('carrierTenantId', '==', 'carrier-1'))));
+  });
+});

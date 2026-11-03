@@ -8,4 +8,7 @@ export interface BillingReader {
   billingConfig(): Promise<BillingConfig>;
   tenantPlan(tenantId: string): Promise<PlanSubject | null>;
   loadsPostedSince(tenantId: string, sinceIso: string): Promise<number>;
+  // Loads the company has picked up (accepted) since a given instant — the
+  // count the server makes against the free daily allowance.
+  jobsAcceptedSince(tenantId: string, sinceIso: string): Promise<number>;
 }

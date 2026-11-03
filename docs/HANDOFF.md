@@ -659,6 +659,17 @@ and Plan offers only the tiers a company can use.
   null for no end); `override.expiresAt` is checked by `activeOverride`, so
   an expired gift simply stops counting — no clean-up needed.
 
+## 30-day trial; one post and one pick-up a day without a plan (built)
+
+TRIAL_DAYS = 30 (`trialEndsAt` = later of stamp and createdAt + 30, so the
+14-day stamps stretch). `POSTING_ALLOWANCE` / `PICKUP_ALLOWANCE` are
+`{count, per: 'day' | 'month'} | null`; free is 1/day for both, shipper
+plans are monthly posting, any plan makes pick-ups unlimited. Daily periods
+start at UK midnight (`ukDayStart`). requireLoadAllowance / requireAcceptPlan
+count loads / the carrier's jobs since the period start, in the action's
+transaction. Billing shows a meter per limit; `jobsAcceptedSince` reads the
+carrier's jobs (rules test pins the list).
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

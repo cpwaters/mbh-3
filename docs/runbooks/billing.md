@@ -74,12 +74,14 @@ monthly prices to display. Save, leaving "Enforce plans" off.
 ## 6. Enforce
 
 Tick "Enforce plans" in the back office and save. From then on:
-- Every company is free for 14 days from sign-up. Companies created before
-  trials existed count 14 days from when they were created, so most will
-  already be past it. Give any you want to keep a plan first (below).
-- After the trial, a shipper past its monthly allowance (Free 3, Starter 25,
-  Growth 100, Fleet unlimited) is told to upgrade when it posts.
-- After the trial, a driver needs the Driver plan to accept loads. Jobs
+- Every company gets everything free for 30 days from sign-up. Companies
+  created before trials existed count 30 days from when they were created,
+  so many will already be past it. Give any you want to keep a plan first
+  (below).
+- After the trial, a company with no plan can post **one load a day** and
+  pick up **one load a day**. The day resets at midnight UK time.
+- A shipper plan lifts posting (Starter 25 a month, Growth 100, Fleet
+  unlimited). The Driver plan, or any plan, makes pick-ups unlimited. Jobs
   already accepted carry on regardless.
 
 To give a pilot customer a plan without payment, open their company page →

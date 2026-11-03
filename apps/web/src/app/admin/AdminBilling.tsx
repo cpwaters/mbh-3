@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  MONTHLY_LOAD_ALLOWANCE,
+  PICKUP_ALLOWANCE,
+  POSTING_ALLOWANCE,
+  allowancePeriodStart,
   PLAN_LABELS,
   PLAN_TIERS,
   activeOverride,
@@ -91,10 +93,10 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
               <span className="text-xs text-gray-500">
                 (
                 {!isShipperTier(tier)
-                  ? 'accepts loads'
-                  : MONTHLY_LOAD_ALLOWANCE[tier] === null
+                  ? 'unlimited pick-ups'
+                  : POSTING_ALLOWANCE[tier] === null
                     ? 'unlimited'
-                    : `${MONTHLY_LOAD_ALLOWANCE[tier]}/mo`}
+                    : `${POSTING_ALLOWANCE[tier]?.count}/mo`}
                 )
               </span>
             </span>
@@ -190,17 +192,33 @@ export function PlanSource({ company }: { company: Tenant }) {
 
 function Companies({ data }: { data: AdminData }) {
   const now = new Date().toISOString();
-  const monthStart = monthStartUtc(now);
   const rows = useMemo(
     () =>
       [...data.companies]
-        .map((company) => ({
-          company,
-          tier: effectivePlan(company, now),
-          posted: data.loads.filter((l) => l.tenantId === company.tenantId && (l.createdAt ?? '') >= monthStart).length,
-        }))
+        .map((company) => {
+          const tier = effectivePlan(company, now);
+          // Counted over whichever period the company's allowance runs on —
+          // today (UK) without a plan, this month on a shipper plan.
+          const posting = POSTING_ALLOWANCE[tier];
+          const pickup = PICKUP_ALLOWANCE[tier];
+          const postingSince = posting !== null ? allowancePeriodStart(posting, now) : monthStartUtc(now);
+          const pickupSince = pickup !== null ? allowancePeriodStart(pickup, now) : null;
+          return {
+            company,
+            tier,
+            posting,
+            pickup,
+            posted: data.loads.filter((l) => l.tenantId === company.tenantId && (l.createdAt ?? '') >= postingSince)
+              .length,
+            pickedUp:
+              pickupSince === null
+                ? 0
+                : data.jobs.filter((j) => j.carrierTenantId === company.tenantId && (j.createdAt ?? '') >= pickupSince)
+                    .length,
+          };
+        })
         .sort((a, b) => a.company.name.localeCompare(b.company.name)),
-    [data, now, monthStart]
+    [data, now]
   );
 
   const paying = rows.filter(
@@ -218,9 +236,9 @@ function Companies({ data }: { data: AdminData }) {
         </p>
       </div>
       <ul className="divide-y divide-gray-100">
-        {rows.map(({ company, tier, posted }) => {
-          const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
+        {rows.map(({ company, tier, posting, pickup, posted, pickedUp }) => {
           const ships = company.capabilities.includes('shipper');
+          const carries = company.capabilities.includes('carrier');
           return (
             <li key={company.tenantId} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -239,12 +257,20 @@ function Companies({ data }: { data: AdminData }) {
                     ` · ${company.billing.cancelAtPeriodEnd ? 'ends' : 'renews'} ${formatDay(company.billing.currentPeriodEnd)}`}
                 </p>
               </div>
-              {ships && (
-                <span className="text-sm text-gray-700 tabular-nums">
-                  {posted}
-                  {allowance !== null ? ` / ${allowance}` : ''} loads this month
-                </span>
-              )}
+              <div className="text-sm text-gray-700 tabular-nums sm:text-right">
+                {ships && (
+                  <p>
+                    {posted}
+                    {posting !== null ? ` / ${posting.count}` : ''} posted{' '}
+                    {posting?.per === 'day' ? 'today' : 'this month'}
+                  </p>
+                )}
+                {carries && pickup !== null && (
+                  <p>
+                    {pickedUp} / {pickup.count} picked up today
+                  </p>
+                )}
+              </div>
             </li>
           );
         })}
@@ -281,7 +307,8 @@ export function AdminBilling() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
         <p className="text-gray-600 mt-1">
-          Everyone gets a 14-day free trial; then shippers pay to post and drivers pay to accept.{' '}
+          Everyone gets a 30-day free trial. After it, without a plan, a company can post one load and pick up one
+          load a day; shipper plans lift posting, the Driver plan lifts pick-ups.{' '}
           {config !== null &&
             (config.enforced ? (
               <strong className="text-emerald-700">Plans are enforced.</strong>
