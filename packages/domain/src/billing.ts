@@ -20,7 +20,7 @@ export interface PlanSubject {
 }
 
 export type ShipperTier = 'starter' | 'growth' | 'fleet';
-export type DriverTier = 'driver_standard' | 'driver_pro';
+export type DriverTier = 'driver_new' | 'driver_fleet' | 'driver_pro';
 export type PlanTier = ShipperTier | DriverTier;
 
 // What a company is entitled to right now: a paid (or founder-given) tier,
@@ -28,7 +28,7 @@ export type PlanTier = ShipperTier | DriverTier;
 export type EffectiveTier = PlanTier | 'trial' | 'free';
 
 export const SHIPPER_TIERS: readonly ShipperTier[] = ['starter', 'growth', 'fleet'];
-export const DRIVER_TIERS: readonly DriverTier[] = ['driver_standard', 'driver_pro'];
+export const DRIVER_TIERS: readonly DriverTier[] = ['driver_new', 'driver_fleet', 'driver_pro'];
 export const PLAN_TIERS: readonly PlanTier[] = [...SHIPPER_TIERS, ...DRIVER_TIERS];
 
 export function isShipperTier(tier: PlanTier): tier is ShipperTier {
@@ -41,7 +41,8 @@ export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
   starter: 'Starter',
   growth: 'Growth',
   fleet: 'Fleet',
-  driver_standard: 'Driver Standard',
+  driver_new: 'Driver New',
+  driver_fleet: 'Driver Fleet',
   driver_pro: 'Driver Pro',
 };
 
@@ -62,12 +63,13 @@ export const POSTING_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>
   starter: { count: 25, per: 'month' },
   growth: { count: 100, per: 'month' },
   fleet: null,
-  driver_standard: { count: 1, per: 'day' },
+  driver_new: { count: 1, per: 'day' },
+  driver_fleet: { count: 1, per: 'day' },
   driver_pro: { count: 1, per: 'day' },
 };
 
-// Picking up (accepting) loads. The Driver plans buy a monthly allowance —
-// deliberately no unlimited tier. A shipper plan covers a company that also
+// Picking up (accepting) loads. Driver New and Driver Fleet buy a monthly
+// allowance; Driver Pro is unlimited. A shipper plan covers a company that also
 // carries, the way it always has. With no plan it is one a day.
 export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>> = {
   free: { count: 1, per: 'day' },
@@ -75,8 +77,9 @@ export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>>
   starter: null,
   growth: null,
   fleet: null,
-  driver_standard: { count: 20, per: 'month' },
-  driver_pro: { count: 60, per: 'month' },
+  driver_new: { count: 20, per: 'month' },
+  driver_fleet: { count: 60, per: 'month' },
+  driver_pro: null,
 };
 
 export function describeAllowance(allowance: Allowance | null, noun: string): string {
@@ -89,24 +92,25 @@ export const PLAN_LOOKUP_KEYS: Readonly<Record<PlanTier, string>> = {
   starter: 'mbh_starter_monthly',
   growth: 'mbh_growth_monthly',
   fleet: 'mbh_fleet_monthly',
-  driver_standard: 'mbh_driver_standard_monthly',
+  driver_new: 'mbh_driver_new_monthly',
+  driver_fleet: 'mbh_driver_fleet_monthly',
   driver_pro: 'mbh_driver_pro_monthly',
 };
 
 // Before the Driver plan was split in two it was one tier, 'driver', on the
 // price key mbh_driver_monthly. Anything still carrying either — a plan the
-// founder gave, a price provisioned early — is read as Driver Standard, the
+// founder gave, a price provisioned early — is read as Driver New, the
 // tier it most nearly was.
 const LEGACY_DRIVER_TIER = 'driver';
 const LEGACY_DRIVER_LOOKUP_KEY = 'mbh_driver_monthly';
 
 export function normalizeTier(tier: string | null | undefined): PlanTier | null {
-  if (tier === LEGACY_DRIVER_TIER) return 'driver_standard';
+  if (tier === LEGACY_DRIVER_TIER) return 'driver_new';
   return (PLAN_TIERS as readonly string[]).includes(tier ?? '') ? (tier as PlanTier) : null;
 }
 
 export function tierFromLookupKey(lookupKey: string | null | undefined): PlanTier | null {
-  if (lookupKey === LEGACY_DRIVER_LOOKUP_KEY) return 'driver_standard';
+  if (lookupKey === LEGACY_DRIVER_LOOKUP_KEY) return 'driver_new';
   const match = PLAN_TIERS.find((tier) => PLAN_LOOKUP_KEYS[tier] === lookupKey);
   return match ?? null;
 }
@@ -272,7 +276,7 @@ export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number):
   const allowance = POSTING_ALLOWANCE[tier];
   if (allowance === null || postedInPeriod < allowance.count) return { ok: true };
   const when = PERIOD_WORDS[allowance.per];
-  if (tier === 'free' || tier === 'driver_standard' || tier === 'driver_pro') {
+  if (tier === 'free' || tier === 'driver_new' || tier === 'driver_fleet' || tier === 'driver_pro') {
     return {
       ok: false,
       message: `Without a shipper plan you can post ${describeAllowance(allowance, 'load')}, and you have posted ${when}'s. Choose a shipper plan under Billing to post more.`,
@@ -286,20 +290,20 @@ export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number):
 
 // Whether one more load may be picked up, given how many the company has
 // accepted in the current period. Says what to do next: choose a plan, move
-// up to Driver Pro, or — already on Pro — wait for the month to turn.
+// up a plan. Driver Pro is unlimited, so never reaches here.
 export function checkAcceptAllowed(tier: EffectiveTier, acceptedInPeriod: number): AllowanceCheck {
   const allowance = PICKUP_ALLOWANCE[tier];
   if (allowance === null || acceptedInPeriod < allowance.count) return { ok: true };
-  if (tier === 'driver_standard') {
+  if (tier === 'driver_new') {
     return {
       ok: false,
-      message: `You've picked up all ${allowance.count} loads in your Driver Standard plan this month. Move up to Driver Pro under Billing to pick up more.`,
+      message: `You've picked up all ${allowance.count} loads in your Driver New plan this month. Move up to Driver Fleet or Driver Pro under Billing to pick up more.`,
     };
   }
-  if (tier === 'driver_pro') {
+  if (tier === 'driver_fleet') {
     return {
       ok: false,
-      message: `You've picked up all ${allowance.count} loads in your Driver Pro plan this month. Your allowance starts again on the 1st.`,
+      message: `You've picked up all ${allowance.count} loads in your Driver Fleet plan this month. Move up to Driver Pro under Billing for unlimited pick-ups.`,
     };
   }
   return {

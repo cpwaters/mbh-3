@@ -93,7 +93,9 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
               <span className="text-xs text-gray-500">
                 (
                 {!isShipperTier(tier)
-                  ? `${PICKUP_ALLOWANCE[tier]?.count} pick-ups/mo`
+                  ? PICKUP_ALLOWANCE[tier] === null
+                    ? 'unlimited pick-ups'
+                    : `${PICKUP_ALLOWANCE[tier]?.count} pick-ups/mo`
                   : POSTING_ALLOWANCE[tier] === null
                     ? 'unlimited'
                     : `${POSTING_ALLOWANCE[tier]?.count}/mo`}

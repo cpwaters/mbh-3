@@ -39,8 +39,9 @@ const PLAN_BLURBS: Record<PlanTier, string> = {
   starter: 'For a shipper with the odd load to move.',
   growth: 'For a regular flow of backhauls every week.',
   fleet: 'Unlimited loads, for a shipper running at volume.',
-  driver_standard: 'For an owner-driver picking up the odd backhaul each week.',
-  driver_pro: 'For a driver running backhauls most days.',
+  driver_new: 'For a driver new to backhauls, picking up the odd one each week.',
+  driver_fleet: 'For a driver running backhauls most days.',
+  driver_pro: 'Unlimited pick-ups, for a driver who backhauls every run.',
 };
 
 function whatItBuys(tier: PlanTier): string {
@@ -162,7 +163,7 @@ export default function Billing() {
           Every account starts with a {TRIAL_DAYS}-day free trial. After it, without a plan you can{' '}
           {ships && carries ? 'post one load and pick up one load a day' : ships ? 'post one load a day' : 'pick up one load a day'}
           {ships ? ' — a shipper plan lets you post more' : ''}
-          {carries ? `${ships ? ', and' : ' —'} a Driver plan gives you a monthly allowance of pick-ups` : ''}.
+          {carries ? `${ships ? ', and' : ' —'} a Driver plan lets you pick up more` : ''}.
         </p>
       </div>
 

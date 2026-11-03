@@ -168,7 +168,8 @@ const setBillingConfigSchema = z.object({
     growth: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).'),
     fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).'),
     // Optional so a client saved before the Driver plans existed still parses.
-    driver_standard: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
+    driver_new: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
+    driver_fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_pro: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
   }),
   portalUrl: httpsUrlOrEmpty(
@@ -179,7 +180,8 @@ const setBillingConfigSchema = z.object({
     starter: z.number().int().positive().max(1_000_000).optional(),
     growth: z.number().int().positive().max(1_000_000).optional(),
     fleet: z.number().int().positive().max(1_000_000).optional(),
-    driver_standard: z.number().int().positive().max(1_000_000).optional(),
+    driver_new: z.number().int().positive().max(1_000_000).optional(),
+    driver_fleet: z.number().int().positive().max(1_000_000).optional(),
     driver_pro: z.number().int().positive().max(1_000_000).optional(),
   }),
 });

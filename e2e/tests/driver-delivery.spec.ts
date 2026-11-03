@@ -650,12 +650,13 @@ test('a shipper sees their plan and today’s usage, read through the real rules
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
-test('a driver reaches their plan from Profile, and is offered the two Driver plans', async ({ page }) => {
+test('a driver reaches their plan from Profile, and is offered the three Driver plans', async ({ page }) => {
   await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
   await page.getByRole('link', { name: 'Profile' }).first().click();
   await page.getByRole('button', { name: 'Plan & billing' }).click();
   await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Driver Standard', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Driver New', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Driver Fleet', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Driver Pro', exact: true })).toBeVisible();
   await expect(page.getByText('20 pick-ups a month')).toBeVisible();
   // A driver does not post, so there is no posting meter or shipper plans.

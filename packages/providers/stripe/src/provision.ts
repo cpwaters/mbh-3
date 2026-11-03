@@ -59,8 +59,9 @@ export const DEFAULT_MONTHLY_PENCE: Record<PlanTier, number> = {
   growth: 12_900,
   fleet: 29_900,
   // A person, not a company — priced well under the cheapest shipper plan.
-  driver_standard: 799,
-  driver_pro: 1_499,
+  driver_new: 799,
+  driver_fleet: 1_499,
+  driver_pro: 2_499,
 };
 
 const WEBHOOK_EVENTS = [
@@ -171,7 +172,7 @@ export async function provision(stripe: StripeFetch, options: ProvisionOptions):
     'login_page[enabled]': 'true',
     'metadata[mbh]': 'portal',
   };
-  // Every plan is switchable in the portal — a driver moving up to Driver Pro
+  // Every plan is switchable in the portal — a driver moving up a Driver plan
   // is the switch that matters most now. Stripe allows one product list per
   // portal, so a shipper could pick a Driver plan there too; that only
   // lowers its own posting allowance, so it corrects itself.
@@ -230,7 +231,8 @@ async function main(): Promise<void> {
     starter: penceFromEnv('STARTER_PENCE', DEFAULT_MONTHLY_PENCE.starter),
     growth: penceFromEnv('GROWTH_PENCE', DEFAULT_MONTHLY_PENCE.growth),
     fleet: penceFromEnv('FLEET_PENCE', DEFAULT_MONTHLY_PENCE.fleet),
-    driver_standard: penceFromEnv('DRIVER_STANDARD_PENCE', DEFAULT_MONTHLY_PENCE.driver_standard),
+    driver_new: penceFromEnv('DRIVER_NEW_PENCE', DEFAULT_MONTHLY_PENCE.driver_new),
+    driver_fleet: penceFromEnv('DRIVER_FLEET_PENCE', DEFAULT_MONTHLY_PENCE.driver_fleet),
     driver_pro: penceFromEnv('DRIVER_PRO_PENCE', DEFAULT_MONTHLY_PENCE.driver_pro),
   };
 
