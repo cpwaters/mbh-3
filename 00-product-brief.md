@@ -9,10 +9,12 @@ delivery record, not the listing, as the product's legal core.
 Every sign-up gets a 30-day free trial of the whole product. After it,
 without a subscription a company may post one load a day and pick up one
 load a day. Subscriptions through Stripe lift those limits: shippers on
-Starter / Growth / Fleet (how many loads they can post), and drivers on the
-Driver plan (unlimited pick-ups) — priced well below the shipper plans,
-because a driver is an individual rather than a company (founder decisions,
-October–November 2026, superseding "drivers ride free"; see ADR-0004). Tier is derived from the Price. No per-load commission
+Starter / Growth / Fleet (how many loads they can post), and drivers on
+Driver New (20 pick-ups a month), Driver Fleet (60) or Driver Pro
+(unlimited) — priced well below the shipper plans, because a driver is an
+individual rather than a company (founder decisions, October–November 2026,
+superseding "drivers ride free"; see ADR-0004). Tier is derived from the
+Price. No per-load commission
 in v1 — holding money in the flow drags in payment-institution compliance
 we don't want yet.
 

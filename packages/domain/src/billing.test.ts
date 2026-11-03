@@ -3,6 +3,9 @@ import {
   checkAcceptAllowed,
   checkLoadAllowance,
   effectivePlan,
+  normalizeTier,
+  PICKUP_ALLOWANCE,
+  type PlanSubject,
   ukDayStart,
   trialDaysLeft,
   trialEndsAt,
@@ -28,7 +31,7 @@ describe('effectivePlan', () => {
 
   it('is the paid tier while Stripe says the subscription is good', () => {
     expect(plan({ tier: 'growth', status: 'active' })).toBe('growth');
-    expect(plan({ tier: 'driver', status: 'trialing' })).toBe('driver');
+    expect(plan({ tier: 'driver_fleet', status: 'trialing' })).toBe('driver_fleet');
   });
 
   it('keeps the plan while a renewal is being retried, and drops it once Stripe gives up', () => {
@@ -66,22 +69,46 @@ describe('effectivePlan', () => {
   });
 
   it('prefers a paid plan to the trial, so subscribing early shows the plan bought', () => {
-    const signedUp = { createdAt: '2026-10-26T00:00:00.000Z', billing: { tier: 'driver' as const, status: 'active' as const } };
-    expect(effectivePlan(signedUp, NOW)).toBe('driver');
+    const signedUp = {
+      createdAt: '2026-10-26T00:00:00.000Z',
+      billing: { tier: 'driver_new' as const, status: 'active' as const },
+    };
+    expect(effectivePlan(signedUp, NOW)).toBe('driver_new');
   });
 });
 
 describe('checkAcceptAllowed', () => {
-  it('lets anyone in a trial or on any plan pick up as many as they like', () => {
-    expect(checkAcceptAllowed('trial', 50).ok).toBe(true);
-    expect(checkAcceptAllowed('driver', 50).ok).toBe(true);
-    expect(checkAcceptAllowed('growth', 50).ok).toBe(true);
+  it('lets the trial and shipper plans pick up as many as they like', () => {
+    expect(checkAcceptAllowed('trial', 500).ok).toBe(true);
+    expect(checkAcceptAllowed('growth', 500).ok).toBe(true);
+  });
+
+  it('gives Driver New 20 pick-ups a month, and points it at the plans above', () => {
+    expect(checkAcceptAllowed('driver_new', 19).ok).toBe(true);
+    const refused = checkAcceptAllowed('driver_new', 20);
+    expect(!refused.ok && refused.message).toMatch(/all 20 loads in your Driver New plan this month.*Driver Fleet or Driver Pro/);
+  });
+
+  it('gives Driver Fleet 60 a month, and points it at Driver Pro', () => {
+    expect(checkAcceptAllowed('driver_fleet', 59).ok).toBe(true);
+    const refused = checkAcceptAllowed('driver_fleet', 60);
+    expect(!refused.ok && refused.message).toMatch(/all 60 loads in your Driver Fleet plan.*Driver Pro.*unlimited/);
+  });
+
+  it('never meters Driver Pro', () => {
+    expect(checkAcceptAllowed('driver_pro', 10_000).ok).toBe(true);
   });
 
   it('allows one pick-up a day without a plan, and says how to get more', () => {
     expect(checkAcceptAllowed('free', 0).ok).toBe(true);
     const refused = checkAcceptAllowed('free', 1);
     expect(!refused.ok && refused.message).toMatch(/1 load a day.*today's.*Driver plan/);
+  });
+
+  it('meters the driver plans by the month', () => {
+    expect(PICKUP_ALLOWANCE.driver_new).toEqual({ count: 20, per: 'month' });
+    expect(PICKUP_ALLOWANCE.driver_fleet).toEqual({ count: 60, per: 'month' });
+    expect(PICKUP_ALLOWANCE.driver_pro).toBeNull();
   });
 });
 
@@ -103,9 +130,11 @@ describe('checkLoadAllowance', () => {
     expect(checkLoadAllowance('trial', 10_000)).toEqual({ ok: true });
   });
 
-  it('treats the Driver plan as free for posting — it buys picking up', () => {
-    expect(checkLoadAllowance('driver', 0).ok).toBe(true);
-    expect(checkLoadAllowance('driver', 1).ok).toBe(false);
+  it('treats the Driver plans as free for posting — they buy picking up', () => {
+    for (const tier of ['driver_new', 'driver_fleet', 'driver_pro'] as const) {
+      expect(checkLoadAllowance(tier, 0).ok).toBe(true);
+      expect(checkLoadAllowance(tier, 1).ok).toBe(false);
+    }
   });
 });
 
@@ -134,7 +163,9 @@ describe('ukDayStart — when a daily allowance resets', () => {
 describe('the Stripe edges', () => {
   it('derives the tier from the price lookup key, and nothing else', () => {
     expect(tierFromLookupKey('mbh_growth_monthly')).toBe('growth');
-    expect(tierFromLookupKey('mbh_driver_monthly')).toBe('driver');
+    expect(tierFromLookupKey('mbh_driver_new_monthly')).toBe('driver_new');
+    expect(tierFromLookupKey('mbh_driver_fleet_monthly')).toBe('driver_fleet');
+    expect(tierFromLookupKey('mbh_driver_pro_monthly')).toBe('driver_pro');
     expect(tierFromLookupKey('growth')).toBeNull();
     expect(tierFromLookupKey(undefined)).toBeNull();
   });
@@ -166,24 +197,44 @@ describe('a free plan with an end date', () => {
   const setAt = '2026-10-20T12:00:00.000Z';
   const given = (days: number | null) => ({
     ...old,
-    billing: { override: { tier: 'driver' as const, note: '', setAt, expiresAt: freePlanExpiry(setAt, days) } },
+    billing: { override: { tier: 'driver_fleet' as const, note: '', setAt, expiresAt: freePlanExpiry(setAt, days) } },
   });
 
   it('lasts the days given, then the company falls back on its own', () => {
     expect(freePlanExpiry(setAt, 7)).toBe('2026-10-27T12:00:00.000Z');
-    expect(effectivePlan(given(14), NOW)).toBe('driver');
-    expect(effectivePlan(given(7), '2026-10-27T11:59:59.000Z')).toBe('driver');
+    expect(effectivePlan(given(14), NOW)).toBe('driver_fleet');
+    expect(effectivePlan(given(7), '2026-10-27T11:59:59.000Z')).toBe('driver_fleet');
     expect(effectivePlan(given(7), '2026-10-27T12:00:00.000Z')).toBe('free');
   });
 
   it('falls back to what the company pays for, not to nothing', () => {
-    const lapsed = { ...given(7), billing: { ...given(7).billing, tier: 'driver' as const, status: 'active' as const } };
+    const lapsed = {
+      ...given(7),
+      billing: { ...given(7).billing, tier: 'driver_new' as const, status: 'active' as const },
+    };
     expect(activeOverride(lapsed.billing, '2026-11-01T00:00:00.000Z')).toBeNull();
-    expect(effectivePlan(lapsed, '2026-11-01T00:00:00.000Z')).toBe('driver');
+    expect(effectivePlan(lapsed, '2026-11-01T00:00:00.000Z')).toBe('driver_new');
   });
 
   it('has no end when given with none, as before', () => {
     expect(freePlanExpiry(setAt, null)).toBeNull();
-    expect(effectivePlan(given(null), '2030-01-01T00:00:00.000Z')).toBe('driver');
+    expect(effectivePlan(given(null), '2030-01-01T00:00:00.000Z')).toBe('driver_fleet');
+  });
+});
+
+describe('the single Driver plan from before the split', () => {
+  // Stored data is untyped at runtime: a plan given, or a price provisioned,
+  // before the split still says 'driver'.
+  const legacy = (billing: Record<string, unknown>) => ({ ...old, billing } as unknown as PlanSubject);
+
+  it('is read as Driver New, whether paid for or given', () => {
+    expect(effectivePlan(legacy({ tier: 'driver', status: 'active' }), NOW)).toBe('driver_new');
+    expect(effectivePlan(legacy({ override: { tier: 'driver', note: '', setAt: NOW } }), NOW)).toBe('driver_new');
+    expect(tierFromLookupKey('mbh_driver_monthly')).toBe('driver_new');
+    expect(normalizeTier('driver')).toBe('driver_new');
+  });
+
+  it('entitles to nothing when the stored tier is not one we know', () => {
+    expect(effectivePlan(legacy({ tier: 'platinum', status: 'active' }), NOW)).toBe('free');
   });
 });

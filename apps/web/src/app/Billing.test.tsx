@@ -27,10 +27,12 @@ const LIVE: BillingConfig = {
   paymentLinks: {
     starter: 'https://buy.stripe.com/test_s',
     growth: 'https://buy.stripe.com/test_g',
-    driver: 'https://buy.stripe.com/test_d',
+    driver_new: 'https://buy.stripe.com/test_dn',
+    driver_fleet: 'https://buy.stripe.com/test_df',
+    driver_pro: 'https://buy.stripe.com/test_dp',
   },
   portalUrl: 'https://billing.stripe.com/p/login/test_p',
-  monthlyPricePence: { starter: 4900, growth: 12900, driver: 999 },
+  monthlyPricePence: { starter: 4900, growth: 12900, driver_new: 799, driver_fleet: 1499, driver_pro: 2499 },
 };
 
 function renderBilling(
@@ -139,13 +141,22 @@ describe('Billing — the trial', () => {
 });
 
 describe('Billing — drivers', () => {
-  it('offers a driver the Driver plan only, at its own price', async () => {
+  it('offers a driver the three Driver plans only — New, Fleet, then unlimited Pro', async () => {
     config = LIVE;
     renderBilling('owner', '/billing', ['carrier']);
-    const link = await screen.findByRole('link', { name: 'Choose Driver' });
-    expect(link).toHaveAttribute('href', expect.stringContaining('https://buy.stripe.com/test_d?client_reference_id=acme'));
-    expect(screen.getByText('£9.99')).toBeInTheDocument();
-    expect(screen.queryByText('Starter')).not.toBeInTheDocument();
+    const first = await screen.findByRole('link', { name: 'Choose Driver New' });
+    expect(first).toHaveAttribute('href', expect.stringContaining('https://buy.stripe.com/test_dn?client_reference_id=acme'));
+    expect(screen.getByRole('link', { name: 'Choose Driver Fleet' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Choose Driver Pro' })).toBeInTheDocument();
+    expect(screen.getByText('20 pick-ups a month')).toBeInTheDocument();
+    expect(screen.getByText('60 pick-ups a month')).toBeInTheDocument();
+    expect(screen.getByText('Unlimited pick-ups')).toBeInTheDocument();
+    expect(screen.getByText('£7.99')).toBeInTheDocument();
+    expect(screen.getByText('£14.99')).toBeInTheDocument();
+    expect(screen.getByText('£24.99')).toBeInTheDocument();
+    // In that order, and no shipper plans.
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Driver New', 'Driver Fleet', 'Driver Pro']);
     // A driver does not post, so there is no posting meter.
     expect(screen.queryByText(/Loads posted/)).not.toBeInTheDocument();
   });
@@ -156,16 +167,26 @@ describe('Billing — drivers', () => {
     renderBilling('owner', '/billing', ['carrier']);
     expect(await screen.findByText(/Loads picked up today/)).toBeInTheDocument();
     expect(screen.getByText('/ 1', { exact: false })).toBeInTheDocument();
-    expect(screen.getByText(/Without the Driver plan you can pick up 1 load a day/)).toBeInTheDocument();
+    expect(screen.getByText(/Without a Driver plan you can pick up 1 load a day/)).toBeInTheDocument();
   });
 
-  it('shows a subscribed driver their plan', async () => {
+  it('shows a Driver New subscriber this month’s pick-ups, and sends them to the portal to move up', async () => {
     config = LIVE;
-    billing = { stripeCustomerId: 'cus_d', stripeSubscriptionId: 'sub_d', tier: 'driver', status: 'active', override: null };
+    pickedUp = 12;
+    billing = {
+      stripeCustomerId: 'cus_d',
+      stripeSubscriptionId: 'sub_d',
+      tier: 'driver_new',
+      status: 'active',
+      override: null,
+    };
     renderBilling('owner', '/billing', ['carrier']);
     expect(await screen.findAllByText('Your plan')).toHaveLength(2);
-    expect(screen.queryByRole('link', { name: 'Choose Driver' })).not.toBeInTheDocument();
-    // On the Driver plan pick-ups are unlimited, so there is no meter.
-    expect(screen.queryByText(/Loads picked up/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Loads picked up this month/)).toBeInTheDocument();
+    expect(screen.getByText('/ 20', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /switch to driver pro/i })).toHaveAttribute(
+      'href',
+      'https://billing.stripe.com/p/login/test_p?prefilled_email=ann%40acme.test'
+    );
   });
 });

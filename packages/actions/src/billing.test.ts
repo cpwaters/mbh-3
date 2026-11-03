@@ -402,7 +402,7 @@ describe('accepting loads after the trial', () => {
       {
         kind: 'update',
         path: 'tenants/carrier-1',
-        data: { billing: { tier: 'driver', status: 'active', override: null } },
+        data: { billing: { tier: 'driver_new', status: 'active', override: null } },
       },
     ]);
     await expect(accept(h2, loadId2)).resolves.toBeTruthy();
@@ -422,8 +422,8 @@ describe('accepting loads after the trial', () => {
 describe('setCompanyPlan fits the plan to the company', () => {
   it('gives a carrier the Driver plan', async () => {
     const h = await makeHarness();
-    await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'driver' }, requestId: 'r-1' });
-    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({ billing: { override: { tier: 'driver' } } });
+    await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'driver_fleet' }, requestId: 'r-1' });
+    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({ billing: { override: { tier: 'driver_fleet' } } });
   });
 
   it('refuses a shipper plan for a carrier-only company, and the Driver plan for a shipper-only one', async () => {
@@ -433,7 +433,7 @@ describe('setCompanyPlan fits the plan to the company', () => {
       'conflict'
     );
     await expectAppError(
-      h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'shipper-1', tier: 'driver' }, requestId: 'r-2' }),
+      h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'shipper-1', tier: 'driver_new' }, requestId: 'r-2' }),
       'conflict'
     );
   });
@@ -444,12 +444,12 @@ describe('a free plan for a number of days', () => {
     const h = await makeHarness();
     await h.run(founder, {
       type: 'setCompanyPlan',
-      payload: { tenantId: 'carrier-1', tier: 'driver', note: 'Trial extension', days: 7 },
+      payload: { tenantId: 'carrier-1', tier: 'driver_new', note: 'Trial extension', days: 7 },
       requestId: 'r-1',
     });
     // FIXED_NOW is 2026-08-01T09:00Z.
     expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({
-      billing: { override: { tier: 'driver', expiresAt: '2026-08-08T09:00:00.000Z' } },
+      billing: { override: { tier: 'driver_new', expiresAt: '2026-08-08T09:00:00.000Z' } },
     });
   });
 
@@ -457,7 +457,7 @@ describe('a free plan for a number of days', () => {
     const h = await makeHarness();
     await h.run(founder, {
       type: 'setCompanyPlan',
-      payload: { tenantId: 'carrier-1', tier: 'driver', days: null },
+      payload: { tenantId: 'carrier-1', tier: 'driver_new', days: null },
       requestId: 'r-1',
     });
     expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({ billing: { override: { expiresAt: null } } });
@@ -468,10 +468,57 @@ describe('a free plan for a number of days', () => {
     await expectAppError(
       h.run(founder, {
         type: 'setCompanyPlan',
-        payload: { tenantId: 'carrier-1', tier: 'driver', days: 365 },
+        payload: { tenantId: 'carrier-1', tier: 'driver_new', days: 365 },
         requestId: 'r-1',
       }),
       'invalid-payload'
     );
+  });
+});
+
+describe('the Driver plans meter pick-ups by the month', () => {
+  // Driver New allows 20 a month; seed 20 accepted this month (and one
+  // last month, which must not count) and the 21st is refused.
+  async function carrierWithPickups(tier: 'driver_new' | 'driver_fleet' | 'driver_pro', thisMonth: number) {
+    const h = await makeHarness();
+    const { loadId } = (await post(h, 'r-post')) as { loadId: string };
+    await enforce(h);
+    const jobs = Array.from({ length: thisMonth }, (_, i) => ({
+      kind: 'create' as const,
+      path: `jobs/job-month-${i}`,
+      data: { jobId: `job-month-${i}`, carrierTenantId: 'carrier-1', driverActorId: 'driver-2', status: 'closed', createdAt: '2026-08-01T01:00:00.000Z' },
+    }));
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/carrier-1', data: { billing: { tier, status: 'active', override: null } } },
+      {
+        kind: 'create',
+        path: 'jobs/job-last-month',
+        data: { jobId: 'job-last-month', carrierTenantId: 'carrier-1', driverActorId: 'driver-2', status: 'closed', createdAt: '2026-07-31T12:00:00.000Z' },
+      },
+      ...jobs,
+    ]);
+    const accept = () =>
+      h.run('driver-1', { type: 'acceptLoad', payload: { carrierTenantId: 'carrier-1', loadId }, requestId: 'r-accept' });
+    return { accept };
+  }
+
+  it('lets Driver New pick up its 20th load of the month', async () => {
+    const { accept } = await carrierWithPickups('driver_new', 19);
+    await expect(accept()).resolves.toBeTruthy();
+  });
+
+  it('refuses Driver New a 21st, pointing it at Driver Fleet', async () => {
+    const { accept } = await carrierWithPickups('driver_new', 20);
+    const err = await expectAppError(accept(), 'forbidden');
+    expect(err.message).toMatch(/Driver New.*Driver Fleet/);
+  });
+
+  it('never stops Driver Pro', async () => {
+    await expect((await carrierWithPickups('driver_pro', 200)).accept()).resolves.toBeTruthy();
+  });
+
+  it('gives Driver Fleet room for more, but not without limit', async () => {
+    await expect((await carrierWithPickups('driver_fleet', 20)).accept()).resolves.toBeTruthy();
+    await expectAppError((await carrierWithPickups('driver_fleet', 60)).accept(), 'forbidden');
   });
 });

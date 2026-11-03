@@ -36,8 +36,8 @@ interface Form {
 }
 
 function toForm(config: BillingConfig): Form {
-  const links: Record<PlanTier, string> = { starter: '', growth: '', fleet: '', driver: '' };
-  const prices: Record<PlanTier, string> = { starter: '', growth: '', fleet: '', driver: '' };
+  const links = Object.fromEntries(PLAN_TIERS.map((t) => [t, ''])) as Record<PlanTier, string>;
+  const prices = Object.fromEntries(PLAN_TIERS.map((t) => [t, ''])) as Record<PlanTier, string>;
   for (const tier of PLAN_TIERS) {
     links[tier] = config.paymentLinks[tier] ?? '';
     const pence = config.monthlyPricePence[tier];
@@ -87,13 +87,15 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
 
       <div className="grid gap-4">
         {PLAN_TIERS.map((tier) => (
-          <div key={tier} className="grid sm:grid-cols-[8rem_1fr_9rem] gap-2 sm:items-center">
+          <div key={tier} className="grid sm:grid-cols-[10rem_1fr_9rem] gap-2 sm:items-center">
             <span className="font-medium text-gray-800">
               {PLAN_LABELS[tier]}{' '}
               <span className="text-xs text-gray-500">
                 (
                 {!isShipperTier(tier)
-                  ? 'unlimited pick-ups'
+                  ? PICKUP_ALLOWANCE[tier] === null
+                    ? 'unlimited pick-ups'
+                    : `${PICKUP_ALLOWANCE[tier]?.count} pick-ups/mo`
                   : POSTING_ALLOWANCE[tier] === null
                     ? 'unlimited'
                     : `${POSTING_ALLOWANCE[tier]?.count}/mo`}
@@ -120,7 +122,7 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
             </label>
           </div>
         ))}
-        <div className="grid sm:grid-cols-[8rem_1fr] gap-2 sm:items-center">
+        <div className="grid sm:grid-cols-[10rem_1fr] gap-2 sm:items-center">
           <span className="font-medium text-gray-800">Customer portal</span>
           <input
             aria-label="Customer portal link"
@@ -267,7 +269,7 @@ function Companies({ data }: { data: AdminData }) {
                 )}
                 {carries && pickup !== null && (
                   <p>
-                    {pickedUp} / {pickup.count} picked up today
+                    {pickedUp} / {pickup.count} picked up {pickup.per === 'day' ? 'today' : 'this month'}
                   </p>
                 )}
               </div>
@@ -308,7 +310,7 @@ export function AdminBilling() {
         <h2 className="text-2xl font-bold text-gray-900">Billing</h2>
         <p className="text-gray-600 mt-1">
           Everyone gets a 30-day free trial. After it, without a plan, a company can post one load and pick up one
-          load a day; shipper plans lift posting, the Driver plan lifts pick-ups.{' '}
+          load a day; shipper plans lift posting, the Driver plans lift pick-ups.{' '}
           {config !== null &&
             (config.enforced ? (
               <strong className="text-emerald-700">Plans are enforced.</strong>
