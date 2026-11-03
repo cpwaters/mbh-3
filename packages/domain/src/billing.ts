@@ -1,14 +1,14 @@
 // Subscriptions. Every company starts with a 30-day free trial. After it,
 // without a plan, a company may post one load a day and pick up one load a
-// day; shipper plans lift the posting limit and the Driver plan — a lower,
-// individual price — lifts the pick-up limit (00-product-brief.md §1,
-// ADR-0004). Tiers are derived from the Stripe Price — by the price's lookup
+// day; shipper plans lift the posting limit and the Driver plans — lower,
+// individual prices — lift the pick-up limit to a monthly allowance
+// (00-product-brief.md §1, ADR-0004). Tiers are derived from the Stripe Price — by the price's lookup
 // key, which the provisioning script sets and which travels on every
 // subscription event, so no price-id mapping is configured anywhere.
 //
 // A driver is a person, not a fleet: signing up as a carrier creates a
-// one-person carrier company, so the Driver plan is held on that company
-// like any other plan.
+// one-person carrier company, so a Driver plan is held on that company like
+// any other plan.
 
 // The parts of a company the plan depends on. Loose on purpose: every field
 // is optional, so a partial read (or a company that predates the field) is
@@ -20,7 +20,7 @@ export interface PlanSubject {
 }
 
 export type ShipperTier = 'starter' | 'growth' | 'fleet';
-export type DriverTier = 'driver';
+export type DriverTier = 'driver_standard' | 'driver_pro';
 export type PlanTier = ShipperTier | DriverTier;
 
 // What a company is entitled to right now: a paid (or founder-given) tier,
@@ -28,7 +28,7 @@ export type PlanTier = ShipperTier | DriverTier;
 export type EffectiveTier = PlanTier | 'trial' | 'free';
 
 export const SHIPPER_TIERS: readonly ShipperTier[] = ['starter', 'growth', 'fleet'];
-export const DRIVER_TIERS: readonly DriverTier[] = ['driver'];
+export const DRIVER_TIERS: readonly DriverTier[] = ['driver_standard', 'driver_pro'];
 export const PLAN_TIERS: readonly PlanTier[] = [...SHIPPER_TIERS, ...DRIVER_TIERS];
 
 export function isShipperTier(tier: PlanTier): tier is ShipperTier {
@@ -41,7 +41,8 @@ export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
   starter: 'Starter',
   growth: 'Growth',
   fleet: 'Fleet',
-  driver: 'Driver',
+  driver_standard: 'Driver Standard',
+  driver_pro: 'Driver Pro',
 };
 
 export const TRIAL_DAYS = 30;
@@ -54,26 +55,28 @@ export interface Allowance {
 }
 
 // Posting loads. Shipper plans buy a monthly allowance; with no plan (or
-// only the Driver plan, which buys picking up, not posting) it is one a day.
+// only a Driver plan, which buys picking up, not posting) it is one a day.
 export const POSTING_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>> = {
   free: { count: 1, per: 'day' },
   trial: null,
   starter: { count: 25, per: 'month' },
   growth: { count: 100, per: 'month' },
   fleet: null,
-  driver: { count: 1, per: 'day' },
+  driver_standard: { count: 1, per: 'day' },
+  driver_pro: { count: 1, per: 'day' },
 };
 
-// Picking up (accepting) loads. Any plan is unlimited — the Driver plan is
-// the cheap one made for it, and a shipper plan covers a company that also
-// carries. With no plan it is one a day.
+// Picking up (accepting) loads. The Driver plans buy a monthly allowance —
+// deliberately no unlimited tier. A shipper plan covers a company that also
+// carries, the way it always has. With no plan it is one a day.
 export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>> = {
   free: { count: 1, per: 'day' },
   trial: null,
   starter: null,
   growth: null,
   fleet: null,
-  driver: null,
+  driver_standard: { count: 20, per: 'month' },
+  driver_pro: { count: 60, per: 'month' },
 };
 
 export function describeAllowance(allowance: Allowance | null, noun: string): string {
@@ -86,10 +89,24 @@ export const PLAN_LOOKUP_KEYS: Readonly<Record<PlanTier, string>> = {
   starter: 'mbh_starter_monthly',
   growth: 'mbh_growth_monthly',
   fleet: 'mbh_fleet_monthly',
-  driver: 'mbh_driver_monthly',
+  driver_standard: 'mbh_driver_standard_monthly',
+  driver_pro: 'mbh_driver_pro_monthly',
 };
 
+// Before the Driver plan was split in two it was one tier, 'driver', on the
+// price key mbh_driver_monthly. Anything still carrying either — a plan the
+// founder gave, a price provisioned early — is read as Driver Standard, the
+// tier it most nearly was.
+const LEGACY_DRIVER_TIER = 'driver';
+const LEGACY_DRIVER_LOOKUP_KEY = 'mbh_driver_monthly';
+
+export function normalizeTier(tier: string | null | undefined): PlanTier | null {
+  if (tier === LEGACY_DRIVER_TIER) return 'driver_standard';
+  return (PLAN_TIERS as readonly string[]).includes(tier ?? '') ? (tier as PlanTier) : null;
+}
+
 export function tierFromLookupKey(lookupKey: string | null | undefined): PlanTier | null {
+  if (lookupKey === LEGACY_DRIVER_LOOKUP_KEY) return 'driver_standard';
   const match = PLAN_TIERS.find((tier) => PLAN_LOOKUP_KEYS[tier] === lookupKey);
   return match ?? null;
 }
@@ -148,7 +165,8 @@ export function activeOverride(billing: TenantBilling | undefined, nowIso: strin
   const override = billing?.override ?? null;
   if (override === null) return null;
   if (override.expiresAt != null && nowIso >= override.expiresAt) return null;
-  return override;
+  const tier = normalizeTier(override.tier);
+  return tier === null ? null : { ...override, tier };
 }
 
 // Held on the tenant doc as `billing`, so members read their own plan with
@@ -189,7 +207,8 @@ export function effectivePlan(tenant: PlanSubject, nowIso: string): EffectiveTie
   const billing = tenant.billing;
   const override = activeOverride(billing, nowIso);
   if (override !== null) return override.tier;
-  if (billing?.tier !== undefined && billing.tier !== null && isEntitledStatus(billing.status)) return billing.tier;
+  const paid = normalizeTier(billing?.tier);
+  if (paid !== null && isEntitledStatus(billing?.status)) return paid;
   const trialEnd = trialEndsAt(tenant);
   if (trialEnd !== null && nowIso < trialEnd) return 'trial';
   return 'free';
@@ -253,7 +272,7 @@ export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number):
   const allowance = POSTING_ALLOWANCE[tier];
   if (allowance === null || postedInPeriod < allowance.count) return { ok: true };
   const when = PERIOD_WORDS[allowance.per];
-  if (tier === 'free' || tier === 'driver') {
+  if (tier === 'free' || tier === 'driver_standard' || tier === 'driver_pro') {
     return {
       ok: false,
       message: `Without a shipper plan you can post ${describeAllowance(allowance, 'load')}, and you have posted ${when}'s. Choose a shipper plan under Billing to post more.`,
@@ -266,13 +285,26 @@ export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number):
 }
 
 // Whether one more load may be picked up, given how many the company has
-// accepted in the current period.
+// accepted in the current period. Says what to do next: choose a plan, move
+// up to Driver Pro, or — already on Pro — wait for the month to turn.
 export function checkAcceptAllowed(tier: EffectiveTier, acceptedInPeriod: number): AllowanceCheck {
   const allowance = PICKUP_ALLOWANCE[tier];
   if (allowance === null || acceptedInPeriod < allowance.count) return { ok: true };
+  if (tier === 'driver_standard') {
+    return {
+      ok: false,
+      message: `You've picked up all ${allowance.count} loads in your Driver Standard plan this month. Move up to Driver Pro under Billing to pick up more.`,
+    };
+  }
+  if (tier === 'driver_pro') {
+    return {
+      ok: false,
+      message: `You've picked up all ${allowance.count} loads in your Driver Pro plan this month. Your allowance starts again on the 1st.`,
+    };
+  }
   return {
     ok: false,
-    message: `Without a plan you can pick up ${describeAllowance(allowance, 'load')}, and you have picked up ${PERIOD_WORDS[allowance.per]}'s. Choose the Driver plan under Billing to pick up more.`,
+    message: `Without a plan you can pick up ${describeAllowance(allowance, 'load')}, and you have picked up ${PERIOD_WORDS[allowance.per]}'s. Choose a Driver plan under Billing to pick up more.`,
   };
 }
 

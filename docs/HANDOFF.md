@@ -670,6 +670,15 @@ count loads / the carrier's jobs since the period start, in the action's
 transaction. Billing shows a meter per limit; `jobsAcceptedSince` reads the
 carrier's jobs (rules test pins the list).
 
+## Driver Standard / Driver Pro (built)
+
+The single Driver tier is split: `driver_standard` (20 pick-ups/month) and
+`driver_pro` (60/month), no unlimited driver plan. Legacy `driver` /
+`mbh_driver_monthly` normalise to Standard (`normalizeTier`). Pick-ups count
+the carrier's jobs since the period start (day for free, month for driver
+plans). Provisioning: DRIVER_STANDARD_PENCE / DRIVER_PRO_PENCE; the portal
+now offers switching between all tiers.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

@@ -12,11 +12,12 @@ Never put them in a chat, an issue, a commit or a file in the repo.
 ## 1. Set the prices (optional)
 
 The provisioning script creates these monthly GBP prices unless told
-otherwise: Starter £49, Growth £129, Fleet £299 for shippers, and Driver
-£9.99 for drivers. **They are placeholders.** To use your own, set them in
-pence when you run step 2:
+otherwise: Starter £49, Growth £129 and Fleet £299 for shippers, and Driver
+Standard £7.99 and Driver Pro £14.99 for drivers. **They are placeholders.**
+To use your own, set them in pence when you run step 2:
 
-    STARTER_PENCE=3900 GROWTH_PENCE=9900 FLEET_PENCE=24900 DRIVER_PENCE=799
+    STARTER_PENCE=3900 GROWTH_PENCE=9900 FLEET_PENCE=24900 \
+    DRIVER_STANDARD_PENCE=699 DRIVER_PRO_PENCE=1299
 
 A Stripe price's amount cannot change once created. To change a price later,
 create a new one in the dashboard and move its lookup key
@@ -56,9 +57,9 @@ Webhooks → the endpoint → Roll secret) and update the GitHub secret.
 
 ## 4. Paste the links into the back office
 
-In /app/admin → Billing, paste the four payment links (three shipper plans
-and the Driver plan) and the portal link the script printed, along with the
-monthly prices to display. Save, leaving "Enforce plans" off.
+In /app/admin → Billing, paste the five payment links (three shipper plans
+and the two Driver plans) and the portal link the script printed, along with
+the monthly prices to display. Save, leaving "Enforce plans" off.
 
 ## 5. Prove it end to end (test mode)
 
@@ -81,8 +82,10 @@ Tick "Enforce plans" in the back office and save. From then on:
 - After the trial, a company with no plan can post **one load a day** and
   pick up **one load a day**. The day resets at midnight UK time.
 - A shipper plan lifts posting (Starter 25 a month, Growth 100, Fleet
-  unlimited). The Driver plan, or any plan, makes pick-ups unlimited. Jobs
-  already accepted carry on regardless.
+  unlimited).
+- A Driver plan lifts pick-ups to a monthly allowance: Driver Standard 20,
+  Driver Pro 60.
+- Jobs already accepted carry on regardless.
 
 To give a pilot customer a plan without payment, open their company page →
 Plan, choose the plan and how long (7, 14 or 30 days, or no end date), then

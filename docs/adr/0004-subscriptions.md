@@ -122,3 +122,24 @@ The founder lengthened the trial and replaced the free tier's limits:
   Growth 100, Fleet unlimited). Any plan, the Driver plan included, makes
   pick-ups unlimited. The Driver plan does not lift posting.
 - Both gates still wait on the founder's enforcement switch.
+
+## Addendum (November 2026): two Driver plans, no unlimited
+
+The founder asked for drivers to have a structured plan rather than an
+unlimited one:
+
+- **Driver Standard:** 20 pick-ups a month (`mbh_driver_standard_monthly`,
+  placeholder £7.99).
+- **Driver Pro:** 60 pick-ups a month (`mbh_driver_pro_monthly`, placeholder
+  £14.99).
+- **Without a plan:** one a day, as before.
+- **When the limit is hit:** monthly pick-ups count the carrier company's
+  jobs since the 1st (UTC), in `acceptLoad`'s transaction. The refusal
+  names the next step: Standard is pointed at Pro, and Pro is told the
+  allowance restarts on the 1st.
+- **Legacy data:** the single `driver` tier and the `mbh_driver_monthly` key
+  from before the split are read as Driver Standard (`normalizeTier`), so a
+  plan already given keeps working.
+- **Portal:** every plan can now be switched to every other, because Stripe
+  allows one product list per portal. A shipper choosing a Driver plan there
+  only lowers its own posting allowance.

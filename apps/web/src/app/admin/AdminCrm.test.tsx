@@ -324,11 +324,11 @@ describe('Billing (founder)', () => {
     await waitFor(() => expect(dispatched()[0]).toMatchObject({ type: 'setCompanyPlan', payload: { days: null } }));
   });
 
-  it('offers a carrier the Driver plan, and only that', async () => {
+  it('offers a carrier the two Driver plans, and only those', async () => {
     renderAt('/admin/companies/waters');
     const select = await screen.findByRole('combobox', { name: 'Plan to give' });
     const options = Array.from((select as HTMLSelectElement).options).map((o) => o.value);
-    expect(options).toEqual(['driver']);
+    expect(options).toEqual(['driver_standard', 'driver_pro']);
   });
 });
 

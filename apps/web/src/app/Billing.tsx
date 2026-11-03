@@ -29,7 +29,7 @@ import { getReader } from '../lib/reader';
 // A company's plan: its free trial, what it is on, how much of its posting
 // and pick-up allowances is used, and the way to change it. One page for both
 // sides of the marketplace — a shipper sees the shipper plans, a driver sees
-// the Driver plan, a company that does both sees both.
+// the Driver plans, a company that does both sees both.
 //
 // Paying happens on Stripe's own pages (a payment link, the customer portal):
 // this page never touches a card and never calls Stripe. The plan shown is
@@ -39,11 +39,12 @@ const PLAN_BLURBS: Record<PlanTier, string> = {
   starter: 'For a shipper with the odd load to move.',
   growth: 'For a regular flow of backhauls every week.',
   fleet: 'Unlimited loads, for a shipper running at volume.',
-  driver: 'For an owner-driver: accept as many backhauls as you can run.',
+  driver_standard: 'For an owner-driver picking up the odd backhaul each week.',
+  driver_pro: 'For a driver running backhauls most days.',
 };
 
 function whatItBuys(tier: PlanTier): string {
-  if (!isShipperTier(tier)) return 'Unlimited pick-ups';
+  if (!isShipperTier(tier)) return describeAllowance(PICKUP_ALLOWANCE[tier], 'pick-up');
   return describeAllowance(POSTING_ALLOWANCE[tier], 'load');
 }
 
@@ -87,6 +88,7 @@ type State =
       postedToday: number;
       postedThisMonth: number;
       pickedUpToday: number;
+      pickedUpThisMonth: number;
     };
 
 export default function Billing() {
@@ -111,10 +113,19 @@ export default function Billing() {
       reader.loadsPostedSince(tenantId, ukDayStart(nowIso)),
       reader.loadsPostedSince(tenantId, monthStartUtc(nowIso)),
       carries ? reader.jobsAcceptedSince(tenantId, ukDayStart(nowIso)) : Promise.resolve(0),
+      carries ? reader.jobsAcceptedSince(tenantId, monthStartUtc(nowIso)) : Promise.resolve(0),
     ])
-      .then(([config, plan, postedToday, postedThisMonth, pickedUpToday]) => {
+      .then(([config, plan, postedToday, postedThisMonth, pickedUpToday, pickedUpThisMonth]) => {
         if (!cancelled) {
-          setState({ kind: 'ready', config, plan: plan ?? {}, postedToday, postedThisMonth, pickedUpToday });
+          setState({
+            kind: 'ready',
+            config,
+            plan: plan ?? {},
+            postedToday,
+            postedThisMonth,
+            pickedUpToday,
+            pickedUpThisMonth,
+          });
         }
       })
       .catch(() => {
@@ -151,7 +162,7 @@ export default function Billing() {
           Every account starts with a {TRIAL_DAYS}-day free trial. After it, without a plan you can{' '}
           {ships && carries ? 'post one load and pick up one load a day' : ships ? 'post one load a day' : 'pick up one load a day'}
           {ships ? ' — a shipper plan lets you post more' : ''}
-          {carries ? `${ships ? ', and' : ' —'} the Driver plan lets you pick up as many as you like` : ''}.
+          {carries ? `${ships ? ', and' : ' —'} a Driver plan gives you a monthly allowance of pick-ups` : ''}.
         </p>
       </div>
 
@@ -212,7 +223,13 @@ export default function Billing() {
                     allowance={posting}
                   />
                 )}
-                {carries && pickup !== null && <Meter label="Loads picked up" used={state.pickedUpToday} allowance={pickup} />}
+                {carries && pickup !== null && (
+                  <Meter
+                    label="Loads picked up"
+                    used={pickup.per === 'day' ? state.pickedUpToday : state.pickedUpThisMonth}
+                    allowance={pickup}
+                  />
+                )}
               </div>
             )}
             {!state.config.enforced && (
@@ -269,10 +286,10 @@ export default function Billing() {
                         <span className="text-sm text-gray-500">Opening soon</span>
                       ) : !isOwner ? (
                         <span className="text-sm text-gray-500">Ask your company’s owner to change plan</span>
-                      ) : subscribed && isShipperTier(option) && portalHref !== null ? (
-                        // Already subscribed: changing between shipper plans
-                        // happens in the portal, so the old subscription is
-                        // replaced rather than a second one started beside it.
+                      ) : subscribed && portalHref !== null ? (
+                        // Already subscribed: changing plan happens in the
+                        // portal, so the old subscription is replaced rather
+                        // than a second one started beside it.
                         <a
                           href={portalHref}
                           target="_blank"
@@ -297,7 +314,7 @@ export default function Billing() {
             </div>
             <p className="text-sm text-gray-500 mt-3">
               {ships && `Without a shipper plan you can post ${describeAllowance(POSTING_ALLOWANCE.free, 'load')}. `}
-              {carries && `Without the Driver plan you can pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `}
+              {carries && `Without a Driver plan you can pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `}
               Payment is taken by Stripe; we never see your card.
             </p>
           </section>
