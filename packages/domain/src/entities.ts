@@ -32,7 +32,7 @@ export interface Tenant {
   // phones report nothing. Absent means on. See tracking.ts.
   trackingDisabled?: boolean;
   // When the company's free trial ends — set when it is created. Older
-  // companies have none, and are treated as 14 days from createdAt.
+  // companies have none, and are treated as 30 days from createdAt.
   trialEndsAt?: string;
   // The company's plan — see billing.ts. Absent until it first subscribes or
   // the founder gives it one; absent means the free allowance.

@@ -6,12 +6,13 @@ delivery record, not the listing, as the product's legal core.
 
 ## 1. Who pays
 
-Every sign-up gets a 14-day free trial of the whole product. After it,
-both sides subscribe through Stripe: shippers on Starter / Growth / Fleet
-(how many loads they can post), and drivers on the Driver plan — priced
-well below the shipper plans, because a driver is an individual rather
-than a company (founder decision, October 2026, superseding "drivers ride
-free"; see ADR-0004). Tier is derived from the Price. No per-load commission
+Every sign-up gets a 30-day free trial of the whole product. After it,
+without a subscription a company may post one load a day and pick up one
+load a day. Subscriptions through Stripe lift those limits: shippers on
+Starter / Growth / Fleet (how many loads they can post), and drivers on the
+Driver plan (unlimited pick-ups) — priced well below the shipper plans,
+because a driver is an individual rather than a company (founder decisions,
+October–November 2026, superseding "drivers ride free"; see ADR-0004). Tier is derived from the Price. No per-load commission
 in v1 — holding money in the flow drags in payment-institution compliance
 we don't want yet.
 

@@ -3,15 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import { Check, CreditCard, ExternalLink, Info } from 'lucide-react';
 import {
   DRIVER_TIERS,
-  MONTHLY_LOAD_ALLOWANCE,
+  PICKUP_ALLOWANCE,
   PLAN_LABELS,
+  POSTING_ALLOWANCE,
   SHIPPER_TIERS,
   TRIAL_DAYS,
   activeOverride,
+  describeAllowance,
   effectivePlan,
   formatGbp,
   isShipperTier,
   monthStartUtc,
+  ukDayStart,
+  type Allowance,
   paymentLinkFor,
   trialDaysLeft,
   trialEndsAt,
@@ -22,8 +26,8 @@ import {
 import { useApp } from './context';
 import { getReader } from '../lib/reader';
 
-// A company's plan: its free trial, what it is on, how much of this month's
-// posting allowance is used, and the way to change it. One page for both
+// A company's plan: its free trial, what it is on, how much of its posting
+// and pick-up allowances is used, and the way to change it. One page for both
 // sides of the marketplace — a shipper sees the shipper plans, a driver sees
 // the Driver plan, a company that does both sees both.
 //
@@ -39,9 +43,33 @@ const PLAN_BLURBS: Record<PlanTier, string> = {
 };
 
 function whatItBuys(tier: PlanTier): string {
-  if (!isShipperTier(tier)) return 'Accept loads';
-  const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
-  return allowance === null ? 'Unlimited loads' : `${allowance} loads a month`;
+  if (!isShipperTier(tier)) return 'Unlimited pick-ups';
+  return describeAllowance(POSTING_ALLOWANCE[tier], 'load');
+}
+
+// One allowance and how much of it is used in the current period.
+function Meter({ label, used, allowance }: { label: string; used: number; allowance: Allowance }) {
+  const full = used >= allowance.count;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-gray-500">
+          {label} {allowance.per === 'day' ? 'today' : 'this month'}
+        </p>
+        <p className="text-lg font-bold text-gray-900 tabular-nums">
+          {used}
+          <span className="text-gray-400 font-medium"> / {allowance.count}</span>
+        </p>
+      </div>
+      <div className="mt-1 h-2 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true">
+        <div
+          className={`h-full ${full ? 'bg-red-500' : 'bg-blue-600'}`}
+          style={{ width: `${Math.min(100, (used / allowance.count) * 100)}%` }}
+        />
+      </div>
+      {full && allowance.per === 'day' && <p className="text-xs text-gray-500 mt-1">Resets at midnight.</p>}
+    </div>
+  );
 }
 
 function formatDay(iso: string | undefined | null): string {
@@ -52,7 +80,14 @@ function formatDay(iso: string | undefined | null): string {
 type State =
   | { kind: 'loading' }
   | { kind: 'error' }
-  | { kind: 'ready'; config: BillingConfig; plan: PlanSubject; posted: number };
+  | {
+      kind: 'ready';
+      config: BillingConfig;
+      plan: PlanSubject;
+      postedToday: number;
+      postedThisMonth: number;
+      pickedUpToday: number;
+    };
 
 export default function Billing() {
   const app = useApp();
@@ -67,13 +102,20 @@ export default function Billing() {
     if (tenantId === undefined) return;
     let cancelled = false;
     const reader = getReader();
+    const nowIso = new Date().toISOString();
+    // Both periods are read up front, since which one applies depends on the
+    // plan this same read returns.
     Promise.all([
       reader.billingConfig(),
       reader.tenantPlan(tenantId),
-      reader.loadsPostedSince(tenantId, monthStartUtc(new Date().toISOString())),
+      reader.loadsPostedSince(tenantId, ukDayStart(nowIso)),
+      reader.loadsPostedSince(tenantId, monthStartUtc(nowIso)),
+      carries ? reader.jobsAcceptedSince(tenantId, ukDayStart(nowIso)) : Promise.resolve(0),
     ])
-      .then(([config, plan, posted]) => {
-        if (!cancelled) setState({ kind: 'ready', config, plan: plan ?? {}, posted });
+      .then(([config, plan, postedToday, postedThisMonth, pickedUpToday]) => {
+        if (!cancelled) {
+          setState({ kind: 'ready', config, plan: plan ?? {}, postedToday, postedThisMonth, pickedUpToday });
+        }
       })
       .catch(() => {
         if (!cancelled) setState({ kind: 'error' });
@@ -81,7 +123,7 @@ export default function Billing() {
     return () => {
       cancelled = true;
     };
-  }, [tenantId]);
+  }, [tenantId, carries]);
 
   const now = new Date().toISOString();
   const email = app.auth.session?.email ?? null;
@@ -89,7 +131,8 @@ export default function Billing() {
   const billing = plan.billing;
   const tier = effectivePlan(plan, now);
   const gift = activeOverride(billing, now);
-  const allowance = MONTHLY_LOAD_ALLOWANCE[tier];
+  const posting = POSTING_ALLOWANCE[tier];
+  const pickup = PICKUP_ALLOWANCE[tier];
   const tiers: PlanTier[] = [...(ships ? SHIPPER_TIERS : []), ...(carries ? DRIVER_TIERS : [])];
 
   const portalHref = useMemo(() => {
@@ -105,12 +148,10 @@ export default function Billing() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
         <p className="text-gray-600">
-          Every account starts with a {TRIAL_DAYS}-day free trial.{' '}
-          {ships && carries
-            ? 'After it, shipper plans set how many loads you can post, and any plan lets you accept loads.'
-            : ships
-              ? 'After it, your plan sets how many loads you can post each month.'
-              : 'After it, the Driver plan keeps you accepting loads.'}
+          Every account starts with a {TRIAL_DAYS}-day free trial. After it, without a plan you can{' '}
+          {ships && carries ? 'post one load and pick up one load a day' : ships ? 'post one load a day' : 'pick up one load a day'}
+          {ships ? ' — a shipper plan lets you post more' : ''}
+          {carries ? `${ships ? ', and' : ' —'} the Driver plan lets you pick up as many as you like` : ''}.
         </p>
       </div>
 
@@ -156,31 +197,22 @@ export default function Billing() {
                     <>Ends on {formatDay(billing.currentPeriodEnd)}.</>
                   ) : tier !== 'free' && billing?.currentPeriodEnd ? (
                     <>Renews on {formatDay(billing.currentPeriodEnd)}.</>
-                  ) : carries && !ships ? (
-                    <span className="text-amber-700">
-                      Your free trial has ended. Choose the Driver plan to accept loads.
-                    </span>
                   ) : (
                     <>Your free trial has ended — you are on the free allowance.</>
                   )}
                 </p>
               </div>
-              {ships && (
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Loads posted this month</p>
-                  <p className="text-2xl font-bold text-gray-900 tabular-nums">
-                    {state.posted}
-                    {allowance !== null && <span className="text-gray-400 font-medium"> / {allowance}</span>}
-                  </p>
-                </div>
-              )}
             </div>
-            {ships && allowance !== null && (
-              <div className="mt-4 h-2 rounded-full bg-gray-100 overflow-hidden" aria-hidden="true">
-                <div
-                  className={`h-full ${state.posted >= allowance ? 'bg-red-500' : 'bg-blue-600'}`}
-                  style={{ width: `${Math.min(100, (state.posted / allowance) * 100)}%` }}
-                />
+            {((ships && posting !== null) || (carries && pickup !== null)) && (
+              <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                {ships && posting !== null && (
+                  <Meter
+                    label="Loads posted"
+                    used={posting.per === 'day' ? state.postedToday : state.postedThisMonth}
+                    allowance={posting}
+                  />
+                )}
+                {carries && pickup !== null && <Meter label="Loads picked up" used={state.pickedUpToday} allowance={pickup} />}
               </div>
             )}
             {!state.config.enforced && (
@@ -264,7 +296,8 @@ export default function Billing() {
               })}
             </div>
             <p className="text-sm text-gray-500 mt-3">
-              {ships && `Without a shipper plan you can post ${MONTHLY_LOAD_ALLOWANCE.free} loads a month free. `}
+              {ships && `Without a shipper plan you can post ${describeAllowance(POSTING_ALLOWANCE.free, 'load')}. `}
+              {carries && `Without the Driver plan you can pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `}
               Payment is taken by Stripe; we never see your card.
             </p>
           </section>

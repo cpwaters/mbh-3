@@ -102,3 +102,23 @@ and drivers subscribe too**, at a lower individual price.
 - Both gates still wait on the founder's enforcement switch.
 - The portal's plan-switching offers the shipper plans only. The Driver plan
   has nothing to switch to.
+
+## Addendum (November 2026): a 30-day trial, then one a day
+
+The founder lengthened the trial and replaced the free tier's limits:
+
+- **Trial: 30 days.** A trial ends 30 days after the company was created, or
+  at the end stamped on it at sign-up if that is later. Companies stamped
+  with the old 14 days therefore get the full 30.
+- **Without a plan, after the trial: one load posted and one load picked up
+  per UK day.** The day runs from midnight to midnight on the UK clock
+  (`ukDayStart`, from the platform's own Europe/London time-zone data), not
+  UTC.
+  - The posting count includes cancelled loads.
+  - The pick-up count is the company's accepted jobs, so a second driver at
+    the same carrier is no way round it. A load handed back deletes its job
+    and does not count.
+- Shipper plans still lift posting to monthly allowances (Starter 25,
+  Growth 100, Fleet unlimited). Any plan, the Driver plan included, makes
+  pick-ups unlimited. The Driver plan does not lift posting.
+- Both gates still wait on the founder's enforcement switch.

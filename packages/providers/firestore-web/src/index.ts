@@ -474,4 +474,11 @@ export class FirestoreReader
     const snap = await getDocs(query(collection(this.db, loadsCollection()), where('tenantId', '==', tenantId)));
     return snap.docs.filter((d) => ((d.data() as Load).createdAt ?? '') >= sinceIso).length;
   }
+
+  async jobsAcceptedSince(tenantId: string, sinceIso: string): Promise<number> {
+    // Authorized by the carrierTenantId member match in the jobs rule; same
+    // count as the server's (require-plan.ts).
+    const snap = await getDocs(query(collection(this.db, jobsCollection()), where('carrierTenantId', '==', tenantId)));
+    return snap.docs.filter((d) => ((d.data() as { createdAt?: string }).createdAt ?? '') >= sinceIso).length;
+  }
 }

@@ -208,25 +208,39 @@ describe('the load allowance', () => {
     for (let i = 0; i < 5; i += 1) await post(h, `r-${i}`);
   });
 
-  it('stops a free shipper at three loads a month, and says how to get more', async () => {
+  it('lets a free shipper post one load a day, and says how to get more', async () => {
     const h = await makeHarness();
     await enforce(h);
-    for (let i = 0; i < 3; i += 1) await post(h, `r-${i}`);
-    const err = await expectAppError(post(h, 'r-4'), 'forbidden');
-    expect(err.message).toMatch(/3 free loads.*Billing/);
+    await post(h, 'r-1');
+    const err = await expectAppError(post(h, 'r-2'), 'forbidden');
+    expect(err.message).toMatch(/1 load a day.*shipper plan under Billing/);
+  });
+
+  it('starts a new day at UK midnight: yesterday’s post does not count', async () => {
+    const h = await makeHarness();
+    await enforce(h);
+    // FIXED_NOW is 09:00 UTC on 1 August — 10:00 BST; the UK day began at
+    // 23:00 UTC on 31 July. A load posted at 22:30 UTC was yesterday.
+    await h.store.runBatch([
+      {
+        kind: 'create',
+        path: 'loads/load-yesterday',
+        data: { loadId: 'load-yesterday', tenantId: 'shipper-1', status: 'available', createdAt: '2026-07-31T22:30:00.000Z' },
+      },
+    ]);
+    await expect(post(h, 'r-1')).resolves.toBeTruthy();
   });
 
   it('counts a cancelled load, so post-and-cancel is not a way round it', async () => {
     const h = await makeHarness();
     await enforce(h);
-    const posted: string[] = [];
-    for (let i = 0; i < 3; i += 1) posted.push(((await post(h, `r-${i}`)) as { loadId: string }).loadId);
+    const { loadId } = (await post(h, 'r-1')) as { loadId: string };
     await h.run('ship-owner', {
       type: 'cancelLoad',
-      payload: { shipperTenantId: 'shipper-1', loadId: posted[0] },
+      payload: { shipperTenantId: 'shipper-1', loadId },
       requestId: 'r-cancel',
     });
-    await expectAppError(post(h, 'r-4'), 'forbidden');
+    await expectAppError(post(h, 'r-2'), 'forbidden');
   });
 
   it('lets a plan the founder gave carry on past the free allowance', async () => {
@@ -303,7 +317,7 @@ describe('setCompanyPlan', () => {
   });
 });
 
-describe('the 14-day free trial', () => {
+describe('the 30-day free trial', () => {
   it('starts when a company is created', async () => {
     const h = await makeHarness();
     const { tenantId } = (await h.run('newcomer', {
@@ -312,7 +326,7 @@ describe('the 14-day free trial', () => {
       requestId: 'r-create',
     })) as { tenantId: string };
     // FIXED_NOW is 2026-08-01T09:00Z.
-    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ trialEndsAt: '2026-08-15T09:00:00.000Z' });
+    expect(await h.store.getDoc(`tenants/${tenantId}`)).toMatchObject({ trialEndsAt: '2026-08-31T09:00:00.000Z' });
   });
 
   it('lets a shipper in its trial post past the free allowance', async () => {
@@ -337,15 +351,39 @@ describe('accepting loads after the trial', () => {
     await expect(accept(h, await postedLoad(h))).resolves.toBeTruthy();
   });
 
-  it('is refused to a carrier whose trial has ended with no plan, saying how to fix it', async () => {
+  it('allows one pick-up a day once the trial has ended with no plan, and says how to get more', async () => {
+    const h = await makeHarness();
+    const first = ((await post(h, 'r-post-1')) as { loadId: string }).loadId;
+    const second = ((await post(h, 'r-post-2')) as { loadId: string }).loadId;
+    await enforce(h);
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/carrier-1', data: { trialEndsAt: '2026-07-31T00:00:00.000Z' } },
+    ]);
+    // The limit is the company's, so a second driver at the same carrier is
+    // refused too — otherwise adding drivers would be a way round it.
+    await expect(
+      h.run('driver-1', { type: 'acceptLoad', payload: { carrierTenantId: 'carrier-1', loadId: first }, requestId: 'r-a1' })
+    ).resolves.toBeTruthy();
+    const err = await expectAppError(
+      h.run('driver-2', { type: 'acceptLoad', payload: { carrierTenantId: 'carrier-1', loadId: second }, requestId: 'r-a2' }),
+      'forbidden'
+    );
+    expect(err.message).toMatch(/1 load a day.*Driver plan/);
+  });
+
+  it('does not count a pick-up from yesterday', async () => {
     const h = await makeHarness();
     const loadId = await postedLoad(h);
     await enforce(h);
     await h.store.runBatch([
       { kind: 'update', path: 'tenants/carrier-1', data: { trialEndsAt: '2026-07-31T00:00:00.000Z' } },
+      {
+        kind: 'create',
+        path: 'jobs/job-yesterday',
+        data: { jobId: 'job-yesterday', carrierTenantId: 'carrier-1', driverActorId: 'driver-2', status: 'delivered', createdAt: '2026-07-31T22:30:00.000Z' },
+      },
     ]);
-    const err = await expectAppError(accept(h, loadId), 'forbidden');
-    expect(err.message).toMatch(/trial has ended.*Driver plan/);
+    await expect(accept(h, loadId)).resolves.toBeTruthy();
   });
 
   it('is open in the trial, and on the Driver plan after it', async () => {

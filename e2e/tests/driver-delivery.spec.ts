@@ -639,11 +639,13 @@ test('the back office reads the whole marketplace through the real rules', async
   }
 });
 
-test('a shipper sees their plan and this month’s usage, read through the real rules', async ({ page }) => {
+test('a shipper sees their plan and today’s usage, read through the real rules', async ({ page }) => {
   await signIn(page, E2E.shipperEmail, E2E.shipperPassword);
   await page.getByRole('link', { name: 'Billing' }).click();
   await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
-  await expect(page.getByText('Loads posted this month')).toBeVisible();
+  // The seeded shipper has no sign-up date, so no trial: the free allowance,
+  // one load a day, counted from the real loads collection.
+  await expect(page.getByText(/Loads posted today/)).toBeVisible();
   await expect(page.getByText(/not being enforced yet/)).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
