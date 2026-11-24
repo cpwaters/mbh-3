@@ -150,9 +150,9 @@ export function ActiveJobsPage() {
 
   function viewRoute() {
     // Ask for location permission (if not already tracking) so progress starts
-    // flowing, then head to the map.
+    // flowing, then head to the job's route.
     app.requestLocation();
-    navigate('/map');
+    navigate('/map/route');
   }
 
   // Founder-only: return this job's load to the available pool and clear the
