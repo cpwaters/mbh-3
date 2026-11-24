@@ -24,7 +24,8 @@
     "docs:screenshots": "bash scripts/capture-screenshots.sh",
     "seed": "tsx scripts/seed.ts",
     "smoke:prod": "tsx scripts/smoke-prod.ts",
-    "stripe:provision": "tsx packages/providers/stripe/src/provision.ts"
+    "stripe:provision": "tsx packages/providers/stripe/src/provision.ts",
+    "stripe:check": "tsx packages/providers/stripe/src/check.ts"
   },
   "devDependencies": {
     "@mbh/actions": "workspace:*",

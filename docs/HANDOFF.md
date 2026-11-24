@@ -699,6 +699,17 @@ failed lookup is retried rather than remembered. The founder's Tools →
 existed and re-queues ones never enriched. The page searches around "My
 location" or "A postcode" (remembered per phone), so it works without a fix.
 
+## Stripe check and hand-made setups (built)
+
+`pnpm stripe:check` (packages/providers/stripe/src/check.ts) is a read-only
+audit of a Stripe account against what the backend needs: tagged monthly GBP
+prices per plan, an active recurring link per plan, the webhook endpoint and
+events, and the portal login page. It prints what to paste into Admin →
+Billing. `pnpm stripe:provision` now adopts hand-made prices via
+`ADOPT_PRICES=plan=price_…` (it tags them with the lookup key and
+transfer_lookup_key), and reuses any active link already selling a plan's
+price rather than creating a second one.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the
