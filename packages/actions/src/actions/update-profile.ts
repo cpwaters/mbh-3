@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError, validateProfileInput, type UserProfile } from '@mbh/domain';
+import { AppError, validateAdrCertificate, validateProfileInput, type UserProfile } from '@mbh/domain';
 import { userProfileDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
@@ -36,6 +36,10 @@ const updateProfileSchema = z.object({
   companyContact: contactSchema,
   vatNumber: z.string(),
   drivingLicenseNumber: z.string(),
+  // The driver's ADR certificate: an object sets it, null removes it, and
+  // leaving it out keeps whatever is stored (so an older client that doesn't
+  // know the field can't wipe it).
+  adrCertificate: z.object({ number: z.string(), expiresOn: z.string() }).nullable().optional(),
   quantityOfVehicles: z.number().int().nonnegative(),
   paymentType: paymentTypeSchema,
   image: z.string(),
@@ -65,6 +69,18 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
     const existing = (await tx.get(userProfileDoc(ctx.actorId))) as UserProfile | null;
     const rating = existing?.rating ?? 0;
 
+    let adrCertificate = existing?.adrCertificate;
+    if (payload.adrCertificate === null) {
+      adrCertificate = undefined;
+    } else if (payload.adrCertificate !== undefined) {
+      const adr = { number: payload.adrCertificate.number.trim(), expiresOn: payload.adrCertificate.expiresOn };
+      const adrCheck = validateAdrCertificate(adr);
+      if (!adrCheck.ok) {
+        throw new AppError('invalid-payload', adrCheck.message, { field: adrCheck.field });
+      }
+      adrCertificate = adr;
+    }
+
     const firstName = payload.firstName.trim();
     const lastName = payload.lastName.trim();
     const profile: UserProfile = {
@@ -80,6 +96,7 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
       companyContact: payload.companyContact,
       vatNumber: payload.vatNumber.trim(),
       drivingLicenseNumber: payload.drivingLicenseNumber.trim(),
+      ...(adrCertificate !== undefined ? { adrCertificate } : {}),
       quantityOfVehicles: payload.quantityOfVehicles,
       paymentType: payload.paymentType,
       rating,

@@ -26,6 +26,8 @@ const empty = {
   contactEmail: '',
   contactPhone: '',
   drivingLicenseNumber: '',
+  adrCertificateNumber: '',
+  adrCertificateExpiresOn: '',
   quantityOfVehicles: '',
   invoiced: false,
   instantPayment: false,
@@ -68,6 +70,8 @@ export default function EditProfile() {
         contactEmail: profile.companyContact?.email ?? '',
         contactPhone: profile.companyContact?.phone ?? '',
         drivingLicenseNumber: profile.drivingLicenseNumber ?? '',
+        adrCertificateNumber: profile.adrCertificate?.number ?? '',
+        adrCertificateExpiresOn: profile.adrCertificate?.expiresOn ?? '',
         quantityOfVehicles: profile.quantityOfVehicles ? String(profile.quantityOfVehicles) : '',
         invoiced: profile.paymentType?.invoiced ?? false,
         instantPayment: profile.paymentType?.instantPayment ?? false,
@@ -121,6 +125,12 @@ export default function EditProfile() {
           companyContact: { name: f.contactName, email: f.contactEmail, phone: f.contactPhone },
           vatNumber: f.vatNumber,
           drivingLicenseNumber: f.drivingLicenseNumber,
+          // Both blank removes it; anything else is checked by the server,
+          // which names the missing half.
+          adrCertificate:
+            f.adrCertificateNumber.trim() === '' && f.adrCertificateExpiresOn === ''
+              ? null
+              : { number: f.adrCertificateNumber, expiresOn: f.adrCertificateExpiresOn },
           quantityOfVehicles: parseInt(f.quantityOfVehicles, 10) || 0,
           paymentType: { invoiced: f.invoiced, instantPayment: f.instantPayment },
           image: f.image,
@@ -194,6 +204,8 @@ export default function EditProfile() {
 
         <FormSection icon={<FileText className="w-5 h-5 text-blue-600" />} title="Driver Information">
           {field('drivingLicenseNumber', 'Driving License Number')}
+          {field('adrCertificateNumber', 'ADR Certificate Number', 'text', false, 'Needed to accept ADR loads')}
+          {field('adrCertificateExpiresOn', 'ADR Certificate Expiry', 'date')}
           {field('quantityOfVehicles', 'Number of Vehicles', 'number')}
         </FormSection>
 

@@ -4,6 +4,7 @@
 
 import type { LoadRoute } from './geo.js';
 import type { TenantBilling } from './billing.js';
+import type { AdrCertificate } from './user-profile.js';
 
 export type TenantCapability = 'shipper' | 'carrier';
 
@@ -186,6 +187,8 @@ export interface UserProfile {
   companyContact: ProfileContact;
   vatNumber: string;
   drivingLicenseNumber: string;
+  // Needed to accept a load marked ADR (see user-profile.ts). Absent: none held.
+  adrCertificate?: AdrCertificate;
   quantityOfVehicles: number;
   paymentType: ProfilePaymentType;
   rating: number; // system-assigned; never user-editable

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  adrCertificateStatus,
+  adrRefusal,
   AppError,
   canTransitionLoad,
   isActiveJobStatus,
@@ -12,8 +14,9 @@ import {
   type LoadStatus,
   type Role,
   type Tenant,
+  type UserProfile,
 } from '@mbh/domain';
-import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc, tenantDoc } from '@mbh/paths';
+import { jobDoc, jobEventDoc, jobsCollection, listingDoc, loadDoc, tenantDoc, userProfileDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireMember } from '../require-member.js';
@@ -60,6 +63,16 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
     const shipper = (await tx.get(tenantDoc(load.tenantId))) as unknown as Tenant | null;
     if (shipper !== null && isTenantSuspended(shipper)) {
       throw new AppError('conflict', 'That load is no longer available.', { recoverable: false });
+    }
+
+    // Dangerous goods: only a driver holding an ADR certificate that is in
+    // date today may take the load. The accepting member is the driver.
+    if (load.consignment.adrRequired === true) {
+      const profile = (await tx.get(userProfileDoc(ctx.actorId))) as unknown as UserProfile | null;
+      const refusal = adrRefusal(adrCertificateStatus(profile?.adrCertificate, ctx.now), profile?.adrCertificate);
+      if (refusal !== null) {
+        throw new AppError('forbidden', refusal, { recoverable: false });
+      }
     }
 
     // One active job per driver — checked against committed state in the tx.

@@ -2,7 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Star, Truck, MapPin, Phone, Building, FileText, Calendar, UserPlus, Copy, Check } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
-import { VEHICLE_TYPE_LABELS, VEHICLE_CONFIGURATION_LABELS, type VehicleType, type VehicleConfiguration } from '@mbh/domain';
+import {
+  adrCertificateStatus,
+  formatCalendarDate,
+  VEHICLE_TYPE_LABELS,
+  VEHICLE_CONFIGURATION_LABELS,
+  type AdrCertificate,
+  type VehicleType,
+  type VehicleConfiguration,
+} from '@mbh/domain';
 import { useApp } from './context';
 import CompanyLogo from './CompanyLogo';
 import { useProfile } from '../components/useProfile';
@@ -245,6 +253,7 @@ export default function Profile() {
 
           <Section icon={<FileText className="w-5 h-5 text-blue-600" />} title="Driver Information">
             <Field label="Driving License Number" value={profile?.drivingLicenseNumber} />
+            <AdrCertificateField certificate={profile?.adrCertificate} />
             <div>
               <label className="text-sm text-gray-600">Rating</label>
               <div className="flex items-center gap-2">
@@ -398,5 +407,30 @@ function FieldInner({ label, value }: { label: string; value?: string }) {
       <label className="text-sm text-gray-600">{label}</label>
       <p className="font-medium text-gray-900">{value || 'Not provided'}</p>
     </>
+  );
+}
+
+// The driver's ADR certificate and whether it is in date today: ADR loads can
+// only be accepted while it is.
+function AdrCertificateField({ certificate }: { certificate: AdrCertificate | undefined }) {
+  const status = adrCertificateStatus(certificate, new Date().toISOString());
+  return (
+    <div>
+      <label className="text-sm text-gray-600">ADR Certificate</label>
+      {certificate === undefined || status === 'none' ? (
+        <p className="font-medium text-gray-900">
+          Not provided <span className="block text-xs font-normal text-gray-500">Needed to accept ADR loads.</span>
+        </p>
+      ) : (
+        <p className="font-medium text-gray-900">
+          {certificate.number}
+          <span className={`block text-xs font-medium ${status === 'valid' ? 'text-green-700' : 'text-red-700'}`}>
+            {status === 'valid'
+              ? `Valid until ${formatCalendarDate(certificate.expiresOn)}`
+              : `Expired on ${formatCalendarDate(certificate.expiresOn)} — ADR loads can't be accepted`}
+          </span>
+        </p>
+      )}
+    </div>
   );
 }

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Package, Weight, Box, AlertCircle, Navigation, MapPin } from 'lucide-react';
-import { formatGbp, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { dispatchAction } from '../lib/dispatch';
 import type { GeoPoint } from '../lib/geocode';
 import { useNearbyListings } from './useNearbyListings';
+import type { AdrState } from './useAdrStatus';
 import {
   JobCard,
   JobCardRoute,
@@ -12,12 +13,15 @@ import {
   JobCardSection,
   JobCardActions,
   JobCardStatusBadge,
+  AdrAcceptNote,
 } from '../app/JobCard';
 
 // The carrier browse ("Available Loads"), ported from the mbh-2 prototype
 // (client/src/pages/Dashboard.tsx): expandable JobCards with Accept / View
 // Details. Wired to mbh-3's listings + the acceptLoad dispatch (an online
 // request/response; on success the parent re-reads the active job).
+const NO_ADR_INFO: AdrState = { status: null, certificate: null };
+
 export function AvailableLoads({
   carrierTenantId,
   listings,
@@ -30,6 +34,8 @@ export function AvailableLoads({
   watchingLocation = false,
   onEnableLocation,
   locationError = null,
+  adr = NO_ADR_INFO,
+  onOpenProfile,
 }: {
   carrierTenantId: string | null;
   listings: Listing[];
@@ -49,6 +55,11 @@ export function AvailableLoads({
   // Why "Enable location" didn't work (permission denied, no GPS, etc.) —
   // without this the button looks broken with no explanation when it fails.
   locationError?: string | null;
+  // The driver's ADR certificate: an ADR load they can't take says why
+  // instead of offering Accept. Unknown (status null) blocks nothing; the
+  // server decides either way.
+  adr?: AdrState;
+  onOpenProfile?: () => void;
 }) {
   const [expandedLoadId, setExpandedLoadId] = useState<string | null>(null);
   const [acceptingLoadId, setAcceptingLoadId] = useState<string | null>(null);
@@ -149,7 +160,10 @@ export function AvailableLoads({
         </div>
       ) : (
         <div className="grid gap-4">
-          {ranked.map(({ listing: load, distanceMeters }) => (
+          {ranked.map(({ listing: load, distanceMeters }) => {
+            const adrBlock =
+              load.adrRequired === true && adr.status !== null ? adrRefusal(adr.status, adr.certificate) : null;
+            return (
             <JobCard key={load.loadId}>
               <JobCardRoute
                 badge={<JobCardStatusBadge status="available" />}
@@ -205,10 +219,14 @@ export function AvailableLoads({
                 </JobCardSection>
               )}
 
+              {adrBlock !== null && (
+                <AdrAcceptNote message={adrBlock} {...(onOpenProfile ? { onOpenProfile } : {})} />
+              )}
+
               <JobCardActions>
                 <button
                   onClick={() => void handleAccept(load)}
-                  disabled={hasActiveJob || acceptingLoadId === load.loadId}
+                  disabled={hasActiveJob || adrBlock !== null || acceptingLoadId === load.loadId}
                   className="w-full sm:flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                 >
                   {acceptingLoadId === load.loadId ? 'Accepting...' : 'Accept Load'}
@@ -221,7 +239,8 @@ export function AvailableLoads({
                 </button>
               </JobCardActions>
             </JobCard>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

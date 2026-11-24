@@ -96,3 +96,27 @@ describe('Profile — inviting a company in', () => {
     expect(screen.queryByText(/\/app\/invite\//)).not.toBeInTheDocument();
   });
 });
+
+describe('Profile — ADR certificate', () => {
+  const base = { actorId: 'actor-1', firstName: 'Chris', lastName: 'Waters', email: 'c@example.com', rating: 0 };
+
+  it('shows a certificate in date with its expiry', async () => {
+    profileForActor.mockResolvedValueOnce({ ...base, adrCertificate: { number: 'ADR-778899', expiresOn: '2099-03-12' } });
+    renderProfile();
+    await waitFor(() => expect(screen.getByText('ADR-778899')).toBeInTheDocument());
+    expect(screen.getByText('Valid until 12 March 2099')).toBeInTheDocument();
+  });
+
+  it('flags an expired certificate', async () => {
+    profileForActor.mockResolvedValueOnce({ ...base, adrCertificate: { number: 'ADR-1', expiresOn: '2020-01-31' } });
+    renderProfile();
+    await waitFor(() => expect(screen.getByText(/Expired on 31 January 2020/)).toBeInTheDocument());
+  });
+
+  it('says one is needed for ADR loads when there is none', async () => {
+    profileForActor.mockResolvedValueOnce({ ...base });
+    renderProfile();
+    await waitFor(() => expect(screen.getByText('Needed to accept ADR loads.')).toBeInTheDocument());
+  });
+});
+

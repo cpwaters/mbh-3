@@ -451,6 +451,47 @@ describe('updateProfile', () => {
     );
     expect(emailErr.field).toBe('email');
   });
+
+  it('saves an ADR certificate, keeps it when an edit leaves it out, and removes it on null', async () => {
+    const h = await makeHarness();
+    const adrCertificate = { number: ' ADR-123456 ', expiresOn: '2028-05-31' };
+    await h.run('driver-1', { type: 'updateProfile', payload: validProfile({ adrCertificate }), requestId: 'r-adr-1' });
+    expect(await h.store.getDoc('userProfiles/driver-1')).toMatchObject({
+      adrCertificate: { number: 'ADR-123456', expiresOn: '2028-05-31' },
+    });
+
+    await h.run('driver-1', { type: 'updateProfile', payload: validProfile({ lastName: 'W' }), requestId: 'r-adr-2' });
+    expect(await h.store.getDoc('userProfiles/driver-1')).toMatchObject({ adrCertificate: { number: 'ADR-123456' } });
+
+    await h.run('driver-1', {
+      type: 'updateProfile',
+      payload: validProfile({ adrCertificate: null }),
+      requestId: 'r-adr-3',
+    });
+    expect(await h.store.getDoc('userProfiles/driver-1')).not.toHaveProperty('adrCertificate');
+  });
+
+  it('refuses an ADR certificate without a number or a real expiry date', async () => {
+    const h = await makeHarness();
+    const noNumber = await expectAppError(
+      h.run('driver-1', {
+        type: 'updateProfile',
+        payload: validProfile({ adrCertificate: { number: '', expiresOn: '2028-05-31' } }),
+        requestId: 'r-adr-n',
+      }),
+      'invalid-payload'
+    );
+    expect(noNumber.field).toBe('adrCertificateNumber');
+    const badDate = await expectAppError(
+      h.run('driver-1', {
+        type: 'updateProfile',
+        payload: validProfile({ adrCertificate: { number: 'ADR-1', expiresOn: '31/05/2028' } }),
+        requestId: 'r-adr-d',
+      }),
+      'invalid-payload'
+    );
+    expect(badDate.field).toBe('adrCertificateExpiresOn');
+  });
 });
 
 describe('createTenant', () => {
