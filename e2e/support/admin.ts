@@ -217,6 +217,16 @@ export async function seedDeliverableJob(): Promise<void> {
     pickupBy: '2026-08-06',
     deliverBy: '2026-08-07',
     createdAt: new Date().toISOString(),
+    // Enriched, as the drain would have it: when "Complete" puts it back on
+    // offer, its listing carries the collection point that plots it on the
+    // drivers' "Loads near you" map.
+    route: {
+      origin: { lat: 53.7632, lng: -2.7031 },
+      destination: { lat: 53.8175, lng: -3.0357 },
+      distanceMeters: 27000,
+      durationSeconds: 1800,
+      enrichedAt: new Date().toISOString(),
+    },
   });
   await db.doc(`jobs/${E2E.founderJobId}`).set({
     jobId: E2E.founderJobId,

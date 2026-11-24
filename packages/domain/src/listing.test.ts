@@ -37,4 +37,23 @@ describe('listingFromLoad', () => {
     expect(json).not.toContain('Distribution Way');
     expect(json).not.toContain('Harbour Road');
   });
+
+  it('carries the collection point and route once the load is enriched, so it can be plotted', () => {
+    const enriched: Load = {
+      ...load,
+      route: {
+        origin: { lat: 53.4697, lng: -2.3266 },
+        destination: { lat: 55.9758, lng: -3.1706 },
+        distanceMeters: 352_000,
+        durationSeconds: 14_400,
+        enrichedAt: '2026-08-01T09:01:00.000Z',
+      },
+    };
+    expect(listingFromLoad(enriched)).toMatchObject({
+      collectionPoint: { lat: 53.4697, lng: -2.3266 },
+      route: { distanceMeters: 352_000, durationSeconds: 14_400 },
+    });
+    // The delivery point is not exposed; only the collection is plotted.
+    expect(JSON.stringify(listingFromLoad(enriched))).not.toContain('55.9758');
+  });
 });

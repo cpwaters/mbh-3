@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Listing } from '@mbh/domain';
-import { geocodePostcode, type GeoPoint } from '../lib/geocode';
+import { lookupPostcode, type GeoPoint } from '../lib/geocode';
 import { haversineMeters } from '../lib/progress';
 
 export interface RankedListing {
@@ -12,11 +12,15 @@ export interface RankedListing {
   pickup: GeoPoint | null;
 }
 
-// Ranks the available loads by how close their PICKUP is to the driver's live
-// GPS position — nearest first — re-ranking as the driver moves and as polling
-// brings new loads in, without a page refresh. Listings carry no coordinates,
-// so pickups are geocoded from their postcode once and cached; a re-sort or a
-// poll never re-geocodes a postcode already seen.
+// Ranks the available loads by how close their PICKUP is to a point — the
+// driver's live GPS position, or a place they chose — nearest first,
+// re-ranking as it moves and as polling brings new loads in.
+//
+// Where a pickup is: the collection point the server put on the listing when
+// it enriched the load. Only a listing without one (not enriched yet) is
+// looked up here, by postcode, once per postcode. A lookup that failed (no
+// signal) is not remembered, so the next poll tries again rather than leaving
+// the load off the map for the rest of the session.
 export function useNearbyListings(listings: Listing[], driverLocation: GeoPoint | null): RankedListing[] {
   const cacheRef = useRef<Map<string, GeoPoint | null>>(new Map());
   const [resolved, setResolved] = useState(0); // bumps when new geocodes land
@@ -26,6 +30,7 @@ export function useNearbyListings(listings: Listing[], driverLocation: GeoPoint 
     const pending = Array.from(
       new Set(
         listings
+          .filter((l) => l.collectionPoint === undefined)
           .map((l) => l.origin.postcode.trim())
           .filter((pc) => pc.length > 0 && !cacheRef.current.has(pc))
       )
@@ -33,7 +38,8 @@ export function useNearbyListings(listings: Listing[], driverLocation: GeoPoint 
     if (pending.length === 0) return;
     Promise.all(
       pending.map(async (pc) => {
-        cacheRef.current.set(pc, await geocodePostcode(pc));
+        const point = await lookupPostcode(pc);
+        if (point !== 'unavailable') cacheRef.current.set(pc, point);
       })
     ).then(() => {
       if (!cancelled) setResolved((n) => n + 1);
@@ -45,7 +51,7 @@ export function useNearbyListings(listings: Listing[], driverLocation: GeoPoint 
 
   return useMemo(() => {
     const ranked: RankedListing[] = listings.map((listing) => {
-      const pickup = cacheRef.current.get(listing.origin.postcode.trim()) ?? null;
+      const pickup = listing.collectionPoint ?? cacheRef.current.get(listing.origin.postcode.trim()) ?? null;
       const distanceMeters =
         driverLocation !== null && pickup !== null ? haversineMeters(driverLocation, pickup) : null;
       return { listing, distanceMeters, pickup };

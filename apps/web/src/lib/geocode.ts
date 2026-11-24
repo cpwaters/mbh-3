@@ -5,7 +5,11 @@ export interface GeoPoint {
 
 // Free, no-API-key UK postcode lookup (https://postcodes.io). Ported from the
 // mbh-2 prototype (client/src/lib/geocode.ts).
-export async function geocodePostcode(postcode: string): Promise<GeoPoint | null> {
+//
+// Three answers, kept apart: a point; null — the postcode does not exist, so
+// asking again will not help; or 'unavailable' — the lookup itself failed (no
+// signal, the service down), so it is worth asking again later.
+export async function lookupPostcode(postcode: string): Promise<GeoPoint | null | 'unavailable'> {
   const trimmed = postcode.trim();
   if (!trimmed) return null;
 
@@ -23,8 +27,13 @@ export async function geocodePostcode(postcode: string): Promise<GeoPoint | null
     return null;
   } catch (error) {
     console.error('Geocoding error for postcode', postcode, error);
-    return null;
+    return 'unavailable';
   }
+}
+
+export async function geocodePostcode(postcode: string): Promise<GeoPoint | null> {
+  const point = await lookupPostcode(postcode);
+  return point === 'unavailable' ? null : point;
 }
 
 // Location strings in this app are formatted as "City, POSTCODE".

@@ -6,12 +6,21 @@ import { formatGbp } from '@mbh/domain';
 import type { GeoPoint } from '../lib/geocode';
 import { milesToMetres } from '../lib/nearby';
 import type { RankedListing } from '../components/useNearbyListings';
-// Importing LiveLocationMap's module fixes Leaflet's default marker icons for
-// the bundle (it repoints them at the bundled assets on import).
-import './LiveLocationMap';
 
-// The driver's patch: where they are, the radius they chose drawn around
-// them, and a pin on the collection point of every load inside it.
+// The driver's patch: the centre they chose (their position, or a postcode),
+// the radius drawn around it, and a pin on the collection point of every load
+// inside it.
+
+// Every marker is drawn, not an image: Leaflet's default marker images need
+// their URLs repointed for the bundle, and a pin that silently fails to load
+// is a load that silently is not on the map.
+const loadIcon = L.divIcon({
+  className: '',
+  html: '<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#16a34a;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.45);"></div>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 22],
+  popupAnchor: [0, -22],
+});
 
 const youIcon = L.divIcon({
   className: '',
@@ -35,11 +44,14 @@ function FitRadius({ centre, radiusMiles }: { centre: GeoPoint; radiusMiles: num
 
 export default function NearbyMap({
   centre,
+  centreLabel,
   radiusMiles,
   loads,
   onSelect,
 }: {
   centre: GeoPoint;
+  // What the blue dot is: "You are here", or the postcode searched around.
+  centreLabel: string;
   radiusMiles: number;
   loads: RankedListing[];
   onSelect: (loadId: string) => void;
@@ -62,13 +74,15 @@ export default function NearbyMap({
         pathOptions={{ color: '#2563eb', weight: 1, fillOpacity: 0.06 }}
       />
       <Marker position={[centre.lat, centre.lng]} icon={youIcon}>
-        <Popup>You are here</Popup>
+        <Popup>{centreLabel}</Popup>
       </Marker>
       {loads.map(({ listing, pickup }) =>
         pickup === null ? null : (
           <Marker
             key={listing.loadId}
             position={[pickup.lat, pickup.lng]}
+            icon={loadIcon}
+            title={`${listing.origin.town} to ${listing.destination.town}`}
             eventHandlers={{ click: () => onSelect(listing.loadId) }}
           >
             <Popup>

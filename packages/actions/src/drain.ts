@@ -211,7 +211,11 @@ async function recordEnrichment(
       tx.write({
         kind: 'update',
         path: listingDoc(loadId),
-        data: { route: { distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds } },
+        data: {
+          route: { distanceMeters: route.distanceMeters, durationSeconds: route.durationSeconds },
+          // The collection postcode's centre — what plots it on a driver's map.
+          collectionPoint: { lat: route.origin.lat, lng: route.origin.lng },
+        },
       });
     }
     // acceptLoad only denormalizes the route onto the Job if the load was

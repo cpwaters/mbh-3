@@ -690,6 +690,15 @@ pickup postcode, via the same useNearbyListings ranking as Available Loads
 (lib/nearby.ts). An active job's route view moved to /map/route, reached from
 the job card's "View Route".
 
+Plotting: listings now carry `collectionPoint` (the collection postcode's
+centre — no more precise than the postcode they already show), written by the
+drain with the route and by `listingFromLoad` for an enriched load. The map
+plots from it; only an unenriched listing is looked up on the phone, and a
+failed lookup is retried rather than remembered. The founder's Tools →
+"Place loads" (`placeListings`) places listings enriched before the field
+existed and re-queues ones never enriched. The page searches around "My
+location" or "A postcode" (remembered per phone), so it works without a fix.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

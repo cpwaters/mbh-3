@@ -8,6 +8,7 @@ import { AvailableLoads } from './AvailableLoads';
 // hermetic and doesn't depend on outbound network.
 vi.mock('../lib/geocode', () => ({
   geocodePostcode: vi.fn().mockResolvedValue(null),
+  lookupPostcode: vi.fn().mockResolvedValue(null),
 }));
 
 const listing: Listing = {
