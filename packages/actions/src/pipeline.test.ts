@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AppError, FOUNDER_EMAIL } from '@mbh/domain';
-import { makeHarness, validPostLoadPayload } from './test-harness.js';
+import { FIXED_NOW, makeHarness, validPostLoadPayload } from './test-harness.js';
 
 async function expectAppError(promise: Promise<unknown>, code: string): Promise<AppError> {
   try {
@@ -491,6 +491,50 @@ describe('updateProfile', () => {
       'invalid-payload'
     );
     expect(badDate.field).toBe('adrCertificateExpiresOn');
+  });
+
+  it('setAdrCertificate adds, renews and removes just the certificate, leaving the rest of the profile', async () => {
+    const h = await makeHarness();
+    await h.run('driver-1', { type: 'updateProfile', payload: validProfile(), requestId: 'r-p' });
+
+    await h.run('driver-1', {
+      type: 'setAdrCertificate',
+      payload: { adrCertificate: { number: ' ADR-42 ', expiresOn: '2029-01-31' } },
+      requestId: 'r-set-1',
+    });
+    expect(await h.store.getDoc('userProfiles/driver-1')).toMatchObject({
+      firstName: 'Chris',
+      companyName: 'Waters Haulage',
+      adrCertificate: { number: 'ADR-42', expiresOn: '2029-01-31' },
+      updatedAt: FIXED_NOW,
+    });
+
+    await h.run('driver-1', { type: 'setAdrCertificate', payload: { adrCertificate: null }, requestId: 'r-set-2' });
+    const after = await h.store.getDoc('userProfiles/driver-1');
+    expect(after).not.toHaveProperty('adrCertificate');
+    expect(after).toMatchObject({ firstName: 'Chris', displayName: 'Chris Waters' });
+  });
+
+  it('setAdrCertificate asks for a profile first, and validates the certificate', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run('driver-1', {
+        type: 'setAdrCertificate',
+        payload: { adrCertificate: { number: 'ADR-1', expiresOn: '2029-01-31' } },
+        requestId: 'r-noprof',
+      }),
+      'conflict'
+    );
+    await h.run('driver-1', { type: 'updateProfile', payload: validProfile(), requestId: 'r-p2' });
+    const err = await expectAppError(
+      h.run('driver-1', {
+        type: 'setAdrCertificate',
+        payload: { adrCertificate: { number: 'ADR-1', expiresOn: '2029-02-30' } },
+        requestId: 'r-baddate',
+      }),
+      'invalid-payload'
+    );
+    expect(err.field).toBe('adrCertificateExpiresOn');
   });
 });
 

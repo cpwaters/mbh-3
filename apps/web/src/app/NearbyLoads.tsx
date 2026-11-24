@@ -309,7 +309,7 @@ export default function NearbyLoads() {
                   {adrBlockFor(listing) !== null && (
                     <AdrAcceptNote
                       message={adrBlockFor(listing) ?? ''}
-                      onOpenProfile={() => navigate('/profile/edit')}
+                      onOpenProfile={() => navigate('/profile', { state: { addAdr: true } })}
                     />
                   )}
                   <JobCardActions>

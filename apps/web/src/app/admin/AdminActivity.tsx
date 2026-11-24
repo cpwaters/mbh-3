@@ -18,6 +18,7 @@ export const ACTION_LABELS: Record<string, string> = {
   addVehicle: 'Added a vehicle',
   retireVehicle: 'Retired a vehicle',
   updateProfile: 'Updated their profile',
+  setAdrCertificate: 'Updated their ADR certificate',
   createTenant: 'Set up a company',
   createInvite: 'Created an invitation',
   revokeInvite: 'Withdrew an invitation',

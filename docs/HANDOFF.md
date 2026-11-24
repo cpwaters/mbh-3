@@ -720,8 +720,12 @@ shipper's Loads list, Available Loads, Loads near you, the driver's active
 job and the back office's loads list.
 
 It is enforced. A driver records their ADR certificate (number + expiry
-date) on their own profile (`UserProfile.adrCertificate`, set through
-updateProfile: an object sets it, null removes it, omitted keeps it).
+date) on their own profile (`UserProfile.adrCertificate`). They add, renew
+or remove it right on the Profile page (`AdrCertificateCard`, action
+`setAdrCertificate`, which needs a saved profile first), or in Edit Profile
+(updateProfile: an object sets it, null removes it, omitted keeps it).
+An ADR load's "Add ADR certificate" button opens Profile with the form
+already open.
 acceptLoad refuses an ADR load (`forbidden`, not recoverable) unless the
 accepting driver's certificate is in date on the UK calendar day
 (`adrCertificateStatus` / `adrRefusal` in user-profile.ts). It is valid

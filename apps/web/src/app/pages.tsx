@@ -112,7 +112,7 @@ export function Dashboard() {
           onEnableLocation={app.requestLocation}
           locationError={app.locationError}
           adr={adr}
-          onOpenProfile={() => navigate('/profile/edit')}
+          onOpenProfile={() => navigate('/profile', { state: { addAdr: true } })}
         />
       </>
     );

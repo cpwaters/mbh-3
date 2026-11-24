@@ -109,3 +109,49 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
     return { result: { actorId: ctx.actorId }, auditDetail: { actorId: ctx.actorId } };
   },
 };
+
+// The driver's ADR certificate on its own, so the profile page can add,
+// renew or remove it without resending the whole profile. An object sets it;
+// null removes it. Needs a saved profile to hang it on: the name and email
+// there are what the back office checks it against.
+const setAdrCertificateSchema = z.object({
+  adrCertificate: z.object({ number: z.string(), expiresOn: z.string() }).nullable(),
+});
+
+export type SetAdrCertificatePayload = z.infer<typeof setAdrCertificateSchema>;
+
+export const setAdrCertificateHandler: ActionHandler<SetAdrCertificatePayload, UpdateProfileResult> = {
+  type: 'setAdrCertificate',
+  idempotent: true,
+  parse: zodParse(setAdrCertificateSchema),
+  async execute(tx, ctx, payload) {
+    const existing = (await tx.get(userProfileDoc(ctx.actorId))) as UserProfile | null;
+    if (existing === null) {
+      throw new AppError('conflict', 'Fill in your profile first, then add your ADR certificate.', {
+        recoverable: false,
+      });
+    }
+
+    let next: UserProfile = { ...existing, updatedAt: ctx.now };
+    delete next.adrCertificate;
+    if (payload.adrCertificate !== null) {
+      const adr = { number: payload.adrCertificate.number.trim(), expiresOn: payload.adrCertificate.expiresOn };
+      const check = validateAdrCertificate(adr);
+      if (!check.ok) {
+        throw new AppError('invalid-payload', check.message, { field: check.field });
+      }
+      next = { ...next, adrCertificate: adr };
+    }
+    tx.write({ kind: 'set', path: userProfileDoc(ctx.actorId), data: { ...next } });
+
+    return {
+      result: { actorId: ctx.actorId },
+      auditDetail: {
+        actorId: ctx.actorId,
+        ...(next.adrCertificate !== undefined
+          ? { adrCertificateNumber: next.adrCertificate.number, expiresOn: next.adrCertificate.expiresOn }
+          : { removed: true }),
+      },
+    };
+  },
+};

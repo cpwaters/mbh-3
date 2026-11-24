@@ -15,10 +15,10 @@ vi.mock('../lib/reader', () => ({
   }),
 }));
 
-function renderProfile(over: Parameters<typeof makeMockApp>[0] = {}) {
+function renderProfile(over: Parameters<typeof makeMockApp>[0] = {}, routerState: unknown = null) {
   return render(
     <AppProvider value={makeMockApp(over)}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: '/profile', state: routerState }]}>
         <Profile />
       </MemoryRouter>
     </AppProvider>
@@ -117,6 +117,41 @@ describe('Profile — ADR certificate', () => {
     profileForActor.mockResolvedValueOnce({ ...base });
     renderProfile();
     await waitFor(() => expect(screen.getByText('Needed to accept ADR loads.')).toBeInTheDocument());
+  });
+
+  it('adds a certificate right from the profile page', async () => {
+    profileForActor.mockResolvedValue({ ...base });
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { actorId: 'actor-1' } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderProfile();
+
+    await user.click(await screen.findByRole('button', { name: 'Add ADR certificate' }));
+    await user.type(screen.getByLabelText('Certificate number'), 'ADR-555');
+    await user.type(screen.getByLabelText('Expiry date'), '2029-06-30');
+    await user.click(screen.getByRole('button', { name: 'Save certificate' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as { type: string; payload: unknown };
+    expect(body.type).toBe('setAdrCertificate');
+    expect(body.payload).toEqual({ adrCertificate: { number: 'ADR-555', expiresOn: '2029-06-30' } });
+    // Re-read so the page shows what was saved.
+    await waitFor(() => expect(profileForActor.mock.calls.length).toBeGreaterThan(1));
+    profileForActor.mockResolvedValue(null);
+  });
+
+  it('opens the form straight away when sent from an ADR load', async () => {
+    profileForActor.mockResolvedValueOnce({ ...base, adrCertificate: { number: 'ADR-1', expiresOn: '2020-01-31' } });
+    renderProfile({}, { addAdr: true });
+    expect(await screen.findByLabelText('Certificate number')).toHaveValue('ADR-1');
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+  });
+
+  it('sends someone with no profile yet to fill it in first', async () => {
+    profileForActor.mockResolvedValueOnce(null);
+    renderProfile();
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Add ADR certificate' }));
+    expect(screen.queryByLabelText('Certificate number')).not.toBeInTheDocument();
   });
 });
 
