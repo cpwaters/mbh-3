@@ -25,11 +25,16 @@ describe('listingFromLoad', () => {
       description: 'Mixed pallets',
       weightKg: 14200,
       palletCount: 16,
+      adrRequired: false,
       priceGbpPence: 68000,
       pickupBy: '2026-08-02',
       deliverBy: '2026-08-03',
       postedAt: '2026-08-01T09:00:00.000Z',
     });
+  });
+
+  it('tells carriers up front when a load is dangerous goods (ADR)', () => {
+    expect(listingFromLoad({ ...load, consignment: { ...load.consignment, adrRequired: true } }).adrRequired).toBe(true);
   });
 
   it('never exposes the precise street address (line1)', () => {

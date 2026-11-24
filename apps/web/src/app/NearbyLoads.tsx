@@ -283,6 +283,7 @@ export default function NearbyLoads() {
                 <JobCard>
                   <JobCardRoute
                     badge={<JobCardStatusBadge status="available" />}
+                    adr={listing.adrRequired === true}
                     origin={`${listing.origin.town}, ${listing.origin.postcode}`}
                     destination={`${listing.destination.town}, ${listing.destination.postcode}`}
                   />

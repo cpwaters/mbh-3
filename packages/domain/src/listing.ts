@@ -20,6 +20,10 @@ export interface Listing {
   description: string;
   weightKg: number;
   palletCount: number;
+  // Dangerous goods — shown up front, because a carrier without an ADR-trained
+  // driver cannot take the load at all. Absent on listings made before the
+  // field existed, which means not ADR.
+  adrRequired?: boolean;
   priceGbpPence: number;
   pickupBy: string;
   deliverBy: string;
@@ -44,6 +48,7 @@ export function listingFromLoad(load: Load): Listing {
     description: load.consignment.description,
     weightKg: load.consignment.weightKg,
     palletCount: load.consignment.palletCount,
+    adrRequired: load.consignment.adrRequired === true,
     priceGbpPence: load.priceGbpPence,
     pickupBy: load.pickupBy,
     deliverBy: load.deliverBy,

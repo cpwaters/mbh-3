@@ -13,6 +13,7 @@ vi.mock('../../lib/reader', () => ({
 }));
 
 const fulfilledLoad: ShipperLoad = {
+  adrRequired: false,
   loadId: 'load-1',
   origin: 'Trafford, M17 1WS',
   destination: 'Leith, EH6 6JJ',

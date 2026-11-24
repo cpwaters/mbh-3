@@ -153,6 +153,7 @@ export function AvailableLoads({
             <JobCard key={load.loadId}>
               <JobCardRoute
                 badge={<JobCardStatusBadge status="available" />}
+                adr={load.adrRequired === true}
                 origin={`${load.origin.town}, ${load.origin.postcode}`}
                 destination={`${load.destination.town}, ${load.destination.postcode}`}
               />

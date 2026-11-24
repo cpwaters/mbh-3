@@ -31,6 +31,8 @@ export interface ShipperLoad {
   distanceMiles: number | null;
   weightKg: number;
   palletCount: number;
+  // Dangerous goods (ADR).
+  adrRequired: boolean;
   priceGbpPence: number;
   pickupBy: string;
   pickupTime: string;

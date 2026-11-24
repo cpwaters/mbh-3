@@ -193,6 +193,39 @@ describe('CreateLoad — closing the form once the load is posted', () => {
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toMatchObject({ type: 'postLoad' });
   });
 
+  it('posts a load as ADR (dangerous goods) when the box is ticked, and not otherwise', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { loadId: 'load-9' } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderCreateLoad();
+    fillRequired();
+
+    const adr = screen.getByRole('checkbox', { name: /ADR required/i });
+    expect(adr).not.toBeChecked();
+    await user.click(adr);
+    await user.click(screen.getByRole('button', { name: /create load/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      payload: { consignment: Record<string, unknown> };
+    };
+    expect(body.payload.consignment).toMatchObject({ adrRequired: true });
+  });
+
+  it('sends no ADR flag for an ordinary load', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { loadId: 'load-9' } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderCreateLoad();
+    fillRequired();
+    await user.click(screen.getByRole('button', { name: /create load/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      payload: { consignment: Record<string, unknown> };
+    };
+    expect(body.payload.consignment).not.toHaveProperty('adrRequired');
+  });
+
   it('stays on the form when the server refuses the load', async () => {
     vi.stubGlobal(
       'fetch',

@@ -254,7 +254,12 @@ export default function LoadsList() {
       <div className="grid grid-cols-1 gap-4">
         {loads.map((load) => (
           <JobCard key={load.loadId}>
-            <JobCardRoute badge={<JobCardStatusBadge status={load.status} />} origin={load.origin} destination={load.destination} />
+            <JobCardRoute
+              badge={<JobCardStatusBadge status={load.status} />}
+              adr={load.adrRequired}
+              origin={load.origin}
+              destination={load.destination}
+            />
             <JobCardPayment amount={formatGbp(load.priceGbpPence)} />
             <JobCardSection>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

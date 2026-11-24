@@ -268,6 +268,7 @@ export function ActiveJobsPage() {
           <JobCard>
             <JobCardRoute
               badge={<JobCardStatusBadge status={job.status} />}
+              adr={job.adrRequired === true}
               origin={fmtAddr(job.origin)}
               destination={fmtAddr(job.destination)}
             />

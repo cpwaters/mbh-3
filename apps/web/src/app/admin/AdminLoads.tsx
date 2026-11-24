@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Ban, Search } from 'lucide-react';
 import { formatGbp, type Load, type LoadStatus } from '@mbh/domain';
+import { AdrPill } from '../JobCard';
 import {
   LOAD_STATUS_LABELS,
   LOAD_STATUS_STYLES,
@@ -52,6 +53,7 @@ export function LoadList({
                   {load.origin.town} <ArrowRight className="w-3.5 h-3.5 text-gray-400" /> {load.destination.town}
                 </span>
                 <span className="text-gray-700">{formatGbp(load.priceGbpPence)}</span>
+                {load.consignment.adrRequired === true && <AdrPill />}
               </div>
               <p className="text-sm text-gray-500 mt-0.5">
                 {showCompany && (

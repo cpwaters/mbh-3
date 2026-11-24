@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { MapPin } from 'lucide-react';
+import { MapPin, TriangleAlert } from 'lucide-react';
 
 // Universal job/load card, matching the reference design used across the
 // site: white card, sections separated by thin dividers, in the order
@@ -29,18 +29,41 @@ export function JobCardStatusBadge({ status }: { status: string }) {
   return <span className={`px-3 py-1 rounded-full text-sm font-medium ${color}`}>{label}</span>;
 }
 
+// Dangerous goods. Only a driver holding an ADR certificate, in a vehicle
+// equipped for it, may carry the load, so it is flagged wherever the load is
+// shown rather than tucked into the details.
+export function AdrPill() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-orange-800 ring-1 ring-orange-300"
+      title="Dangerous goods — needs an ADR-certified driver"
+    >
+      <TriangleAlert className="w-3.5 h-3.5" aria-hidden="true" />
+      ADR
+    </span>
+  );
+}
+
 export function JobCardRoute({
   badge,
+  adr = false,
   origin,
   destination,
 }: {
   badge?: ReactNode;
+  // Dangerous goods: shows the ADR pill beside the badge.
+  adr?: boolean;
   origin: string;
   destination: string;
 }) {
   return (
     <div>
-      {badge && <div className="flex items-center gap-3 mb-3">{badge}</div>}
+      {(badge || adr) && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {badge}
+          {adr && <AdrPill />}
+        </div>
+      )}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />

@@ -124,4 +124,20 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
     expect(screen.queryByText(/Waiting for a GPS signal/)).not.toBeInTheDocument();
     expect(screen.getByText(/Could not get your location/)).toBeInTheDocument();
   });
+
+  it('flags a dangerous-goods load with an ADR pill, and only that one', () => {
+    render(
+      <AvailableLoads
+        carrierTenantId="carrier-1"
+        listings={[listing, { ...listing, loadId: 'load-adr', adrRequired: true }]}
+        getIdToken={async () => 'token'}
+        onAccepted={() => {}}
+        onChanged={() => {}}
+        hasActiveJob={false}
+      />
+    );
+    const pills = screen.getAllByText('ADR');
+    expect(pills).toHaveLength(1);
+    expect(pills[0]?.closest('[title]')).toHaveAttribute('title', expect.stringMatching(/ADR-certified driver/));
+  });
 });
