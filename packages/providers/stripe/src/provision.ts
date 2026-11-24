@@ -75,6 +75,28 @@ export interface ProvisionOptions {
   siteUrl: string; // e.g. https://mybackhaul-app.web.app
   monthlyPence: Record<PlanTier, number>;
   log: (line: string) => void;
+  // Prices already made by hand in the dashboard, by plan: tagged with that
+  // plan's lookup key instead of a new price being created. From
+  // ADOPT_PRICES=starter=price_…,driver_new=price_… (see stripe:check, which
+  // lists the untagged prices and their ids).
+  adoptPrices?: Partial<Record<PlanTier, string>>;
+}
+
+// ADOPT_PRICES="starter=price_123,growth=price_456" → { starter: 'price_123', … }
+export function parseAdoptPrices(raw: string | undefined): Partial<Record<PlanTier, string>> {
+  const out: Partial<Record<PlanTier, string>> = {};
+  if (raw === undefined || raw.trim() === '') return out;
+  for (const pair of raw.split(',')) {
+    const [tier, priceId] = pair.split('=').map((x) => x.trim());
+    if (!(PLAN_TIERS as readonly string[]).includes(tier ?? '')) {
+      throw new Error(`ADOPT_PRICES: "${tier ?? ''}" is not a plan (one of ${PLAN_TIERS.join(', ')}).`);
+    }
+    if (priceId === undefined || !/^price_[A-Za-z0-9]+$/.test(priceId)) {
+      throw new Error(`ADOPT_PRICES: "${priceId ?? ''}" for ${tier} is not a price id (price_…).`);
+    }
+    out[tier as PlanTier] = priceId;
+  }
+  return out;
 }
 
 export interface ProvisionResult {
@@ -87,7 +109,7 @@ export interface ProvisionResult {
 type List = { data: Record<string, unknown>[] };
 
 export async function provision(stripe: StripeFetch, options: ProvisionOptions): Promise<ProvisionResult> {
-  const { siteUrl, monthlyPence, log } = options;
+  const { siteUrl, monthlyPence, log, adoptPrices = {} } = options;
   const prices = {} as Record<PlanTier, string>;
   const products = {} as Record<PlanTier, string>;
 
@@ -106,6 +128,22 @@ export async function provision(stripe: StripeFetch, options: ProvisionOptions):
         );
       }
       log(`  = ${PLAN_LABELS[tier]} price ${prices[tier]} (exists)`);
+      continue;
+    }
+    const adopt = adoptPrices[tier];
+    if (adopt !== undefined) {
+      // A price made by hand: tag it, so the webhook knows which plan its
+      // subscribers are on. Its amount is whatever it was made with.
+      const tagged = await stripe(`/v1/prices/${adopt}`, {
+        method: 'POST',
+        form: { lookup_key: lookupKey, transfer_lookup_key: 'true', 'metadata[mbh_tier]': tier },
+      });
+      if (tagged.recurring == null || (tagged.recurring as { interval?: string }).interval !== 'month') {
+        throw new Error(`${PLAN_LABELS[tier]}: ${adopt} is not a monthly subscription price, so it cannot be a plan.`);
+      }
+      prices[tier] = adopt;
+      products[tier] = tagged.product as string;
+      log(`  ~ ${PLAN_LABELS[tier]} price ${adopt} (yours, now tagged ${lookupKey})`);
       continue;
     }
     const product = await stripe('/v1/products', {
@@ -128,12 +166,23 @@ export async function provision(stripe: StripeFetch, options: ProvisionOptions):
     log(`  + ${PLAN_LABELS[tier]} price ${prices[tier]}`);
   }
 
-  // 2. A payment link per tier, found by metadata. client_reference_id is
-  //    appended per company by the Billing page, not baked in here.
+  // 2. A payment link per tier — one of ours (by metadata), or one made by
+  //    hand that already sells the plan's price, so nothing is duplicated.
+  //    client_reference_id is appended per company by the Billing page, not
+  //    baked in here.
   const paymentLinks = {} as Record<PlanTier, string>;
   const links = (await stripe('/v1/payment_links?active=true&limit=100', { method: 'GET' })) as List;
+  const linkPrice = new Map<string, string>();
+  for (const link of links.data) {
+    const items = (await stripe(`/v1/payment_links/${String(link.id)}/line_items?limit=10`, { method: 'GET' })) as List;
+    const sold = items.data[0]?.price as { id?: string } | string | undefined;
+    const soldId = typeof sold === 'string' ? sold : sold?.id;
+    if (soldId !== undefined) linkPrice.set(String(link.id), soldId);
+  }
   for (const tier of PLAN_TIERS) {
-    const existing = links.data.find((l) => (l.metadata as Record<string, string> | undefined)?.mbh_tier === tier);
+    const existing =
+      links.data.find((l) => (l.metadata as Record<string, string> | undefined)?.mbh_tier === tier) ??
+      links.data.find((l) => linkPrice.get(String(l.id)) === prices[tier]);
     if (existing !== undefined) {
       paymentLinks[tier] = existing.url as string;
       log(`  = ${PLAN_LABELS[tier]} payment link (exists)`);
@@ -227,6 +276,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
   const siteUrl = (process.env.SITE_URL ?? 'https://mybackhaul-app.web.app').replace(/\/$/, '');
+  const adoptPrices = parseAdoptPrices(process.env.ADOPT_PRICES);
   const monthlyPence = {
     starter: penceFromEnv('STARTER_PENCE', DEFAULT_MONTHLY_PENCE.starter),
     growth: penceFromEnv('GROWTH_PENCE', DEFAULT_MONTHLY_PENCE.growth),
@@ -237,7 +287,7 @@ async function main(): Promise<void> {
   };
 
   console.log(`Provisioning Stripe (${key.startsWith('sk_live_') || key.startsWith('rk_live_') ? 'LIVE' : 'test'} mode) for ${siteUrl}`);
-  const result = await provision(stripeFetch(key), { siteUrl, monthlyPence, log: (l) => console.log(l) });
+  const result = await provision(stripeFetch(key), { siteUrl, monthlyPence, adoptPrices, log: (l) => console.log(l) });
 
   console.log('\nPaste these into the back office → Billing (none are secret):');
   for (const tier of PLAN_TIERS) {

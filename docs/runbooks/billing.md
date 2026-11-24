@@ -9,6 +9,51 @@ Secrets in this runbook (your Stripe secret key and the webhook signing
 secret) go only where it says: your own shell and GitHub's secret store.
 Never put them in a chat, an issue, a commit or a file in the repo.
 
+## Payment Links or Subscriptions?
+
+Both, in different places. A **payment link** is the checkout page a shipper or
+driver is sent to from Billing, so the plans' links live under **Payment
+Links**. When someone pays through a link that sells a *monthly recurring*
+price, Stripe creates a **Subscription** for them, under **Billing →
+Subscriptions**. That subscription is what renews each month and what the
+webhook reports to MyBackHaul. The plans themselves (products and prices) live
+under **Product catalogue**. Nothing needs moving. What matters is that each
+link sells a recurring monthly price tagged with its plan's lookup key, and
+`pnpm stripe:check` tells you whether it does.
+
+## 0. Check what is there already
+
+    STRIPE_SECRET_KEY=rk_live_... pnpm stripe:check
+
+A restricted key with read access is enough; the check changes nothing. It
+compares the account with what the backend expects and lists each problem:
+
+- **Prices:** a plan with no price tagged `mbh_<plan>_monthly`, an untagged
+  subscription price (subscribers to it would get no plan), or a price that is
+  not monthly.
+- **Payment links:** a link selling a one-off price (that takes a payment, not
+  a subscription) or an untagged price.
+- **Webhook:** no endpoint at `/api/billing/webhook`, or missing events.
+- **Customer portal:** the login page is off.
+
+At the end it prints the links, prices and portal URL to paste into the back
+office.
+
+### If you made products, prices or links by hand
+
+The check lists your untagged prices with their ids (`price_...`). Tell
+provisioning which plan each one is, and it **tags your prices** instead of
+making new ones. It also reuses a link that already sells the right price:
+
+    STRIPE_SECRET_KEY=sk_live_... \
+    ADOPT_PRICES=starter=price_AAA,growth=price_BBB,fleet=price_CCC,driver_new=price_DDD,driver_fleet=price_EEE,driver_pro=price_FFF \
+    pnpm stripe:provision
+
+Any plan left out of `ADOPT_PRICES` gets a fresh price at the amount in step 1.
+A price must be a monthly subscription price to be adopted. Afterwards, archive
+any links the check flagged as one-off or untagged so nobody pays through them,
+then run `pnpm stripe:check` again until it reports no problems.
+
 ## 1. Set the prices (optional)
 
 The provisioning script creates these monthly GBP prices unless told
