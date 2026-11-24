@@ -21,6 +21,7 @@ import { AppProvider, type AppData } from '../app/context';
 import { Navigation } from '../app/Navigation';
 import { Dashboard, ActiveJobsPage } from '../app/pages';
 import MapView from '../app/MapView';
+import NearbyLoads from '../app/NearbyLoads';
 import Earnings from '../app/Earnings';
 import DrivingTime from '../app/DrivingTime';
 import Profile from '../app/Profile';
@@ -252,7 +253,10 @@ export default function DriverApp() {
                     <>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/active" element={<ActiveJobsPage />} />
-                      <Route path="/map" element={<MapView />} />
+                      {/* The Map tab is loads near you; an active job's route
+                          has its own page, reached from the job card. */}
+                      <Route path="/map" element={<NearbyLoads />} />
+                      <Route path="/map/route" element={<MapView />} />
                       <Route path="/driving" element={<DrivingTime />} />
                       <Route path="/earnings" element={<Earnings />} />
                       <Route path="/billing" element={<Billing />} />

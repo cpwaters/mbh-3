@@ -710,6 +710,19 @@ test('the founder completes a job, returning its load to Available Loads', async
   await expect.poll(() => getLoadStatus(E2E.founderLoadId), { timeout: 15_000 }).toBe('available');
 });
 
+test('the Map tab shows loads near the phone, within a radius the driver sets', async ({ page }) => {
+  await arriveAtDestination(page, LEITH.latitude, LEITH.longitude);
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await page.getByRole('link', { name: 'Map' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Loads near you' })).toBeVisible();
+  // With a fix, the page counts what is in range — the heading names the
+  // radius, so changing it is visible whatever loads are seeded.
+  await expect(page.getByRole('heading', { name: /within 25 miles$/ })).toBeVisible();
+  await page.getByRole('button', { name: '100 miles' }).click();
+  await expect(page.getByRole('heading', { name: /within 100 miles$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '100 miles' })).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('the map offers to share location, and "Not Now" dismisses it', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
   await goToActiveJobs(page);

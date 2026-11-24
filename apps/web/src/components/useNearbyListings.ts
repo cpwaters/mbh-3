@@ -8,6 +8,8 @@ export interface RankedListing {
   // Straight-line metres from the driver to this load's pickup, or null until
   // the pickup postcode is geocoded / while location is unavailable.
   distanceMeters: number | null;
+  // Where the pickup postcode is, once located — what the map pins.
+  pickup: GeoPoint | null;
 }
 
 // Ranks the available loads by how close their PICKUP is to the driver's live
@@ -46,7 +48,7 @@ export function useNearbyListings(listings: Listing[], driverLocation: GeoPoint 
       const pickup = cacheRef.current.get(listing.origin.postcode.trim()) ?? null;
       const distanceMeters =
         driverLocation !== null && pickup !== null ? haversineMeters(driverLocation, pickup) : null;
-      return { listing, distanceMeters };
+      return { listing, distanceMeters, pickup };
     });
     // Nearest first; unknown distances (no fix yet / un-geocoded) sink to the
     // bottom keeping their original newest-first order.

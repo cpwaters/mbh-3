@@ -679,6 +679,17 @@ count the carrier's jobs since the period start (day for free, month for
 New and Fleet). Provisioning: DRIVER_NEW_PENCE / DRIVER_FLEET_PENCE /
 DRIVER_PRO_PENCE; the portal offers switching between all tiers.
 
+## Map tab: loads near you (built)
+
+The driver app's Map tab (/map) is now "Loads near you": available loads whose
+collection postcode is within a radius (10 / 25 / 50 / 100 miles, default 25,
+remembered per phone in localStorage) of the device's GPS fix — a Leaflet map
+with the radius drawn and a pin per load, and a nearest-first list that
+accepts through dispatch. Distances are straight-line from the phone to the
+pickup postcode, via the same useNearbyListings ranking as Available Loads
+(lib/nearby.ts). An active job's route view moved to /map/route, reached from
+the job card's "View Route".
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

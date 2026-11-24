@@ -42,7 +42,7 @@ test('carrier — available loads', async ({ page }) => {
 test('driver — map', async ({ page }) => {
   await signIn(page, E2E.email, E2E.password);
   await page.getByRole('link', { name: 'Map' }).click();
-  await expect(page.getByRole('heading', { name: 'Route Map' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Loads near you' })).toBeVisible();
   await page.waitForTimeout(1200); // let the tiles paint
   await page.screenshot({ path: `${DIR}/map.png` });
 });
