@@ -4,6 +4,7 @@ import { CheckCircle, Navigation, MapPin, Loader2, RotateCcw, Eye, EyeOff } from
 import { formatGbp, isJobTracked } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { AvailableLoads } from '../components/AvailableLoads';
+import { useAdrStatus } from '../components/useAdrStatus';
 import { PostLoad } from '../components/PostLoad';
 import { MarkDelivered, type ActiveJob } from '../components/MarkDelivered';
 import {
@@ -70,6 +71,8 @@ function toActiveJob(job: { jobId: string; carrierTenantId: string; origin: { to
 export function Dashboard() {
   const app = useApp();
   const flash = useFlash();
+  const navigate = useNavigate();
+  const adr = useAdrStatus(app.auth.session?.actorId ?? null);
 
   if (app.selected === null) {
     return (
@@ -108,6 +111,8 @@ export function Dashboard() {
           watchingLocation={app.watchingLocation}
           onEnableLocation={app.requestLocation}
           locationError={app.locationError}
+          adr={adr}
+          onOpenProfile={() => navigate('/profile', { state: { addAdr: true } })}
         />
       </>
     );

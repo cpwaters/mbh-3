@@ -427,6 +427,7 @@ export class FirestoreReader
         displayName: p.displayName ?? '',
         email: p.email ?? '',
         phone: p.companyContact?.phone ?? p.phone ?? '',
+        ...(p.adrCertificate !== undefined ? { adrCertificate: p.adrCertificate } : {}),
       };
     });
   }

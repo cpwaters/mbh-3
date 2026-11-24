@@ -8,7 +8,7 @@ import { addVehicleHandler, retireVehicleHandler } from './actions/vehicles.js';
 import { setCompanyLogoHandler, clearCompanyLogoHandler } from './actions/company-logo.js';
 import { recordMotionHandler } from './actions/record-motion.js';
 import { setJobTrackingHandler } from './actions/set-job-tracking.js';
-import { updateProfileHandler } from './actions/update-profile.js';
+import { setAdrCertificateHandler, updateProfileHandler } from './actions/update-profile.js';
 import { createTenantHandler } from './actions/create-tenant.js';
 import { createInviteHandler, revokeInviteHandler } from './actions/invites.js';
 import { cancelLoadHandler } from './actions/cancel-load.js';
@@ -43,6 +43,7 @@ const HANDLERS: readonly AnyHandler[] = [
   addVehicleHandler,
   retireVehicleHandler,
   updateProfileHandler,
+  setAdrCertificateHandler,
   createTenantHandler,
   createInviteHandler,
   revokeInviteHandler,
@@ -93,6 +94,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'addVehicle',
   'retireVehicle',
   'updateProfile',
+  'setAdrCertificate',
   'createTenant',
   'cancelLoad',
   'recordRoutePoint',

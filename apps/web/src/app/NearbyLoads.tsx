@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LocateFixed, MapPin, Navigation, Search } from 'lucide-react';
-import { formatGbp, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, type Listing } from '@mbh/domain';
+import { useNavigate } from 'react-router-dom';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import NearbyMap from './NearbyMap';
@@ -17,7 +18,8 @@ import {
   type RadiusMiles,
 } from '../lib/nearby';
 import { useNearbyListings } from '../components/useNearbyListings';
-import { JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBadge } from './JobCard';
+import { useAdrStatus } from '../components/useAdrStatus';
+import { AdrAcceptNote, JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBadge } from './JobCard';
 
 // "Loads near you": the Map page. An area — around where the phone is, or
 // around a postcode the driver types (where they will drop off, say, or when
@@ -30,6 +32,8 @@ import { JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBad
 // filter; the road miles will be more.
 export default function NearbyLoads() {
   const app = useApp();
+  const navigate = useNavigate();
+  const adr = useAdrStatus(app.auth.session?.actorId ?? null);
   const [radius, setRadius] = useState<RadiusMiles>(loadRadius);
   const [selected, setSelected] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
@@ -75,6 +79,10 @@ export default function NearbyLoads() {
   const ranked = useNearbyListings(app.listings, centre);
   const split = useMemo(() => withinRadius(ranked, radius), [ranked, radius]);
   const hasActiveJob = app.job !== null;
+  // Why this driver can't take an ADR load yet; null when they can (or when
+  // their profile hasn't loaded — the server still decides on accept).
+  const adrBlockFor = (load: Listing): string | null =>
+    load.adrRequired === true && adr.status !== null ? adrRefusal(adr.status, adr.certificate) : null;
 
   function chooseRadius(next: RadiusMiles): void {
     setRadius(next);
@@ -298,11 +306,17 @@ export default function NearbyLoads() {
                     {listing.palletCount} pallets · {listing.weightKg.toLocaleString('en-GB')} kg · collect by{' '}
                     {listing.pickupBy}
                   </p>
+                  {adrBlockFor(listing) !== null && (
+                    <AdrAcceptNote
+                      message={adrBlockFor(listing) ?? ''}
+                      onOpenProfile={() => navigate('/profile', { state: { addAdr: true } })}
+                    />
+                  )}
                   <JobCardActions>
                     <button
                       type="button"
                       onClick={() => void accept(listing)}
-                      disabled={hasActiveJob || accepting === listing.loadId}
+                      disabled={hasActiveJob || accepting === listing.loadId || adrBlockFor(listing) !== null}
                       className="w-full sm:flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {accepting === listing.loadId ? 'Accepting…' : 'Accept Load'}

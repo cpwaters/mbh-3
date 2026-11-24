@@ -44,6 +44,26 @@ export function AdrPill() {
   );
 }
 
+// Shown in place of a working Accept button on an ADR load the driver can't
+// take yet: says why, and where to fix it.
+export function AdrAcceptNote({ message, onOpenProfile }: { message: string; onOpenProfile?: () => void }) {
+  return (
+    <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
+      <TriangleAlert className="w-4 h-4 flex-shrink-0 text-orange-600" aria-hidden="true" />
+      <span className="flex-1">{message}</span>
+      {onOpenProfile && (
+        <button
+          type="button"
+          onClick={onOpenProfile}
+          className="self-start sm:self-auto rounded-lg border border-orange-300 bg-white px-3 py-1.5 font-medium text-orange-800 hover:bg-orange-100"
+        >
+          Add ADR certificate
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function JobCardRoute({
   badge,
   adr = false,

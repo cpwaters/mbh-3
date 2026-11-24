@@ -1,4 +1,4 @@
-import type { Job, Load, Member, Tenant } from '@mbh/domain';
+import type { AdrCertificate, Job, Load, Member, Tenant } from '@mbh/domain';
 
 // The founder's back office: reads across EVERY company. Rules-gated by
 // isFounder() on the token's email (firestore.rules); to anyone else each of
@@ -18,6 +18,8 @@ export interface AdminPerson {
   displayName: string;
   email: string;
   phone: string;
+  // As the driver declared it on their profile; absent when none.
+  adrCertificate?: AdrCertificate;
 }
 
 // One entry of the audit log: what was done, by whom, when, with the

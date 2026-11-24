@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import type { Member, Role } from '@mbh/domain';
+import { adrCertificateStatus, formatCalendarDate, type Member, type Role } from '@mbh/domain';
 import {
   Pill,
   ROLE_LABELS,
@@ -61,6 +61,16 @@ export function MemberList({
                   <span className={`font-medium ${disabled ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{name}</span>
                   {disabled && <Pill className="bg-gray-100 text-gray-600">Disabled</Pill>}
                   {carries && !tracked && <Pill className="bg-gray-100 text-gray-600">Not tracked</Pill>}
+                  {person?.adrCertificate !== undefined &&
+                    (adrCertificateStatus(person.adrCertificate, new Date().toISOString()) === 'valid' ? (
+                      <Pill className="bg-orange-100 text-orange-800">
+                        ADR {person.adrCertificate.number} · to {formatCalendarDate(person.adrCertificate.expiresOn)}
+                      </Pill>
+                    ) : (
+                      <Pill className="bg-red-100 text-red-700">
+                        ADR expired {formatCalendarDate(person.adrCertificate.expiresOn)}
+                      </Pill>
+                    ))}
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5 break-all">
                   {showCompany && (

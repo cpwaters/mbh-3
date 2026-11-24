@@ -140,4 +140,48 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
     expect(pills).toHaveLength(1);
     expect(pills[0]?.closest('[title]')).toHaveAttribute('title', expect.stringMatching(/ADR-certified driver/));
   });
+
+  describe('ADR loads and the driver’s certificate', () => {
+    const adrLoad: Listing = { ...listing, loadId: 'load-adr', adrRequired: true };
+
+    function renderWithAdr(adr: Parameters<typeof AvailableLoads>[0]['adr'], onOpenProfile = vi.fn()) {
+      render(
+        <AvailableLoads
+          carrierTenantId="carrier-1"
+          listings={[listing, adrLoad]}
+          getIdToken={async () => 'token'}
+          onAccepted={() => {}}
+          onChanged={() => {}}
+          hasActiveJob={false}
+          adr={adr}
+          onOpenProfile={onOpenProfile}
+        />
+      );
+      return onOpenProfile;
+    }
+
+    it('without a certificate, the ADR load says why and cannot be accepted; the ordinary one can', async () => {
+      const onOpenProfile = renderWithAdr({ status: 'none', certificate: null });
+      expect(screen.getByText(/Add your ADR certificate to your profile/)).toBeInTheDocument();
+      const accepts = screen.getAllByRole('button', { name: 'Accept Load' });
+      expect(accepts).toHaveLength(2);
+      expect(accepts[0]).toBeEnabled();
+      expect(accepts[1]).toBeDisabled();
+
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Add ADR certificate' }));
+      expect(onOpenProfile).toHaveBeenCalled();
+    });
+
+    it('an expired certificate says when it ran out', () => {
+      renderWithAdr({ status: 'expired', certificate: { number: 'ADR-1', expiresOn: '2026-07-31' } });
+      expect(screen.getByText(/expired on 31 July 2026/)).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Accept Load' })[1]).toBeDisabled();
+    });
+
+    it('a valid certificate, or one not loaded yet, blocks nothing', () => {
+      renderWithAdr({ status: 'valid', certificate: { number: 'ADR-1', expiresOn: '2030-01-01' } });
+      expect(screen.queryByText(/ADR certificate to your profile/)).not.toBeInTheDocument();
+      for (const b of screen.getAllByRole('button', { name: 'Accept Load' })) expect(b).toBeEnabled();
+    });
+  });
 });

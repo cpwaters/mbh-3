@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AppError, validateProfileInput, type UserProfile } from '@mbh/domain';
+import { AppError, validateAdrCertificate, validateProfileInput, type UserProfile } from '@mbh/domain';
 import { userProfileDoc } from '@mbh/paths';
 import type { DocData } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
@@ -36,6 +36,10 @@ const updateProfileSchema = z.object({
   companyContact: contactSchema,
   vatNumber: z.string(),
   drivingLicenseNumber: z.string(),
+  // The driver's ADR certificate: an object sets it, null removes it, and
+  // leaving it out keeps whatever is stored (so an older client that doesn't
+  // know the field can't wipe it).
+  adrCertificate: z.object({ number: z.string(), expiresOn: z.string() }).nullable().optional(),
   quantityOfVehicles: z.number().int().nonnegative(),
   paymentType: paymentTypeSchema,
   image: z.string(),
@@ -65,6 +69,18 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
     const existing = (await tx.get(userProfileDoc(ctx.actorId))) as UserProfile | null;
     const rating = existing?.rating ?? 0;
 
+    let adrCertificate = existing?.adrCertificate;
+    if (payload.adrCertificate === null) {
+      adrCertificate = undefined;
+    } else if (payload.adrCertificate !== undefined) {
+      const adr = { number: payload.adrCertificate.number.trim(), expiresOn: payload.adrCertificate.expiresOn };
+      const adrCheck = validateAdrCertificate(adr);
+      if (!adrCheck.ok) {
+        throw new AppError('invalid-payload', adrCheck.message, { field: adrCheck.field });
+      }
+      adrCertificate = adr;
+    }
+
     const firstName = payload.firstName.trim();
     const lastName = payload.lastName.trim();
     const profile: UserProfile = {
@@ -80,6 +96,7 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
       companyContact: payload.companyContact,
       vatNumber: payload.vatNumber.trim(),
       drivingLicenseNumber: payload.drivingLicenseNumber.trim(),
+      ...(adrCertificate !== undefined ? { adrCertificate } : {}),
       quantityOfVehicles: payload.quantityOfVehicles,
       paymentType: payload.paymentType,
       rating,
@@ -90,5 +107,51 @@ export const updateProfileHandler: ActionHandler<UpdateProfilePayload, UpdatePro
     tx.write({ kind: 'set', path: userProfileDoc(ctx.actorId), data: { ...profile } });
 
     return { result: { actorId: ctx.actorId }, auditDetail: { actorId: ctx.actorId } };
+  },
+};
+
+// The driver's ADR certificate on its own, so the profile page can add,
+// renew or remove it without resending the whole profile. An object sets it;
+// null removes it. Needs a saved profile to hang it on: the name and email
+// there are what the back office checks it against.
+const setAdrCertificateSchema = z.object({
+  adrCertificate: z.object({ number: z.string(), expiresOn: z.string() }).nullable(),
+});
+
+export type SetAdrCertificatePayload = z.infer<typeof setAdrCertificateSchema>;
+
+export const setAdrCertificateHandler: ActionHandler<SetAdrCertificatePayload, UpdateProfileResult> = {
+  type: 'setAdrCertificate',
+  idempotent: true,
+  parse: zodParse(setAdrCertificateSchema),
+  async execute(tx, ctx, payload) {
+    const existing = (await tx.get(userProfileDoc(ctx.actorId))) as UserProfile | null;
+    if (existing === null) {
+      throw new AppError('conflict', 'Fill in your profile first, then add your ADR certificate.', {
+        recoverable: false,
+      });
+    }
+
+    let next: UserProfile = { ...existing, updatedAt: ctx.now };
+    delete next.adrCertificate;
+    if (payload.adrCertificate !== null) {
+      const adr = { number: payload.adrCertificate.number.trim(), expiresOn: payload.adrCertificate.expiresOn };
+      const check = validateAdrCertificate(adr);
+      if (!check.ok) {
+        throw new AppError('invalid-payload', check.message, { field: check.field });
+      }
+      next = { ...next, adrCertificate: adr };
+    }
+    tx.write({ kind: 'set', path: userProfileDoc(ctx.actorId), data: { ...next } });
+
+    return {
+      result: { actorId: ctx.actorId },
+      auditDetail: {
+        actorId: ctx.actorId,
+        ...(next.adrCertificate !== undefined
+          ? { adrCertificateNumber: next.adrCertificate.number, expiresOn: next.adrCertificate.expiresOn }
+          : { removed: true }),
+      },
+    };
   },
 };

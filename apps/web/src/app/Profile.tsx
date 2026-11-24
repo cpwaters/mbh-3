@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Star, Truck, MapPin, Phone, Building, FileText, Calendar, UserPlus, Copy, Check } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { VEHICLE_TYPE_LABELS, VEHICLE_CONFIGURATION_LABELS, type VehicleType, type VehicleConfiguration } from '@mbh/domain';
 import { useApp } from './context';
 import CompanyLogo from './CompanyLogo';
+import AdrCertificateCard from './AdrCertificateCard';
 import { useProfile } from '../components/useProfile';
 import { useVehicles } from '../components/useVehicles';
 import { dispatchAction } from '../lib/dispatch';
@@ -56,7 +57,9 @@ export default function Profile() {
       /* ignore */
     }
   }
-  const { loading, profile } = useProfile(actorId);
+  const { loading, profile, reload: reloadProfile } = useProfile(actorId);
+  // Sent here by an ADR load's "Add ADR certificate": open that form.
+  const addAdr = (useLocation().state as { addAdr?: boolean } | null)?.addAdr === true;
   const { vehicles, reload: reloadVehicles } = useVehicles(carrierTenantId);
 
   async function retire(vehicleId: string): Promise<void> {
@@ -259,6 +262,15 @@ export default function Profile() {
                 <span className="font-medium text-gray-900">{rating.toFixed(1)}</span>
               </div>
             </div>
+            <AdrCertificateCard
+              key={`${profile?.adrCertificate?.number ?? ''}|${profile?.adrCertificate?.expiresOn ?? ''}`}
+              certificate={profile?.adrCertificate}
+              hasProfile={profile !== null}
+              getIdToken={app.auth.getIdToken}
+              onSaved={reloadProfile}
+              onNeedProfile={() => navigate('/profile/edit')}
+              startOpen={addAdr}
+            />
           </Section>
 
           {/* Vehicles */}
