@@ -93,6 +93,7 @@ export const acceptLoadHandler: ActionHandler<AcceptLoadPayload, AcceptLoadResul
       ...(load.postingDetails?.destinationCompanyName
         ? { destinationCompanyName: load.postingDetails.destinationCompanyName }
         : {}),
+      ...(load.consignment.adrRequired === true ? { adrRequired: true } : {}),
       priceGbpPence: load.priceGbpPence,
       ...(load.route !== undefined ? { route: load.route } : {}),
       // Decided now from all three parties' switches; the founder's controls

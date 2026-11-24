@@ -117,6 +117,7 @@ interface JobDoc {
   route?: LoadRoute;
   deliveredAt?: string;
   trackingAllowed?: boolean;
+  adrRequired?: boolean;
 }
 
 // A long job's trail is bounded so one read cannot balloon: 500 points is
@@ -169,6 +170,7 @@ export class FirestoreReader
           priceGbpPence: data.priceGbpPence,
           ...(data.route !== undefined ? { route: data.route } : {}),
           ...(data.trackingAllowed !== undefined ? { trackingAllowed: data.trackingAllowed } : {}),
+          ...(data.adrRequired === true ? { adrRequired: true } : {}),
         };
       }
     }
@@ -335,6 +337,7 @@ export class FirestoreReader
         distanceMiles: load.route !== undefined ? Math.round(metersToMiles(load.route.distanceMeters)) : null,
         weightKg: load.consignment.weightKg,
         palletCount: load.consignment.palletCount,
+        adrRequired: load.consignment.adrRequired === true,
         priceGbpPence: load.priceGbpPence,
         pickupBy: load.pickupBy,
         pickupTime: load.postingDetails?.pickupTime ?? '',

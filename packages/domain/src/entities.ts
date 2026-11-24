@@ -65,6 +65,10 @@ export interface ConsignmentDetails {
   description: string;
   weightKg: number;
   palletCount: number;
+  // Dangerous goods: the load must travel under ADR, so only a driver with an
+  // ADR certificate (and a vehicle equipped for it) can take it. Absent on
+  // loads posted before the field existed, which means not ADR.
+  adrRequired?: boolean;
 }
 
 // A Load is the shipper's listing. It is matched at most once; the
@@ -131,6 +135,9 @@ export interface Job {
   // load carried no posting details.
   originCompanyName?: string;
   destinationCompanyName?: string;
+  // Dangerous goods, carried over from the load at acceptance, so the driver
+  // sees it on their job without reading the shipper-private load.
+  adrRequired?: boolean;
   // The carrier's pay for the job, denormalized from the load at acceptance so
   // it is fixed at the price agreed and the driver's earnings read never needs
   // the shipper-private load.

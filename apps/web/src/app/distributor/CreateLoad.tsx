@@ -23,6 +23,7 @@ const empty = {
   vehicle_van: false, vehicle_rigid: false, vehicle_artic: false,
   refrigerated: false, box: false, flat_bed: false, low_loader: false, skeleton: false, tanker: false,
   invoiced: false, instant_payment: false,
+  adr_required: false,
 };
 export type Form = typeof empty;
 
@@ -248,6 +249,7 @@ export default function CreateLoad() {
             description: f.description,
             weightKg: Number(f.weight_kg),
             palletCount: parseInt(f.pallet_count, 10) || 1,
+            ...(f.adr_required ? { adrRequired: true } : {}),
           },
           priceGbpPence: Math.round(Number(f.price) * 100),
           pickupBy: f.pickup_date,
@@ -430,6 +432,28 @@ export default function CreateLoad() {
               />
               {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
+            {/* Dangerous goods. Ticked, the load is flagged ADR to every carrier
+                before they accept — only an ADR-certified driver may take it. */}
+            <label
+              htmlFor="adr_required"
+              className={`md:col-span-2 flex items-start gap-3 rounded-lg border p-3 cursor-pointer ${
+                f.adr_required ? 'border-orange-300 bg-orange-50' : 'border-gray-300'
+              }`}
+            >
+              <input
+                id="adr_required"
+                type="checkbox"
+                checked={f.adr_required}
+                onChange={toggle('adr_required')}
+                className="mt-1"
+              />
+              <span>
+                <span className="block font-medium text-gray-900">ADR required</span>
+                <span className="block text-sm text-gray-600">
+                  Dangerous goods — only a driver with an ADR certificate can carry this load.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 

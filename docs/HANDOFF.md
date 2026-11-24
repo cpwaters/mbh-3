@@ -710,6 +710,17 @@ Billing. `pnpm stripe:provision` now adopts hand-made prices via
 transfer_lookup_key), and reuses any active link already selling a plan's
 price rather than creating a second one.
 
+## ADR (dangerous goods) flag (built)
+
+Create Load has an "ADR required" checkbox in Consignment Details. It is
+stored as `consignment.adrRequired` (absent means not ADR, so older loads read
+correctly), projected onto the listing and copied onto the Job at
+acceptance. An orange "ADR" pill (`AdrPill` in JobCard.tsx) shows on the
+shipper's Loads list, Available Loads, Loads near you, the driver's active
+job and the back office's loads list. It is information only: nothing yet
+checks that the accepting driver holds an ADR certificate. That needs a
+driver-certificate field and a gate in acceptLoad.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

@@ -63,3 +63,37 @@ describe('carrier listing projection', () => {
     });
   });
 });
+
+describe('ADR (dangerous goods)', () => {
+  it('carries the ADR flag from the posted load to the listing and the accepted job', async () => {
+    const harness = await makeHarness();
+    const { loadId } = (await harness.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload({
+        consignment: { description: 'Paint, UN1263', weightKg: 8000, palletCount: 10, adrRequired: true },
+      }),
+      requestId: 'r-adr',
+    })) as { loadId: string };
+
+    expect(await harness.store.getDoc(`loads/${loadId}`)).toMatchObject({ consignment: { adrRequired: true } });
+    expect(await harness.store.getDoc(`listings/${loadId}`)).toMatchObject({ adrRequired: true });
+
+    const { jobId } = (await harness.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId },
+      requestId: 'r-acc',
+    })) as { jobId: string };
+    expect(await harness.store.getDoc(`jobs/${jobId}`)).toMatchObject({ adrRequired: true });
+  });
+
+  it('leaves an ordinary load unflagged, and stores nothing extra on it', async () => {
+    const harness = await makeHarness();
+    const { loadId } = (await harness.run('ship-owner', {
+      type: 'postLoad',
+      payload: validPostLoadPayload(),
+      requestId: 'r-plain',
+    })) as { loadId: string };
+    expect((await harness.store.getDoc(`loads/${loadId}`))?.consignment).not.toHaveProperty('adrRequired');
+    expect(await harness.store.getDoc(`listings/${loadId}`)).toMatchObject({ adrRequired: false });
+  });
+});
