@@ -20,6 +20,7 @@ import {
   updateAddressBookEntryHandler,
 } from './actions/address-book.js';
 import { backfillCloseJobsHandler } from './actions/backfill-close-jobs.js';
+import { placeListingsHandler } from './actions/place-listings.js';
 import {
   reinstateCompanyHandler,
   setCompanyTrackingHandler,
@@ -65,6 +66,7 @@ const HANDLERS: readonly AnyHandler[] = [
   setCompanyPlanHandler,
   setCompanyTrackingHandler,
   setMemberTrackingHandler,
+  placeListingsHandler,
 ];
 
 export function buildRegistry(): ReadonlyMap<string, AnyHandler> {
@@ -114,6 +116,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'setCompanyPlan',
   'setCompanyTracking',
   'setMemberTracking',
+  'placeListings',
 ];
 
 export const ALL_ACTION_TYPES: readonly string[] = HANDLERS.map((h) => h.type);

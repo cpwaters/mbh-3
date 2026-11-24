@@ -72,3 +72,32 @@ export function saveRadius(radius: RadiusMiles): void {
     /* not remembered — harmless */
   }
 }
+
+// Where the driver last searched around — their own position, or a postcode —
+// remembered on this phone so the page reopens on the same area.
+const AREA_KEY = 'mbh.nearbyArea';
+
+export interface SavedArea {
+  around: 'me' | 'postcode';
+  postcode: string;
+}
+
+export function loadArea(): SavedArea {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(AREA_KEY) ?? 'null') as Partial<SavedArea> | null;
+    if (raw !== null && (raw.around === 'me' || raw.around === 'postcode')) {
+      return { around: raw.around, postcode: typeof raw.postcode === 'string' ? raw.postcode : '' };
+    }
+  } catch {
+    /* fall through to the default */
+  }
+  return { around: 'me', postcode: '' };
+}
+
+export function saveArea(area: SavedArea): void {
+  try {
+    window.localStorage.setItem(AREA_KEY, JSON.stringify(area));
+  } catch {
+    /* not remembered — harmless */
+  }
+}

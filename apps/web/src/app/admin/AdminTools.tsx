@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Loader2, Mail, X } from 'lucide-react';
+import { Check, Loader2, Mail, MapPin, X } from 'lucide-react';
 import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { dispatchAction } from '../../lib/dispatch';
@@ -126,6 +126,59 @@ export function AdminTools() {
             </span>
           )}
         </div>
+      </div>
+
+      <PlaceListings />
+    </div>
+  );
+}
+
+// Loads posted before the map had collection points plot only if a driver's
+// phone can look their postcode up. One press places them from what the server
+// already worked out, and re-queues any that were never worked out at all.
+function PlaceListings() {
+  const app = useApp();
+  const [state, setState] = useState<
+    { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; placed: number; requeued: number } | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+
+  async function run(): Promise<void> {
+    setState({ kind: 'busy' });
+    const res = await dispatchAction(app.auth.getIdToken, 'placeListings', {}, genRequestId());
+    if (!res.ok) setState({ kind: 'error', message: res.error.message });
+    else setState({ kind: 'done', placed: res.result.placed as number, requeued: res.result.requeued as number });
+  }
+
+  return (
+    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 max-w-2xl">
+      <h3 className="text-lg font-bold text-gray-900 mb-1">Put existing loads on the map</h3>
+      <p className="text-gray-600 text-sm mb-4">
+        Places every load on the board on drivers’ “Loads near you” map. Loads that were never located are sent
+        back through the drain to try again. Safe to press more than once.
+      </p>
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={state.kind === 'busy'}
+        className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+      >
+        {state.kind === 'busy' ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+        {state.kind === 'busy' ? 'Placing…' : 'Place loads'}
+      </button>
+      <div className="mt-3 text-sm" role="status">
+        {state.kind === 'done' && (
+          <span className="inline-flex items-center gap-1.5 text-emerald-700">
+            <Check className="w-4 h-4" />
+            {state.placed} placed now
+            {state.requeued > 0 ? `, ${state.requeued} sent to be located (on the map within a minute or two)` : ''}.
+          </span>
+        )}
+        {state.kind === 'error' && (
+          <span className="inline-flex items-center gap-1.5 text-red-700">
+            <X className="w-4 h-4" />
+            {state.message}
+          </span>
+        )}
       </div>
     </div>
   );

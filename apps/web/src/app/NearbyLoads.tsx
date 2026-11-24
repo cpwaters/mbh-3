@@ -1,17 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, MapPin, Navigation } from 'lucide-react';
+import { AlertCircle, LocateFixed, MapPin, Navigation, Search } from 'lucide-react';
 import { formatGbp, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import NearbyMap from './NearbyMap';
 import { dispatchAction } from '../lib/dispatch';
-import { RADIUS_OPTIONS_MILES, formatMiles, loadRadius, saveRadius, withinRadius, type RadiusMiles } from '../lib/nearby';
+import { lookupPostcode, type GeoPoint } from '../lib/geocode';
+import {
+  RADIUS_OPTIONS_MILES,
+  formatMiles,
+  loadArea,
+  loadRadius,
+  saveArea,
+  saveRadius,
+  withinRadius,
+  type RadiusMiles,
+} from '../lib/nearby';
 import { useNearbyListings } from '../components/useNearbyListings';
 import { JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBadge } from './JobCard';
 
-// "Loads near you": the Map page. Where the phone is, a radius the driver
-// sets, and the available loads whose collection point falls inside it —
-// on a map, and as a list nearest first that can be accepted from here.
+// "Loads near you": the Map page. An area — around where the phone is, or
+// around a postcode the driver types (where they will drop off, say, or when
+// the phone has no fix) — a radius they set, and every available load whose
+// collection point falls inside it: pinned on a map, and listed nearest
+// first, acceptable from here.
 //
 // The distance is straight-line from the phone to the pickup postcode, the
 // same measure the Available Loads list sorts by. It is a "roughly how far"
@@ -24,7 +36,43 @@ export default function NearbyLoads() {
   const [error, setError] = useState<string | null>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement | null>());
 
-  const ranked = useNearbyListings(app.listings, app.location);
+  // The area's centre: the phone's fix, or a postcode the driver chose.
+  const [around, setAround] = useState<'me' | 'postcode'>(() => loadArea().around);
+  const [postcodeInput, setPostcodeInput] = useState(() => loadArea().postcode);
+  const [postcodePoint, setPostcodePoint] = useState<{ postcode: string; point: GeoPoint } | null>(null);
+  const [postcodeState, setPostcodeState] = useState<'idle' | 'looking' | 'not-found' | 'unavailable'>('idle');
+
+  async function findPostcode(postcode: string): Promise<void> {
+    const trimmed = postcode.trim().toUpperCase();
+    if (trimmed === '') return;
+    setPostcodeState('looking');
+    const point = await lookupPostcode(trimmed);
+    if (point === null) setPostcodeState('not-found');
+    else if (point === 'unavailable') setPostcodeState('unavailable');
+    else {
+      setPostcodePoint({ postcode: trimmed, point });
+      setPostcodeState('idle');
+      saveArea({ around: 'postcode', postcode: trimmed });
+    }
+  }
+
+  // Coming back to the page set to a postcode: find it again.
+  useEffect(() => {
+    if (around === 'postcode' && postcodePoint === null && postcodeInput.trim() !== '') void findPostcode(postcodeInput);
+    // Once, on arrival — typing does not search until the driver asks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function chooseAround(next: 'me' | 'postcode'): void {
+    setAround(next);
+    if (next === 'me') {
+      saveArea({ around: 'me', postcode: postcodeInput.trim().toUpperCase() });
+      if (app.location === null && !app.watchingLocation) app.requestLocation();
+    }
+  }
+
+  const centre: GeoPoint | null = around === 'me' ? app.location : (postcodePoint?.point ?? null);
+  const ranked = useNearbyListings(app.listings, centre);
   const split = useMemo(() => withinRadius(ranked, radius), [ranked, radius]);
   const hasActiveJob = app.job !== null;
 
@@ -63,7 +111,7 @@ export default function NearbyLoads() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Loads near you</h1>
-        <p className="text-gray-600">Backhauls with a collection within your chosen distance of where you are now.</p>
+        <p className="text-gray-600">Backhauls with a collection within your chosen distance — of where you are now, or of a postcode.</p>
       </div>
 
       <div role="group" aria-label="Search radius" className="flex flex-wrap items-center gap-2">
@@ -83,14 +131,78 @@ export default function NearbyLoads() {
         ))}
       </div>
 
-      {app.location === null ? (
+      <div className="space-y-3">
+        <div role="group" aria-label="Search around" className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 mr-1">Around</span>
+          <button
+            type="button"
+            aria-pressed={around === 'me'}
+            onClick={() => chooseAround('me')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              around === 'me' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <LocateFixed className="w-4 h-4" />
+            My location
+          </button>
+          <button
+            type="button"
+            aria-pressed={around === 'postcode'}
+            onClick={() => chooseAround('postcode')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              around === 'postcode' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <MapPin className="w-4 h-4" />A postcode
+          </button>
+        </div>
+
+        {around === 'postcode' && (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void findPostcode(postcodeInput);
+            }}
+          >
+            <input
+              aria-label="Postcode to search around"
+              value={postcodeInput}
+              onChange={(e) => setPostcodeInput(e.target.value)}
+              placeholder="e.g. M17 1WS"
+              autoCapitalize="characters"
+              className="px-3 py-2 border border-gray-300 rounded-lg uppercase w-40 outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={postcodeState === 'looking' || postcodeInput.trim() === ''}
+              className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60"
+            >
+              <Search className="w-4 h-4" />
+              {postcodeState === 'looking' ? 'Finding…' : 'Show loads'}
+            </button>
+            {postcodeState === 'not-found' && (
+              <p role="alert" className="w-full text-sm text-red-700">
+                We couldn’t find that postcode — check it and try again.
+              </p>
+            )}
+            {postcodeState === 'unavailable' && (
+              <p role="alert" className="w-full text-sm text-red-700">
+                Couldn’t look that postcode up just now — check your signal and try again.
+              </p>
+            )}
+          </form>
+        )}
+      </div>
+
+      {around === 'me' && app.location === null && (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 space-y-3">
           <div className="flex items-start gap-3">
             <MapPin className={`w-5 h-5 text-blue-600 shrink-0 mt-0.5 ${app.watchingLocation ? 'animate-pulse' : ''}`} />
             <p className="text-sm text-blue-900">
               {app.watchingLocation
-                ? 'Waiting for a GPS signal — this can take a few seconds outdoors, longer indoors.'
-                : 'Loads near you needs your location, to know where “near” is. It is used on this phone to measure distances.'}
+                ? 'Waiting for a GPS signal — this can take a few seconds outdoors, longer indoors. Or search around a postcode instead.'
+                : 'To show loads around you, the app needs your location. It is used on this phone to measure distances. Or search around a postcode instead.'}
             </p>
           </div>
           {!app.watchingLocation && (
@@ -109,8 +221,16 @@ export default function NearbyLoads() {
             </p>
           )}
         </div>
-      ) : (
-        <NearbyMap centre={app.location} radiusMiles={radius} loads={split.inside} onSelect={setSelected} />
+      )}
+
+      {centre !== null && (
+        <NearbyMap
+          centre={centre}
+          centreLabel={around === 'me' ? 'You are here' : (postcodePoint?.postcode ?? '')}
+          radiusMiles={radius}
+          loads={split.inside}
+          onSelect={setSelected}
+        />
       )}
 
       {hasActiveJob && (
@@ -129,12 +249,15 @@ export default function NearbyLoads() {
         </div>
       )}
 
-      {app.location !== null && (
+      {centre !== null && (
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-gray-900">
             {split.inside.length === 0
               ? `No loads within ${radius} miles`
               : `${split.inside.length} load${split.inside.length === 1 ? '' : 's'} within ${radius} miles`}
+            {around === 'postcode' && postcodePoint !== null && (
+              <span className="font-normal text-gray-600"> of {postcodePoint.postcode}</span>
+            )}
           </h2>
           {split.outside > 0 && (
             <p className="text-sm text-gray-600">
@@ -166,7 +289,7 @@ export default function NearbyLoads() {
                   {distanceMeters !== null && (
                     <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-700">
                       <Navigation className="w-3.5 h-3.5" />
-                      Collection {formatMiles(distanceMeters)} away
+                      Collection {formatMiles(distanceMeters)} {around === 'me' ? 'away' : `from ${postcodePoint?.postcode ?? ''}`}
                     </div>
                   )}
                   <JobCardPayment amount={formatGbp(listing.priceGbpPence)} />

@@ -24,8 +24,14 @@ const PLACES: Record<string, { lat: number; lng: number }> = {
   'PR1 2AB': { lat: 53.7632, lng: -2.7031 },
   'LS1 4AP': { lat: 53.7965, lng: -1.5478 },
 };
+const lookups = vi.fn();
+let lookupFails = false;
 vi.mock('../lib/geocode', () => ({
-  geocodePostcode: async (postcode: string) => PLACES[postcode] ?? null,
+  lookupPostcode: async (postcode: string) => {
+    lookups(postcode);
+    if (lookupFails) return 'unavailable';
+    return PLACES[postcode] ?? null;
+  },
 }));
 
 const MANCHESTER = { lat: 53.4808, lng: -2.2426 };
@@ -55,6 +61,8 @@ let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   mapProps.mockClear();
+  lookups.mockClear();
+  lookupFails = false;
   fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { jobId: 'job-1' } }) });
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -137,5 +145,55 @@ describe('Loads near you', () => {
     await screen.findByRole('heading', { name: '2 loads within 25 miles' });
     for (const button of screen.getAllByRole('button', { name: 'Accept Load' })) expect(button).toBeDisabled();
     expect(screen.getByText(/job in progress/)).toBeInTheDocument();
+  });
+
+  it('plots a load from the point the server gave it, without looking its postcode up', async () => {
+    const placed = { ...load('placed', 'Nowhere', 'ZZ9 9ZZ'), collectionPoint: { lat: 53.47, lng: -2.25 } };
+    renderNearby({ listings: [placed] });
+    expect(await screen.findByRole('heading', { name: '1 load within 25 miles' })).toBeInTheDocument();
+    expect(lookups).not.toHaveBeenCalledWith('ZZ9 9ZZ');
+    expect(mapProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({ loads: [expect.objectContaining({ pickup: { lat: 53.47, lng: -2.25 } })] })
+    );
+  });
+});
+
+describe('Loads near you — around a postcode', () => {
+  it('plots loads around a postcode the driver types, with no GPS fix at all', async () => {
+    const user = userEvent.setup();
+    renderNearby({ location: null });
+    await user.click(screen.getByRole('button', { name: 'A postcode' }));
+    await user.type(screen.getByRole('textbox', { name: 'Postcode to search around' }), 'pr1 2ab');
+    await user.click(screen.getByRole('button', { name: 'Show loads' }));
+
+    // Around Preston at 25 miles: Preston itself and Bolton; Trafford is ~27.
+    expect(await screen.findByText(/within 25 miles/)).toHaveTextContent('2 loads within 25 miles of PR1 2AB');
+    expect(screen.getByTestId('map')).toHaveTextContent('2 pins');
+    expect(mapProps).toHaveBeenLastCalledWith(expect.objectContaining({ centreLabel: 'PR1 2AB' }));
+    expect(screen.getAllByText(/Collection .* from PR1 2AB/).length).toBeGreaterThan(0);
+  });
+
+  it('remembers the postcode, and reopens on it', async () => {
+    const user = userEvent.setup();
+    renderNearby({ location: null });
+    await user.click(screen.getByRole('button', { name: 'A postcode' }));
+    await user.type(screen.getByRole('textbox', { name: 'Postcode to search around' }), 'PR1 2AB');
+    await user.click(screen.getByRole('button', { name: 'Show loads' }));
+    await screen.findByText(/of PR1 2AB/);
+    expect(JSON.parse(window.localStorage.getItem('mbh.nearbyArea') ?? '{}')).toEqual({ around: 'postcode', postcode: 'PR1 2AB' });
+  });
+
+  it('says so when the postcode does not exist, or cannot be looked up', async () => {
+    const user = userEvent.setup();
+    renderNearby({ location: null });
+    await user.click(screen.getByRole('button', { name: 'A postcode' }));
+    await user.type(screen.getByRole('textbox', { name: 'Postcode to search around' }), 'XX1 1XX');
+    await user.click(screen.getByRole('button', { name: 'Show loads' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn’t find that postcode/);
+
+    lookupFails = true;
+    await user.click(screen.getByRole('button', { name: 'Show loads' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/check your signal/);
+    expect(screen.queryByTestId('map')).not.toBeInTheDocument();
   });
 });

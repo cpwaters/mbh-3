@@ -1,5 +1,5 @@
 import type { Load } from './entities.js';
-import type { RouteInfo } from './geo.js';
+import type { GeoPoint, RouteInfo } from './geo.js';
 
 // The carrier-facing projection of a Load (ADR-0002). Raw loads are
 // shipper-private; this is the deliberately-narrow, safe-to-expose view
@@ -26,6 +26,10 @@ export interface Listing {
   postedAt: string;
   // Filled by the drain once it has geocoded + routed the load.
   route?: RouteInfo;
+  // Where the collection postcode is — the postcode's centre, so no more
+  // precise than the postcode the listing already shows. Filled by the drain
+  // with the route; it is what plots the load on a driver's map.
+  collectionPoint?: GeoPoint;
 }
 
 // The ONE place a Load becomes its public projection. Note the omissions:
@@ -44,5 +48,11 @@ export function listingFromLoad(load: Load): Listing {
     pickupBy: load.pickupBy,
     deliverBy: load.deliverBy,
     postedAt: load.createdAt,
+    ...(load.route !== undefined
+      ? {
+          route: { distanceMeters: load.route.distanceMeters, durationSeconds: load.route.durationSeconds },
+          collectionPoint: { lat: load.route.origin.lat, lng: load.route.origin.lng },
+        }
+      : {}),
   };
 }

@@ -130,4 +130,16 @@ describe('AdminTools — the test invoice', () => {
     await user.click(screen.getByRole('button', { name: /send test invoice/i }));
     expect(await screen.findByText(/select a company first/i)).toBeInTheDocument();
   });
+
+  it('puts existing loads on the map through dispatch, and says what it did', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ ok: true, result: { placed: 3, requeued: 1 } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    renderAdmin(founderSession, '/admin/tools');
+
+    await user.click(screen.getByRole('button', { name: 'Place loads' }));
+    expect(await screen.findByText(/3 placed now, 1 sent to be located/)).toBeInTheDocument();
+    const body = JSON.parse((fetchMock.mock.calls[0]?.[1] as { body: string }).body) as { type: string };
+    expect(body.type).toBe('placeListings');
+  });
 });

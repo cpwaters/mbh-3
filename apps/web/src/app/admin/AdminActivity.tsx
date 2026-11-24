@@ -37,6 +37,7 @@ export const ACTION_LABELS: Record<string, string> = {
   setMemberRole: 'Changed someone’s role',
   setCompanyTracking: 'Switched a company’s tracking',
   setMemberTracking: 'Switched someone’s tracking',
+  placeListings: 'Put loads on the map',
 };
 
 // Location breadcrumbs are most of the log by volume and say little on their

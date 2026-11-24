@@ -63,6 +63,8 @@ describe('runDrainOnce — enrichLoadRoute', () => {
     // The carrier listing mirrors the computed route.
     const listing = await harness.store.getDoc('listings/load-1');
     expect((listing?.route as { distanceMeters: number }).distanceMeters).toBeGreaterThan(0);
+    // ...and the collection point, which is what plots it on a driver's map.
+    expect(listing?.collectionPoint).toEqual((load?.route as { origin: unknown }).origin);
 
     const audits = await harness.store.query({
       collection: 'audit',
