@@ -14,6 +14,8 @@ vi.mock('../../lib/reader', () => ({
 
 const fulfilledLoad: ShipperLoad = {
   adrRequired: false,
+  vehicleSizes: ['artic'],
+  vehicleTypes: ['refrigerated', 'flat_bed'],
   loadId: 'load-1',
   origin: 'Trafford, M17 1WS',
   destination: 'Leith, EH6 6JJ',
@@ -176,3 +178,26 @@ describe('LoadsList — mark a stuck matched load as fulfilled', () => {
     expect(screen.queryByRole('button', { name: /mark as fulfilled/i })).not.toBeInTheDocument();
   });
 });
+
+describe('LoadsList — vehicle requirements', () => {
+  it('shows the vehicle size and type the load asks for', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad, { ...fulfilledLoad, loadId: 'load-any', vehicleSizes: [], vehicleTypes: [] }]);
+    renderLoadsList();
+    expect(await screen.findByText('Artic')).toBeInTheDocument();
+    expect(screen.getByText('Refrigerated, Flat Bed')).toBeInTheDocument();
+    // Nothing ticked means any.
+    expect(screen.getAllByText('Any')).toHaveLength(2);
+    expect(screen.getAllByText('Vehicle size')).toHaveLength(2);
+    expect(screen.getAllByText('Vehicle type')).toHaveLength(2);
+  });
+});
+
+describe('LoadsList — sharing', () => {
+  it('offers Share on a load still on offer, and not on one already done', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad, { ...fulfilledLoad, loadId: 'load-open', status: 'available' }]);
+    renderLoadsList();
+    await screen.findAllByText('Vehicle size');
+    expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+  });
+});
+

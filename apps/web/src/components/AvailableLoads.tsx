@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Package, Weight, Box, AlertCircle, Navigation, MapPin } from 'lucide-react';
-import { adrRefusal, formatGbp, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, matchesVehicleTypes, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { dispatchAction } from '../lib/dispatch';
 import type { GeoPoint } from '../lib/geocode';
 import { useNearbyListings } from './useNearbyListings';
 import type { AdrState } from './useAdrStatus';
+import { VehicleTypeFilter, useVehicleTypeFilter } from './VehicleTypeFilter';
+import { ShareLoad } from './ShareLoad';
 import {
   JobCard,
   JobCardRoute,
@@ -14,6 +16,7 @@ import {
   JobCardActions,
   JobCardStatusBadge,
   AdrAcceptNote,
+  LoadVehicleDetails,
 } from '../app/JobCard';
 
 // The carrier browse ("Available Loads"), ported from the mbh-2 prototype
@@ -65,8 +68,11 @@ export function AvailableLoads({
   const [acceptingLoadId, setAcceptingLoadId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Rank the browse by proximity to the driver; re-ranks live as they move.
-  const ranked = useNearbyListings(listings, driverLocation);
+  // The carrier's vehicle-type filter, then rank what is left by proximity to
+  // the driver; re-ranks live as they move.
+  const { picked, setPicked } = useVehicleTypeFilter();
+  const filtered = useMemo(() => listings.filter((l) => matchesVehicleTypes(l.vehicleTypes, picked)), [listings, picked]);
+  const ranked = useNearbyListings(filtered, driverLocation);
   const sortedByLocation = driverLocation !== null;
 
   async function handleAccept(load: Listing): Promise<void> {
@@ -150,6 +156,12 @@ export function AvailableLoads({
         </div>
       )}
 
+      {listings.length > 0 && (
+        <div className="mb-6">
+          <VehicleTypeFilter picked={picked} onChange={setPicked} shown={filtered.length} total={listings.length} />
+        </div>
+      )}
+
       {listings.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
           <div className="text-gray-400 mb-4">
@@ -157,6 +169,21 @@ export function AvailableLoads({
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No Loads Available</h3>
           <p className="text-gray-600">Check back later for new hauls.</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="text-gray-400 mb-4">
+            <Package className="w-16 h-16 mx-auto" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No loads for those vehicle types</h3>
+          <p className="text-gray-600 mb-4">There are {listings.length} loads on the board that need a different vehicle.</p>
+          <button
+            type="button"
+            onClick={() => setPicked([])}
+            className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Show all loads
+          </button>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -214,6 +241,7 @@ export function AvailableLoads({
                       <div className="text-xs text-gray-500">Deliver by</div>
                       <div className="font-medium text-gray-900">{load.deliverBy}</div>
                     </div>
+                    <LoadVehicleDetails sizes={load.vehicleSizes} types={load.vehicleTypes} />
                   </div>
                   {load.description && <div className="mt-3 text-sm text-gray-600">{load.description}</div>}
                 </JobCardSection>
@@ -238,6 +266,9 @@ export function AvailableLoads({
                   {expandedLoadId === load.loadId ? 'Hide Details' : 'View Details'}
                 </button>
               </JobCardActions>
+              <div className="mt-3">
+                <ShareLoad tenantId={carrierTenantId} loadId={load.loadId} summary={load} getIdToken={getIdToken} />
+              </div>
             </JobCard>
             );
           })}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LocateFixed, MapPin, Navigation, Search } from 'lucide-react';
-import { adrRefusal, formatGbp, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, matchesVehicleTypes, type Listing } from '@mbh/domain';
 import { useNavigate } from 'react-router-dom';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
@@ -19,7 +19,17 @@ import {
 } from '../lib/nearby';
 import { useNearbyListings } from '../components/useNearbyListings';
 import { useAdrStatus } from '../components/useAdrStatus';
-import { AdrAcceptNote, JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBadge } from './JobCard';
+import { VehicleTypeFilter, useVehicleTypeFilter } from '../components/VehicleTypeFilter';
+import { ShareLoad } from '../components/ShareLoad';
+import {
+  AdrAcceptNote,
+  JobCard,
+  JobCardActions,
+  JobCardPayment,
+  JobCardRoute,
+  JobCardStatusBadge,
+  loadVehicleSummary,
+} from './JobCard';
 
 // "Loads near you": the Map page. An area — around where the phone is, or
 // around a postcode the driver types (where they will drop off, say, or when
@@ -76,7 +86,11 @@ export default function NearbyLoads() {
   }
 
   const centre: GeoPoint | null = around === 'me' ? app.location : (postcodePoint?.point ?? null);
-  const ranked = useNearbyListings(app.listings, centre);
+  // The carrier's vehicle-type filter (shared with Available Loads) narrows
+  // the board before the radius does, so the map and the list agree.
+  const { picked, setPicked } = useVehicleTypeFilter();
+  const filtered = useMemo(() => app.listings.filter((l) => matchesVehicleTypes(l.vehicleTypes, picked)), [app.listings, picked]);
+  const ranked = useNearbyListings(filtered, centre);
   const split = useMemo(() => withinRadius(ranked, radius), [ranked, radius]);
   const hasActiveJob = app.job !== null;
   // Why this driver can't take an ADR load yet; null when they can (or when
@@ -138,6 +152,8 @@ export default function NearbyLoads() {
           </button>
         ))}
       </div>
+
+      <VehicleTypeFilter picked={picked} onChange={setPicked} />
 
       <div className="space-y-3">
         <div role="group" aria-label="Search around" className="flex flex-wrap items-center gap-2">
@@ -306,6 +322,12 @@ export default function NearbyLoads() {
                     {listing.palletCount} pallets · {listing.weightKg.toLocaleString('en-GB')} kg · collect by{' '}
                     {listing.pickupBy}
                   </p>
+                  {loadVehicleSummary(listing.vehicleSizes, listing.vehicleTypes) !== null && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      <span className="text-gray-500">Vehicle:</span>{' '}
+                      {loadVehicleSummary(listing.vehicleSizes, listing.vehicleTypes)}
+                    </p>
+                  )}
                   {adrBlockFor(listing) !== null && (
                     <AdrAcceptNote
                       message={adrBlockFor(listing) ?? ''}
@@ -322,6 +344,14 @@ export default function NearbyLoads() {
                       {accepting === listing.loadId ? 'Accepting…' : 'Accept Load'}
                     </button>
                   </JobCardActions>
+                  <div className="mt-3">
+                    <ShareLoad
+                      tenantId={app.selected?.tenantId ?? null}
+                      loadId={listing.loadId}
+                      summary={listing}
+                      getIdToken={app.auth.getIdToken}
+                    />
+                  </div>
                 </JobCard>
               </div>
             ))}

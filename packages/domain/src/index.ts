@@ -21,3 +21,4 @@ export * from './brand.js';
 export * from './billing.js';
 export * from './tracking.js';
 export * from './features.js';
+export * from './share.js';

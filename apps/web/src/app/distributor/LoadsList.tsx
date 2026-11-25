@@ -12,6 +12,7 @@ import { dispatchAction } from '../../lib/dispatch';
 import LiveLocationMap from '../LiveLocationMap';
 import { extractPostcode, geocodePostcode, type GeoPoint } from '../../lib/geocode';
 import { getDrivingRoute } from '../../lib/routing';
+import { ShareLoad } from '../../components/ShareLoad';
 import type { Form } from './CreateLoad';
 import {
   JobCard,
@@ -20,6 +21,7 @@ import {
   JobCardSection,
   JobCardActions,
   JobCardStatusBadge,
+  LoadVehicleDetails,
 } from '../JobCard';
 
 const TRACKABLE_STATUSES = ['matched', 'accepted', 'collected', 'in_transit'];
@@ -299,6 +301,7 @@ export default function LoadsList() {
                     {load.deliveryTime}
                   </div>
                 </div>
+                <LoadVehicleDetails sizes={load.vehicleSizes} types={load.vehicleTypes} />
               </div>
             </JobCardSection>
 
@@ -343,6 +346,26 @@ export default function LoadsList() {
                 {cancellingId === load.loadId ? 'Cancelling...' : 'Cancel Load'}
               </button>
             </JobCardActions>
+
+            {/* Only a load still on offer is worth posting about. */}
+            {load.status === 'available' && (
+              <div className="mt-3">
+                <ShareLoad
+                  tenantId={shipperTenantId}
+                  loadId={load.loadId}
+                  getIdToken={app.auth.getIdToken}
+                  summary={{
+                    origin: { town: load.originAddress.town, postcode: load.originAddress.postcode },
+                    destination: { town: load.destinationAddress.town, postcode: load.destinationAddress.postcode },
+                    pickupBy: load.pickupBy,
+                    priceGbpPence: load.priceGbpPence,
+                    vehicleSizes: load.vehicleSizes,
+                    vehicleTypes: load.vehicleTypes,
+                    adrRequired: load.adrRequired,
+                  }}
+                />
+              </div>
+            )}
 
             {trackedLoadId === load.loadId && (
               <JobCardSection>

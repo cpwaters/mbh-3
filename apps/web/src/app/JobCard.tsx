@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { MapPin, TriangleAlert } from 'lucide-react';
+import { MapPin, Truck, TriangleAlert } from 'lucide-react';
+import { describeLoadVehicles, LOAD_VEHICLE_SIZE_LABELS, LOAD_VEHICLE_TYPE_LABELS } from '@mbh/domain';
 
 // Universal job/load card, matching the reference design used across the
 // site: white card, sections separated by thin dividers, in the order
@@ -114,3 +115,42 @@ export function JobCardSection({ children }: { children: ReactNode }) {
 export function JobCardActions({ children }: { children: ReactNode }) {
   return <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row gap-3">{children}</div>;
 }
+
+// The vehicle a load needs, as two cells for a load's details grid: size
+// (van / rigid / artic) and type (refrigerated, flat bed, ...). "Any" when
+// the shipper ticked none; left out entirely when the load never said.
+export function LoadVehicleDetails({ sizes, types }: { sizes: readonly string[] | undefined; types: readonly string[] | undefined }) {
+  const size = describeLoadVehicles(sizes, LOAD_VEHICLE_SIZE_LABELS);
+  const type = describeLoadVehicles(types, LOAD_VEHICLE_TYPE_LABELS);
+  return (
+    <>
+      {size !== null && (
+        <div className="flex items-center gap-2">
+          <Truck className="w-4 h-4 text-gray-500 shrink-0" aria-hidden="true" />
+          <div>
+            <div className="text-xs text-gray-500">Vehicle size</div>
+            <div className="font-medium text-gray-900">{size}</div>
+          </div>
+        </div>
+      )}
+      {type !== null && (
+        <div>
+          <div className="text-xs text-gray-500">Vehicle type</div>
+          <div className="font-medium text-gray-900">{type}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// The same, said in one line for a compact card: "Artic · Refrigerated".
+export function loadVehicleSummary(sizes: readonly string[] | undefined, types: readonly string[] | undefined): string | null {
+  const size = describeLoadVehicles(sizes, LOAD_VEHICLE_SIZE_LABELS);
+  const type = describeLoadVehicles(types, LOAD_VEHICLE_TYPE_LABELS);
+  if (size === null && type === null) return null;
+  if ((size ?? 'Any') === 'Any' && (type ?? 'Any') === 'Any') return 'Any vehicle';
+  return [size !== null && size !== 'Any' ? size : null, type !== null && type !== 'Any' ? type : null]
+    .filter((part): part is string => part !== null)
+    .join(' · ');
+}
+

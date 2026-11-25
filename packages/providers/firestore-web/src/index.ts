@@ -36,6 +36,7 @@ import {
   type PlanSubject,
   DEFAULT_BILLING_CONFIG,
   resolveFeatureFlags,
+  isShareCode,
   type FeatureFlags,
 } from '@mbh/domain';
 import {
@@ -56,6 +57,8 @@ import {
   userProfilesCollection,
   billingConfigDoc,
   featureFlagsDoc,
+  shareDoc,
+  listingDoc,
 } from '@mbh/paths';
 import {
   ADMIN_LIST_LIMIT,
@@ -64,6 +67,8 @@ import {
   type AdminReader,
   type BillingReader,
   type FeatureReader,
+  type ShareReader,
+  type SharedLoad,
 } from '@mbh/provider-interfaces';
 import type {
   AddressBookReader,
@@ -142,7 +147,8 @@ export class FirestoreReader
     InviteReader,
     AdminReader,
     BillingReader,
-    FeatureReader
+    FeatureReader,
+    ShareReader
 {
   private readonly db: Firestore;
 
@@ -343,6 +349,8 @@ export class FirestoreReader
         weightKg: load.consignment.weightKg,
         palletCount: load.consignment.palletCount,
         adrRequired: load.consignment.adrRequired === true,
+        vehicleSizes: load.postingDetails?.vehicleSizes ?? [],
+        vehicleTypes: load.postingDetails?.vehicleTypes ?? [],
         priceGbpPence: load.priceGbpPence,
         pickupBy: load.pickupBy,
         pickupTime: load.postingDetails?.pickupTime ?? '',
@@ -463,6 +471,16 @@ export class FirestoreReader
   }
 
   // ── Billing ───────────────────────────────────────────────────────────────
+
+  async sharedLoad(code: string): Promise<SharedLoad | null> {
+    // A malformed code is no link at all — and never becomes a document path.
+    if (!isShareCode(code)) return null;
+    const share = await getDoc(doc(this.db, shareDoc(code)));
+    if (!share.exists()) return null;
+    const { loadId } = share.data() as { loadId: string };
+    const listing = await getDoc(doc(this.db, listingDoc(loadId)));
+    return listing.exists() ? { status: 'available', listing: listing.data() as Listing } : { status: 'gone' };
+  }
 
   async featureFlags(): Promise<FeatureFlags> {
     const snap = await getDoc(doc(this.db, featureFlagsDoc()));

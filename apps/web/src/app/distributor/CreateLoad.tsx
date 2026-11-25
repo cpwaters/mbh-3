@@ -542,6 +542,18 @@ export default function CreateLoad() {
             {check('invoiced', 'Invoiced')}
             {check('instant_payment', 'Instant Payment')}
           </div>
+          {/* MyBackHaul never handles the money for a load: the payment type
+              above only tells the carrier how they will be paid. */}
+          <p
+            role="note"
+            className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            <Info className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" aria-hidden="true" />
+            <span>
+              No payments are made through this website or app. It is up to the shipper to pay the carrier using their
+              own payment methods.
+            </span>
+          </p>
         </div>
 
         <div className="flex justify-end">

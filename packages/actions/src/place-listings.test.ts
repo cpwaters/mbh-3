@@ -36,7 +36,8 @@ describe('placeListings — putting the existing board on the map', () => {
 
     const result = await h.run(founder, { type: 'placeListings', payload: {}, requestId: 'r-1' });
 
-    expect(result).toEqual({ placed: 1, requeued: 1 });
+    // All three were made before vehicle requirements were carried across.
+    expect(result).toEqual({ placed: 1, requeued: 1, described: 3 });
     expect(await h.store.getDoc('listings/enriched')).toMatchObject({ collectionPoint: { lat: 53.47, lng: -2.33 } });
     // One already placed is left exactly as it was.
     expect(await h.store.getDoc('listings/already')).toMatchObject({ collectionPoint: { lat: 1, lng: 1 } });
@@ -48,7 +49,39 @@ describe('placeListings — putting the existing board on the map', () => {
     const h = await makeHarness();
     await h.store.runBatch([listing('enriched'), load('enriched', { route: ROUTE })]);
     await h.run(founder, { type: 'placeListings', payload: {}, requestId: 'r-1' });
-    expect(await h.run(founder, { type: 'placeListings', payload: {}, requestId: 'r-2' })).toEqual({ placed: 0, requeued: 0 });
+    expect(await h.run(founder, { type: 'placeListings', payload: {}, requestId: 'r-2' })).toEqual({
+      placed: 0,
+      requeued: 0,
+      described: 0,
+    });
+  });
+
+  it('gives older listings the vehicle size and type their load asks for, and leaves described ones alone', async () => {
+    const h = await makeHarness();
+    await h.store.runBatch([
+      listing('old', { collectionPoint: { lat: 1, lng: 1 } }),
+      load('old', {
+        route: ROUTE,
+        postingDetails: { vehicleSizes: ['artic'], vehicleTypes: ['refrigerated', 'box'] },
+      }),
+      listing('bare', { collectionPoint: { lat: 1, lng: 1 } }),
+      load('bare', { route: ROUTE }),
+      listing('new', { collectionPoint: { lat: 1, lng: 1 }, vehicleSizes: ['van'], vehicleTypes: [] }),
+      load('new', { route: ROUTE, postingDetails: { vehicleSizes: ['artic'], vehicleTypes: [] } }),
+    ]);
+
+    const result = await h.run(founder, { type: 'placeListings', payload: {}, requestId: 'r-v' });
+
+    expect(result).toEqual({ placed: 0, requeued: 0, described: 2 });
+    expect(await h.store.getDoc('listings/old')).toMatchObject({
+      vehicleSizes: ['artic'],
+      vehicleTypes: ['refrigerated', 'box'],
+      collectionPoint: { lat: 1, lng: 1 },
+    });
+    // A load posted without Create Load's details: any vehicle.
+    expect(await h.store.getDoc('listings/bare')).toMatchObject({ vehicleSizes: [], vehicleTypes: [] });
+    // Already described: untouched.
+    expect(await h.store.getDoc('listings/new')).toMatchObject({ vehicleSizes: ['van'] });
   });
 
   it('is the founder’s alone', async () => {

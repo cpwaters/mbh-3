@@ -7,6 +7,8 @@ import tailwindcss from '@tailwindcss/vite';
 // plugin) is the styling system, matching the design from the prototype.
 export default defineConfig({
   output: 'static',
+  // The production host: absolute addresses for link previews (Base.astro).
+  site: 'https://mybackhaul-app.web.app',
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],

@@ -779,6 +779,44 @@ the new price and link) and pastes the link, the plan shows as "Opening
 soon". Stripe's portal lists every plan for switching and cannot be narrowed
 per company (ADR-0004 addendum).
 
+## Share this load (built)
+
+"Share" on a load card (carrier: Available Loads, Loads near you; shipper:
+All Loads, available loads only) calls `shareLoad`. That issues the load's
+short link, `/l/<8-character code>`, in `shares/{code}` ({code, loadId,
+createdAt, createdBy}). There is one code per load, so a second share returns
+the same link (looked up by loadId alone, no index). Only a load still on
+offer can be shared, by its shipper or by any carrier.
+
+The panel offers Copy, Facebook, X, Reddit, WhatsApp, LinkedIn and Email
+(`socialShareLinks`), plus the phone's share sheet (`navigator.share`), which
+is the way into Instagram since it takes no links from the web.
+
+The link opens `/l/` (pages/l.astro + `SharedLoadPage`), rewritten from
+`/l/**` in firebase.json. It reads `shares/{code}` and then the listing,
+without signing in: the rules now allow a **get** of one share or one
+listing to anyone, while **listing** the board still needs an account. It
+shows the listing only (towns and postcodes, dates, price, pallets, weight,
+vehicle, ADR), never addresses or contacts, and says when the load has gone.
+A visitor not signed in is taken as new: the haulier and shipper sign-up
+pages come first, with "Sign in to accept" underneath. One already signed
+in on that device gets "Open in MyBackHaul".
+
+Link previews on Facebook and X show MyBackHaul's generic card (Base.astro
+Open Graph tags, site set in astro.config): the page is static, and a
+per-load preview would need server rendering, which the two-function budget
+rules out. The load's details travel in the words posted with the link
+(`shareMessage`).
+
+## Vehicle requirements and the carrier filter (built)
+
+Create Load's Vehicle Size and Vehicle Type ride onto the listing
+(`vehicleSizes`, `vehicleTypes`; nothing else from postingDetails). They
+show in load details everywhere, and carriers filter Available Loads and
+Loads near you by type (`matchesVehicleTypes`: a load that takes any
+vehicle always shows). The choice is remembered on the device. Admin → Tools
+→ "Place loads" also gives older listings their vehicle details.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

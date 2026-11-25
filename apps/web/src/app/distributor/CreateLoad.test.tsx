@@ -308,4 +308,11 @@ describe('CreateLoad — address book picker', () => {
 
     await waitFor(() => expect(screen.getAllByLabelText(/save to address book/i)[0]).toBeEnabled());
   });
+
+  it('says under the payment type that no payments go through MyBackHaul', () => {
+    renderCreateLoad();
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'No payments are made through this website or app. It is up to the shipper to pay the carrier using their own payment methods.'
+    );
+  });
 });

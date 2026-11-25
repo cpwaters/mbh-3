@@ -139,22 +139,29 @@ export function AdminTools() {
 function PlaceListings() {
   const app = useApp();
   const [state, setState] = useState<
-    { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; placed: number; requeued: number } | { kind: 'error'; message: string }
+    { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; placed: number; requeued: number; described: number } | { kind: 'error'; message: string }
   >({ kind: 'idle' });
 
   async function run(): Promise<void> {
     setState({ kind: 'busy' });
     const res = await dispatchAction(app.auth.getIdToken, 'placeListings', {}, genRequestId());
     if (!res.ok) setState({ kind: 'error', message: res.error.message });
-    else setState({ kind: 'done', placed: res.result.placed as number, requeued: res.result.requeued as number });
+    else
+      setState({
+        kind: 'done',
+        placed: res.result.placed as number,
+        requeued: res.result.requeued as number,
+        described: (res.result.described as number | undefined) ?? 0,
+      });
   }
 
   return (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 max-w-2xl">
       <h3 className="text-lg font-bold text-gray-900 mb-1">Put existing loads on the map</h3>
       <p className="text-gray-600 text-sm mb-4">
-        Places every load on the board on drivers’ “Loads near you” map. Loads that were never located are sent
-        back through the drain to try again. Safe to press more than once.
+        Places every load on the board on drivers’ “Loads near you” map, and gives loads posted earlier the vehicle
+        size and type carriers now see. Loads that were never located are sent back through the drain to try again.
+        Safe to press more than once.
       </p>
       <button
         type="button"
@@ -170,7 +177,8 @@ function PlaceListings() {
           <span className="inline-flex items-center gap-1.5 text-emerald-700">
             <Check className="w-4 h-4" />
             {state.placed} placed now
-            {state.requeued > 0 ? `, ${state.requeued} sent to be located (on the map within a minute or two)` : ''}.
+            {state.requeued > 0 ? `, ${state.requeued} sent to be located (on the map within a minute or two)` : ''}
+            {state.described > 0 ? `, ${state.described} given their vehicle details` : ''}.
           </span>
         )}
         {state.kind === 'error' && (
