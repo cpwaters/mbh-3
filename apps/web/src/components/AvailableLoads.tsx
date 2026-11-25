@@ -7,6 +7,7 @@ import type { GeoPoint } from '../lib/geocode';
 import { useNearbyListings } from './useNearbyListings';
 import type { AdrState } from './useAdrStatus';
 import { VehicleTypeFilter, useVehicleTypeFilter } from './VehicleTypeFilter';
+import { ShareLoad } from './ShareLoad';
 import {
   JobCard,
   JobCardRoute,
@@ -265,6 +266,9 @@ export function AvailableLoads({
                   {expandedLoadId === load.loadId ? 'Hide Details' : 'View Details'}
                 </button>
               </JobCardActions>
+              <div className="mt-3">
+                <ShareLoad tenantId={carrierTenantId} loadId={load.loadId} summary={load} getIdToken={getIdToken} />
+              </div>
             </JobCard>
             );
           })}

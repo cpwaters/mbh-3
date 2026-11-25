@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import SharedLoadPage from '../components/SharedLoadPage.tsx';
+
+// What every shared load link (/l/<code>) opens: firebase.json rewrites
+// /l/** here, and the island reads the code from the address. The page is
+// static, so a link preview on Facebook or X shows MyBackHaul's card rather
+// than the load itself; the load's details travel in the words posted with
+// the link.
+---
+
+<Base
+  title="A backhaul on MyBackHaul"
+  description="A load looking for a haulier with spare capacity on the way back. See the route, dates and price."
+>
+  <SharedLoadPage client:only="react" />
+</Base>

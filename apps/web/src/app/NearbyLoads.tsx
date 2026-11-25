@@ -20,6 +20,7 @@ import {
 import { useNearbyListings } from '../components/useNearbyListings';
 import { useAdrStatus } from '../components/useAdrStatus';
 import { VehicleTypeFilter, useVehicleTypeFilter } from '../components/VehicleTypeFilter';
+import { ShareLoad } from '../components/ShareLoad';
 import {
   AdrAcceptNote,
   JobCard,
@@ -343,6 +344,14 @@ export default function NearbyLoads() {
                       {accepting === listing.loadId ? 'Accepting…' : 'Accept Load'}
                     </button>
                   </JobCardActions>
+                  <div className="mt-3">
+                    <ShareLoad
+                      tenantId={app.selected?.tenantId ?? null}
+                      loadId={listing.loadId}
+                      summary={listing}
+                      getIdToken={app.auth.getIdToken}
+                    />
+                  </div>
                 </JobCard>
               </div>
             ))}

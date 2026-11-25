@@ -133,6 +133,18 @@ export function listingDoc(loadId: string): string {
   return `${COLLECTIONS.listings}/${loadId}`;
 }
 
+// Short links to a load (/l/<code>), one per load. Anyone may read one by its
+// code (the public share page); only dispatch writes them.
+const SHARES_COLLECTION = 'shares';
+
+export function sharesCollection(): string {
+  return SHARES_COLLECTION;
+}
+
+export function shareDoc(code: string): string {
+  return `${SHARES_COLLECTION}/${code}`;
+}
+
 export function userProfilesCollection(): string {
   return COLLECTIONS.userProfiles;
 }

@@ -287,6 +287,26 @@ test('Available Loads explains why "Enable location" failed, instead of doing no
   await expect(page.getByText(/Location access was denied/)).toBeVisible();
 });
 
+test('a carrier shares a load, and the link opens it for someone who is not signed in', async ({ page, browser }) => {
+  await signIn(page, E2E.joblessEmail, E2E.joblessPassword);
+  await expect(page.getByRole('heading', { name: 'Available Loads' })).toBeVisible();
+  const row = page.locator('div.rounded-lg.shadow-md').filter({ hasText: 'Avonmouth' }).first();
+  await row.getByRole('button', { name: 'Share' }).click();
+  const url = (await row.getByTestId('share-url').textContent()) ?? '';
+  expect(url).toMatch(/\/l\/[0-9A-Za-z]{8}$/);
+
+  // A stranger's browser: no account, no session. The short link is served by
+  // the hosting rewrite and read through the public rules.
+  const stranger = await browser.newContext();
+  const visitor = await stranger.newPage();
+  await visitor.goto(new URL(url).pathname);
+  await expect(visitor.getByText('Backhaul available')).toBeVisible();
+  await expect(visitor.getByRole('heading', { level: 1 })).toContainText('Avonmouth');
+  await expect(visitor.getByRole('heading', { level: 1 })).toContainText('Cardiff');
+  await expect(visitor.getByRole('link', { name: 'Sign in to accept' })).toBeVisible();
+  await stranger.close();
+});
+
 test('a carrier browses available loads and accepts one', async ({ page }) => {
   // Park at the destination first: after accepting, GPS progress drives the
   // job accepted → collected → in_transit and clears the delivery gate.

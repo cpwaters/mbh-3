@@ -3,8 +3,13 @@ import '../styles/app.css';
 
 interface Props {
   title: string;
+  // Given, the page also carries a link-preview card (Open Graph / X) for
+  // when its address is posted on social media.
+  description?: string;
 }
-const { title } = Astro.props;
+const { title, description } = Astro.props;
+// Previews need absolute addresses; Astro.site is the production host.
+const ogImage = new URL('/android-chrome-384x384.png', Astro.site ?? 'https://mybackhaul-app.web.app').href;
 ---
 
 <!doctype html>
@@ -23,6 +28,20 @@ const { title } = Astro.props;
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>{title}</title>
+    {description !== undefined && (
+      <>
+        <meta name="description" content={description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="MyBackHaul" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={ogImage} />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+      </>
+    )}
   </head>
   <body class="min-h-screen bg-gray-50 text-gray-900 overflow-x-hidden">
     <slot />

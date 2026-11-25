@@ -20,7 +20,8 @@
     "rewrites": [
       { "source": "/api/**", "function": { "functionId": "dispatch", "region": "europe-west2" } },
       { "source": "/health", "function": { "functionId": "dispatch", "region": "europe-west2" } },
-      { "source": "/app/**", "destination": "/app/index.html" }
+      { "source": "/app/**", "destination": "/app/index.html" },
+      { "source": "/l/**", "destination": "/l/index.html" }
     ]
   },
   "emulators": {

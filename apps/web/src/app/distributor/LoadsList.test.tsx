@@ -192,3 +192,12 @@ describe('LoadsList — vehicle requirements', () => {
   });
 });
 
+describe('LoadsList — sharing', () => {
+  it('offers Share on a load still on offer, and not on one already done', async () => {
+    loadsForShipper.mockResolvedValue([fulfilledLoad, { ...fulfilledLoad, loadId: 'load-open', status: 'available' }]);
+    renderLoadsList();
+    await screen.findAllByText('Vehicle size');
+    expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
+  });
+});
+

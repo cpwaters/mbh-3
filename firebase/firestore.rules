@@ -97,9 +97,21 @@ service cloud.firestore {
 
     // Listings: the deliberately-projected, safe-to-expose view of an available
     // load (ADR-0002). Any signed-in user may browse; only the server writes
-    // them (via postLoad / acceptLoad / the drain).
+    // them (via postLoad / acceptLoad / the drain). One listing may also be
+    // read by its id without signing in: that is what a shared link (/l/<code>)
+    // opens. Browsing the whole board still needs an account.
     match /listings/{loadId} {
-      allow read: if isSignedIn();
+      allow get: if true;
+      allow list: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Short links to a load: a code and the load it points at, nothing else.
+    // Read one by its code without signing in (the public share page); never
+    // listed, and only dispatch (shareLoad) writes them.
+    match /shares/{code} {
+      allow get: if true;
+      allow list: if false;
       allow write: if false;
     }
 

@@ -71,6 +71,7 @@ beforeEach(async () => {
     await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
     await setDoc(doc(db, 'platformConfig/billing'), { enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} });
     await setDoc(doc(db, 'platformConfig/features'), { ratings: false });
+    await setDoc(doc(db, 'shares/AbC12345'), { code: 'AbC12345', loadId: 'load-1', createdAt: '2026-08-01T09:00:00.000Z', createdBy: SHIP_OWNER });
     await setDoc(doc(db, 'billingCustomers/cus_1'), { customerId: 'cus_1', tenantId: 'shipper-1', tier: 'growth', status: 'active' });
     await setDoc(doc(db, 'invites/inv-1'), { inviteId: 'inv-1', status: 'pending', note: 'Waters Haulage', createdAt: '2026-08-19T09:00:00.000Z', createdBy: 'founder-1', expiresAt: '2026-08-26T09:00:00.000Z' });
   });
@@ -222,8 +223,9 @@ describe('listings (carrier-facing projection)', () => {
     await assertSucceeds(getDoc(doc(db(OUTSIDER), 'listings/load-1')));
   });
 
-  it('an anonymous visitor cannot browse listings', async () => {
-    await assertFails(getDoc(doc(db(null), 'listings/load-1')));
+  it('an anonymous visitor cannot browse listings (one may be opened by id, from a shared link)', async () => {
+    await assertFails(getDocs(collection(db(null), 'listings')));
+    await assertSucceeds(getDoc(doc(db(null), 'listings/load-1')));
   });
 
   it('no client can write a listing', async () => {
@@ -430,6 +432,19 @@ describe('the founder’s back office reads', () => {
     await assertFails(getDocs(collection(db(SHIP_OWNER), 'userProfiles')));
     await assertFails(getDocs(collectionGroup(db(SHIP_OWNER), 'members')));
     await assertFails(getDocs(query(collection(db(SHIP_OWNER), 'audit'), orderBy('at', 'desc'), limit(10))));
+  });
+});
+
+describe('shared links', () => {
+  it('lets anyone open one shared load by its code, and nobody list or forge them', async () => {
+    await assertSucceeds(getDoc(doc(db(null), 'shares/AbC12345')));
+    await assertSucceeds(getDoc(doc(db(null), 'listings/load-1')));
+    // The board as a whole still needs an account.
+    await assertFails(getDocs(collection(db(null), 'listings')));
+    await assertFails(getDocs(collection(db(null), 'shares')));
+    await assertFails(getDocs(collection(db(SHIP_OWNER), 'shares')));
+    await assertFails(setDoc(doc(db(SHIP_OWNER), 'shares/Forged123'), { code: 'Forged123', loadId: 'load-1' }));
+    await assertFails(setDoc(doc(db(null), 'listings/load-1'), { priceGbpPence: 1 }));
   });
 });
 
