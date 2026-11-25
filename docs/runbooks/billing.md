@@ -132,9 +132,11 @@ Tick "Enforce plans" in the back office and save. From then on:
   unlimited).
 - A Driver plan lifts pick-ups: Driver New to 20 a month, Driver Fleet to
   60 a month, Driver Pro to unlimited.
-- A company that both ships and carries is offered one plan only, Shipper &
-  Carrier Unlimited, which lifts both. The same rule applies when you give
-  it a plan free.
+- A company that both ships and carries: while **Shipper & Carrier
+  accounts** is off under Admin → Features (the default), it is offered the
+  shipper and Driver plans like anyone else. Switch it on and it is offered
+  one plan only, Shipper & Carrier Unlimited, which lifts both; the same
+  rule applies when you give it a plan free. Paste that plan's link first.
 - Jobs already accepted carry on regardless.
 
 To give a pilot customer a plan without payment, open their company page →

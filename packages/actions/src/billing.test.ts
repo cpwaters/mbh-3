@@ -523,15 +523,25 @@ describe('the Driver plans meter pick-ups by the month', () => {
   });
 });
 
-describe('a company that both ships and carries', () => {
-  async function dual(h: Harness, data: Record<string, unknown> = {}): Promise<void> {
-    await h.store.runBatch([
-      { kind: 'update', path: 'tenants/carrier-1', data: { capabilities: ['shipper', 'carrier'], ...data } },
-    ]);
-  }
+async function dual(h: Harness, data: Record<string, unknown> = {}): Promise<void> {
+  await h.store.runBatch([
+    { kind: 'update', path: 'tenants/carrier-1', data: { capabilities: ['shipper', 'carrier'], ...data } },
+  ]);
+}
+
+async function shipperCarrier(h: Harness, enabled: boolean): Promise<void> {
+  await h.run(founder, {
+    type: 'setFeatureFlag',
+    payload: { feature: 'shipperCarrier', enabled },
+    requestId: `r-flag-${String(enabled)}`,
+  });
+}
+
+describe('a company that both ships and carries, with Shipper & Carrier accounts switched on', () => {
 
   it('can only be given the Shipper & Carrier Unlimited plan', async () => {
     const h = await makeHarness();
+    await shipperCarrier(h, true);
     await dual(h);
     for (const [i, tier] of (['fleet', 'driver_pro', 'starter'] as const).entries()) {
       const err = await expectAppError(
@@ -552,6 +562,7 @@ describe('a company that both ships and carries', () => {
 
   it('is not a plan for a company on one side only', async () => {
     const h = await makeHarness();
+    await shipperCarrier(h, true);
     await expectAppError(
       h.run(founder, {
         type: 'setCompanyPlan',
@@ -572,6 +583,7 @@ describe('a company that both ships and carries', () => {
 
   it('without a plan after the trial, is pointed at the combined plan', async () => {
     const h = await makeHarness();
+    await shipperCarrier(h, true);
     const first = ((await post(h, 'r-p1')) as { loadId: string }).loadId;
     const second = ((await post(h, 'r-p2')) as { loadId: string }).loadId;
     await enforce(h);
@@ -594,6 +606,7 @@ describe('a company that both ships and carries', () => {
 
   it('on the combined plan, picks up without limit', async () => {
     const h = await makeHarness();
+    await shipperCarrier(h, true);
     const loads: string[] = [];
     for (let i = 0; i < 3; i += 1) loads.push(((await post(h, `r-p${i}`)) as { loadId: string }).loadId);
     await enforce(h);
@@ -611,3 +624,49 @@ describe('a company that both ships and carries', () => {
     }
   });
 });
+
+describe('a company that both ships and carries, with Shipper & Carrier accounts switched off (the default)', () => {
+  it('can be given a shipper or Driver plan as before, but not the combined one', async () => {
+    const h = await makeHarness();
+    await dual(h);
+    await h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier: 'fleet' }, requestId: 'r-f' });
+    await h.run(founder, {
+      type: 'setCompanyPlan',
+      payload: { tenantId: 'carrier-1', tier: 'driver_pro' },
+      requestId: 'r-dp',
+    });
+    const err = await expectAppError(
+      h.run(founder, {
+        type: 'setCompanyPlan',
+        payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+        requestId: 'r-sc',
+      }),
+      'conflict'
+    );
+    expect(err.message).toMatch(/switched off.*Features/);
+  });
+
+  it('without a plan, is pointed at a Driver plan, as before', async () => {
+    const h = await makeHarness();
+    const first = ((await post(h, 'r-p1')) as { loadId: string }).loadId;
+    const second = ((await post(h, 'r-p2')) as { loadId: string }).loadId;
+    await enforce(h);
+    await dual(h, { trialEndsAt: '2026-07-31T00:00:00.000Z' });
+    await h.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId: first },
+      requestId: 'r-a1',
+    });
+    const err = await expectAppError(
+      h.run('driver-2', {
+        type: 'acceptLoad',
+        payload: { carrierTenantId: 'carrier-1', loadId: second },
+        requestId: 'r-a2',
+      }),
+      'forbidden'
+    );
+    expect(err.message).toMatch(/Driver plan/);
+    expect(err.message).not.toMatch(/Shipper & Carrier/);
+  });
+});
+

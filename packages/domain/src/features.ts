@@ -5,11 +5,15 @@
 export interface FeatureFlags {
   // Star ratings on driver and shipper profiles.
   ratings: boolean;
+  // A company that both ships and carries gets its own "Shipper & Carrier"
+  // banner and one plan, Shipper & Carrier Unlimited. Off: it is shown as a
+  // carrier and offered the shipper and Driver plans, as before.
+  shipperCarrier: boolean;
 }
 
 export type FeatureKey = keyof FeatureFlags;
 
-export const DEFAULT_FEATURE_FLAGS: FeatureFlags = { ratings: false };
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = { ratings: false, shipperCarrier: false };
 
 export interface FeatureInfo {
   key: FeatureKey;
@@ -24,6 +28,12 @@ export const FEATURES: readonly FeatureInfo[] = [
     key: 'ratings',
     label: 'Ratings',
     description: 'Star ratings on driver and shipper profiles. Off: no rating is shown on any profile.',
+  },
+  {
+    key: 'shipperCarrier',
+    label: 'Shipper & Carrier accounts',
+    description:
+      'A company that both ships and carries gets its own Shipper & Carrier banner and one plan only, Shipper & Carrier Unlimited (unlimited posting and pick-ups). Off: it is shown as a carrier and offered the shipper and Driver plans.',
   },
 ];
 

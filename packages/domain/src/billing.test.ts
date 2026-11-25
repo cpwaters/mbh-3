@@ -244,12 +244,25 @@ describe('the single Driver plan from before the split', () => {
 });
 
 describe('a company that both ships and carries', () => {
-  it('is offered only the Shipper & Carrier Unlimited plan; one-sided companies keep their own', () => {
-    expect(tiersFor(['shipper', 'carrier'])).toEqual(['shipper_carrier']);
-    expect(tiersFor(['shipper'])).toEqual(['starter', 'growth', 'fleet']);
-    expect(tiersFor(['carrier'])).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
-    expect(tiersFor([])).toEqual([]);
+  it('with the switch on, is offered only the Shipper & Carrier Unlimited plan; one-sided companies keep their own', () => {
+    expect(tiersFor(['shipper', 'carrier'], true)).toEqual(['shipper_carrier']);
+    expect(tiersFor(['shipper'], true)).toEqual(['starter', 'growth', 'fleet']);
+    expect(tiersFor(['carrier'], true)).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
+    expect(tiersFor([], true)).toEqual([]);
     expect(companyKind(['carrier', 'shipper'])).toBe('both');
+  });
+
+  it('with the switch off, is offered every shipper and Driver plan as before, and never the combined one', () => {
+    expect(tiersFor(['shipper', 'carrier'], false)).toEqual([
+      'starter',
+      'growth',
+      'fleet',
+      'driver_new',
+      'driver_fleet',
+      'driver_pro',
+    ]);
+    expect(tiersFor(['shipper'], false)).toEqual(['starter', 'growth', 'fleet']);
+    expect(tiersFor(['carrier'], false)).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
   });
 
   it('the combined plan is unlimited both ways, and Stripe’s price key maps to it', () => {

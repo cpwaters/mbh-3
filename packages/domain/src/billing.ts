@@ -60,12 +60,13 @@ export function companyKind(capabilities: readonly string[]): CompanyKind {
 }
 
 // The plans a company may choose: shipper plans for a shipper, Driver plans
-// for a carrier, and for a company that does both only the combined
-// unlimited plan.
-export function tiersFor(capabilities: readonly string[]): readonly PlanTier[] {
+// for a carrier. For a company that does both it depends on the founder's
+// "Shipper & Carrier accounts" switch (Admin → Features): on, only the
+// combined unlimited plan; off, every shipper and Driver plan, as before.
+export function tiersFor(capabilities: readonly string[], shipperCarrierOn: boolean): readonly PlanTier[] {
   switch (companyKind(capabilities)) {
     case 'both':
-      return COMBINED_TIERS;
+      return shipperCarrierOn ? COMBINED_TIERS : [...SHIPPER_TIERS, ...DRIVER_TIERS];
     case 'shipper':
       return SHIPPER_TIERS;
     case 'carrier':

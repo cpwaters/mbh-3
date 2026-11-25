@@ -10,7 +10,19 @@ describe('setFeatureFlag', () => {
     await expect(
       h.run(founder, { type: 'setFeatureFlag', payload: { feature: 'ratings', enabled: true }, requestId: 'r-on' })
     ).resolves.toEqual({ feature: 'ratings', enabled: true });
-    expect(await h.store.getDoc('platformConfig/features')).toEqual({ ratings: true, updatedAt: FIXED_NOW });
+    expect(await h.store.getDoc('platformConfig/features')).toEqual({
+      ratings: true,
+      shipperCarrier: false,
+      updatedAt: FIXED_NOW,
+    });
+
+    // Flipping another switch leaves this one where it was.
+    await h.run(founder, {
+      type: 'setFeatureFlag',
+      payload: { feature: 'shipperCarrier', enabled: true },
+      requestId: 'r-sc',
+    });
+    expect(await h.store.getDoc('platformConfig/features')).toMatchObject({ ratings: true, shipperCarrier: true });
 
     await h.run(founder, { type: 'setFeatureFlag', payload: { feature: 'ratings', enabled: false }, requestId: 'r-off' });
     expect(await h.store.getDoc('platformConfig/features')).toMatchObject({ ratings: false });

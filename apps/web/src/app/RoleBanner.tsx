@@ -1,6 +1,7 @@
 import { Package, Repeat, Truck } from 'lucide-react';
 import { companyKind } from '@mbh/domain';
 import { useApp } from './context';
+import { useFeatureFlags } from '../components/useFeatureFlags';
 
 const STYLES = {
   // The back office's indigo.
@@ -35,12 +36,15 @@ const STYLES = {
 // A strip under the header saying which side of the marketplace the signed-in
 // user's company is on, and which company: a shipper in the back office's
 // indigo, a carrier in the app's blue, and a company that does both on the two
-// joined. Nothing shows until a company is selected.
+// joined. That last is behind the founder's "Shipper & Carrier accounts"
+// switch: off, a company that does both reads as a carrier, the app it gets.
+// Nothing shows until a company is selected.
 export function RoleBanner() {
   const app = useApp();
+  const shipperCarrierOn = useFeatureFlags().flags.shipperCarrier;
   if (app.selected === null) return null;
   const kind = companyKind(app.selected.capabilities);
-  const style = STYLES[kind === 'shipper' ? 'shipper' : kind === 'both' ? 'both' : 'carrier'];
+  const style = STYLES[kind === 'shipper' ? 'shipper' : kind === 'both' && shipperCarrierOn ? 'both' : 'carrier'];
   const { Icon } = style;
   return (
     <div role="note" aria-label={style.label} className={style.bar}>

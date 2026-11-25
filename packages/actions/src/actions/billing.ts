@@ -6,6 +6,7 @@ import {
   isStripePaymentLink,
   isStripePortalUrl,
   companyKind,
+  resolveFeatureFlags,
   PLAN_LABELS,
   tiersFor,
   freePlanExpiry,
@@ -15,7 +16,7 @@ import {
   type Tenant,
   type TenantBilling,
 } from '@mbh/domain';
-import { billingConfigDoc, billingCustomerDoc, tenantDoc } from '@mbh/paths';
+import { billingConfigDoc, billingCustomerDoc, featureFlagsDoc, tenantDoc } from '@mbh/paths';
 import type { DocData, TransactionContext } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireFounder } from '../require-founder.js';
@@ -274,11 +275,14 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
     // A plan has to be one the company can use: shipper plans for a company
     // that only posts, Driver plans for one that only carries, and for a
     // company that does both only the combined unlimited plan.
-    if (payload.tier !== null && !tiersFor(tenant.capabilities).includes(payload.tier)) {
+    const shipperCarrierOn = resolveFeatureFlags(await tx.get(featureFlagsDoc())).shipperCarrier;
+    if (payload.tier !== null && !tiersFor(tenant.capabilities, shipperCarrierOn).includes(payload.tier)) {
       const kind = companyKind(tenant.capabilities);
       throw new AppError(
         'conflict',
-        kind === 'both'
+        payload.tier === 'shipper_carrier' && !shipperCarrierOn
+          ? 'Shipper & Carrier Unlimited is switched off. Turn on Shipper & Carrier accounts under Features first.'
+          : kind === 'both'
           ? `That company both ships and carries, so its plan is ${PLAN_LABELS.shipper_carrier}.`
           : kind === 'shipper'
             ? 'That company only posts loads, so it takes a shipper plan.'

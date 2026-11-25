@@ -11,6 +11,7 @@ let billing: TenantBilling | null = null;
 let posted = 0;
 let pickedUp = 0;
 let trial: { trialEndsAt?: string } = {};
+let shipperCarrier = false;
 
 vi.mock('../lib/reader', () => ({
   getReader: () => ({
@@ -19,6 +20,7 @@ vi.mock('../lib/reader', () => ({
     tenantPlan: async () => ({ createdAt: '2026-01-01T00:00:00.000Z', billing: billing ?? undefined, ...trial }),
     loadsPostedSince: async () => posted,
     jobsAcceptedSince: async () => pickedUp,
+    featureFlags: async () => ({ ratings: false, shipperCarrier }),
   }),
 }));
 
@@ -56,6 +58,7 @@ function renderBilling(
 }
 
 afterEach(() => {
+  shipperCarrier = false;
   config = DEFAULT_BILLING_CONFIG;
   billing = null;
   posted = 0;
@@ -192,7 +195,8 @@ describe('Billing — drivers', () => {
 });
 
 describe('Billing — a company that both ships and carries', () => {
-  it('offers only the Shipper & Carrier Unlimited plan', async () => {
+  it('with Shipper & Carrier accounts on, offers only the Shipper & Carrier Unlimited plan', async () => {
+    shipperCarrier = true;
     config = {
       ...LIVE,
       paymentLinks: { ...LIVE.paymentLinks, fleet: 'https://buy.stripe.com/test_f', shipper_carrier: 'https://buy.stripe.com/test_sc' },
@@ -208,4 +212,14 @@ describe('Billing — a company that both ships and carries', () => {
     expect(headings).toEqual(['Shipper & Carrier Unlimited']);
     expect(screen.getByText(/the Shipper & Carrier Unlimited plan lifts both/)).toBeInTheDocument();
   });
+
+  it('with it off (the default), offers every shipper and Driver plan as before, and not the combined one', async () => {
+    config = { ...LIVE, paymentLinks: { ...LIVE.paymentLinks, shipper_carrier: 'https://buy.stripe.com/test_sc' } };
+    renderBilling('owner', '/billing', ['shipper', 'carrier']);
+    await screen.findByRole('link', { name: 'Choose Driver New' });
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Starter', 'Growth', 'Fleet', 'Driver New', 'Driver Fleet', 'Driver Pro']);
+    expect(screen.queryByText('Shipper & Carrier Unlimited')).not.toBeInTheDocument();
+  });
 });
+

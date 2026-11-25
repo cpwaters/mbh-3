@@ -150,13 +150,17 @@ unlimited one, settling on three tiers:
 ## Addendum (November 2026): one plan for a company that both ships and carries
 
 The founder decided that a company signed up as both shipper and carrier
-picks one plan only, unlimited both ways:
+picks one plan only, unlimited both ways, and then asked for it to be built
+behind a switch that stays off for now: **Shipper & Carrier accounts**
+(Admin → Features). While it is off, everything below is dormant and a
+two-sided company is treated as before (a Carrier banner; every shipper and
+Driver plan offered). With it on:
 
 - **Shipper & Carrier Unlimited:** unlimited posting and unlimited pick-ups
   (`mbh_shipper_carrier_monthly`, placeholder £319, a little under Fleet and
   Driver Pro together). It has its own price, payment link and portal entry,
   made by `stripe:provision` like the others.
-- **The only plan such a company can choose.** `tiersFor(capabilities)`
+- **The only plan such a company can choose.** `tiersFor(capabilities, on)`
   decides what is offered: shipper plans to a shipper-only company, Driver
   plans to a carrier-only one, and the combined plan alone to one that does
   both. The Billing page offers only these, and the founder's "give plan
