@@ -11,6 +11,7 @@ let billing: TenantBilling | null = null;
 let posted = 0;
 let pickedUp = 0;
 let trial: { trialEndsAt?: string } = {};
+let dualOperator = false;
 
 vi.mock('../lib/reader', () => ({
   getReader: () => ({
@@ -19,6 +20,7 @@ vi.mock('../lib/reader', () => ({
     tenantPlan: async () => ({ createdAt: '2026-01-01T00:00:00.000Z', billing: billing ?? undefined, ...trial }),
     loadsPostedSince: async () => posted,
     jobsAcceptedSince: async () => pickedUp,
+    featureFlags: async () => ({ ratings: false, dualOperator }),
   }),
 }));
 
@@ -56,6 +58,7 @@ function renderBilling(
 }
 
 afterEach(() => {
+  dualOperator = false;
   config = DEFAULT_BILLING_CONFIG;
   billing = null;
   posted = 0;
@@ -190,3 +193,33 @@ describe('Billing — drivers', () => {
     );
   });
 });
+
+describe('Billing — a company that both ships and carries', () => {
+  it('with Dual Operator accounts on, offers only the Dual Operator Unlimited plan', async () => {
+    dualOperator = true;
+    config = {
+      ...LIVE,
+      paymentLinks: { ...LIVE.paymentLinks, fleet: 'https://buy.stripe.com/test_f', dual_operator: 'https://buy.stripe.com/test_sc' },
+      monthlyPricePence: { ...LIVE.monthlyPricePence, dual_operator: 31900 },
+    };
+    renderBilling('owner', '/billing', ['shipper', 'carrier']);
+    const choose = await screen.findByRole('link', { name: 'Choose Dual Operator Unlimited' });
+    expect(choose).toHaveAttribute('href', expect.stringContaining('https://buy.stripe.com/test_sc?client_reference_id=acme'));
+    expect(screen.getByText('Unlimited loads posted and picked up')).toBeInTheDocument();
+    expect(screen.getByText('£319.00')).toBeInTheDocument();
+    // Nothing one-sided on offer.
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Dual Operator Unlimited']);
+    expect(screen.getByText(/the Dual Operator Unlimited plan lifts both/)).toBeInTheDocument();
+  });
+
+  it('with it off (the default), offers every shipper and Driver plan as before, and not the combined one', async () => {
+    config = { ...LIVE, paymentLinks: { ...LIVE.paymentLinks, dual_operator: 'https://buy.stripe.com/test_sc' } };
+    renderBilling('owner', '/billing', ['shipper', 'carrier']);
+    await screen.findByRole('link', { name: 'Choose Driver New' });
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Starter', 'Growth', 'Fleet', 'Driver New', 'Driver Fleet', 'Driver Pro']);
+    expect(screen.queryByText('Dual Operator Unlimited')).not.toBeInTheDocument();
+  });
+});
+

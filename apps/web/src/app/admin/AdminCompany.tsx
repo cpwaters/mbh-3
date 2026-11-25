@@ -4,10 +4,9 @@ import { ArrowLeft, Eye, EyeOff, PauseCircle, PlayCircle } from 'lucide-react';
 import {
   FREE_PLAN_DAYS,
   PLAN_LABELS,
-  PLAN_TIERS,
   activeOverride,
   effectivePlan,
-  isShipperTier,
+  tiersFor,
   isTenantSuspended,
   trialDaysLeft,
   isValidSuspensionReason,
@@ -15,6 +14,7 @@ import {
   type Tenant,
 } from '@mbh/domain';
 import { PlanSource } from './AdminBilling';
+import { useFeatureFlags } from '../../components/useFeatureFlags';
 import { byNewest, formatDay, formatWhen, useAdminAction, useAdminData, type AdminData } from './adminData';
 import { CapabilityPills } from './AdminCompanies';
 import { MemberList } from './AdminPeople';
@@ -134,17 +134,18 @@ function Standing({ company, data, onChanged }: { company: Tenant; data: AdminDa
 
 // A company's plan, and the founder's override: give a plan without payment
 // (a pilot customer) or take that back, leaving whatever Stripe says. Only
-// the plans the company can use are offered — shipper plans to a company
-// that posts, the Driver plan to one that carries.
+// the plans the company can use are offered (tiersFor): shipper plans to a
+// company that only posts, Driver plans to one that only carries, and the
+// Dual Operator Unlimited plan alone to one that does both (while that is
+// switched on under Features; off, such a company is offered both sets).
 function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }) {
   const { run, busy, error } = useAdminAction(onChanged);
   const now = new Date().toISOString();
   const override = activeOverride(company.billing, now);
   const lapsed = override === null ? (company.billing?.override ?? null) : null;
-  const options = PLAN_TIERS.filter((t) =>
-    isShipperTier(t) ? company.capabilities.includes('shipper') : company.capabilities.includes('carrier')
-  );
-  const [tier, setTier] = useState<PlanTier>(options[0] ?? 'driver');
+  const dualOperatorOn = useFeatureFlags().flags.dualOperator;
+  const options = tiersFor(company.capabilities, dualOperatorOn);
+  const [tier, setTier] = useState<PlanTier>(options[0] ?? 'driver_new');
   const [days, setDays] = useState<number | null>(14);
   const [note, setNote] = useState('');
   const effective = effectivePlan(company, now);

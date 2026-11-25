@@ -7,13 +7,14 @@ import {
   checkAcceptAllowed,
   checkLoadAllowance,
   effectivePlan,
+  resolveFeatureFlags,
   type AllowanceCheck,
   type BillingConfig,
   type Job,
   type Load,
   type Tenant,
 } from '@mbh/domain';
-import { billingConfigDoc, jobsCollection, loadsCollection } from '@mbh/paths';
+import { billingConfigDoc, featureFlagsDoc, jobsCollection, loadsCollection } from '@mbh/paths';
 import type { TransactionContext } from '@mbh/provider-interfaces';
 
 // Plan gates. Both are no-ops until the founder switches enforcement on
@@ -27,6 +28,14 @@ async function enforced(tx: TransactionContext): Promise<boolean> {
 
 function refuseUnless(check: AllowanceCheck): void {
   if (!check.ok) throw new AppError('forbidden', check.message, { recoverable: false });
+}
+
+// The capabilities a refusal is worded for. With the founder's "Dual
+// Operator accounts" switch off, a company that does both is spoken to as
+// before (shipper and Driver plans), so its capabilities are left out.
+async function wordingFor(tx: TransactionContext, tenant: Tenant): Promise<readonly string[] | undefined> {
+  const on = resolveFeatureFlags(await tx.get(featureFlagsDoc())).dualOperator;
+  return on ? tenant.capabilities : undefined;
 }
 
 // Whether the shipper's plan has room for one more load in the current
@@ -50,7 +59,8 @@ export async function requireLoadAllowance(tx: TransactionContext, tenant: Tenan
   });
   const posted = rows.filter((row) => ((row.data as unknown as Load).createdAt ?? '') >= since).length;
 
-  refuseUnless(checkLoadAllowance(tier, posted));
+  const check = checkLoadAllowance(tier, posted);
+  if (!check.ok) refuseUnless(checkLoadAllowance(tier, posted, await wordingFor(tx, tenant)));
 }
 
 // Whether the carrier may pick up one more load: unlimited in its trial or on
@@ -70,5 +80,6 @@ export async function requireAcceptPlan(tx: TransactionContext, carrier: Tenant,
   });
   const accepted = rows.filter((row) => ((row.data as unknown as Job).createdAt ?? '') >= since).length;
 
-  refuseUnless(checkAcceptAllowed(tier, accepted));
+  const check = checkAcceptAllowed(tier, accepted);
+  if (!check.ok) refuseUnless(checkAcceptAllowed(tier, accepted, await wordingFor(tx, carrier)));
 }

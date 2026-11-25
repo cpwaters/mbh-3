@@ -752,6 +752,33 @@ the Rating row. `UserProfile.rating` is untouched and still system-assigned.
 To add a switch, add it to `FeatureFlags`, `DEFAULT_FEATURE_FLAGS` and
 `FEATURES`, then gate the UI on `useFeatureFlags().flags.<key>`.
 
+## Shipper/carrier banner and the Dual Operator (built; switched off)
+
+A **Dual Operator** is the founder's name for a company signed up as both
+shipper and carrier (`companyKind(...) === 'both'` in billing.ts).
+
+A strip under the header (`RoleBanner`, under both nav bars) names the
+company and its side: **Shipper** in the back office's indigo, **Carrier**
+in the app's blue, and **Dual Operator** on an indigo-to-blue gradient.
+
+Everything for the two-sided company sits behind the **Dual Operator
+accounts** switch (Admin → Features, flag `dualOperator`), which is **off**.
+While it is off, a two-sided company reads as a Carrier, is offered every
+shipper and Driver plan, and is told about those plans when it hits a limit,
+exactly as before. The server holds the same line: `setCompanyPlan` refuses
+the combined plan, and the gates word refusals the old way. A company
+already holding the combined plan keeps its entitlement either way.
+
+With the switch on, a two-sided company has one plan only: **Dual Operator Unlimited**
+(`dual_operator`, `mbh_dual_operator_monthly`, placeholder £319,
+unlimited posting and pick-ups). `tiersFor(capabilities, dualOperatorOn)` is the single rule
+for what is offered (Billing page, `setCompanyPlan`, the back office's
+company Plan picker). Its payment link and price go in Admin → Billing like
+the rest; until the founder re-runs `pnpm stripe:provision` (which adds just
+the new price and link) and pastes the link, the plan shows as "Opening
+soon". Stripe's portal lists every plan for switching and cannot be narrowed
+per company (ADR-0004 addendum).
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

@@ -16,6 +16,10 @@ import {
   tierFromLookupKey,
   activeOverride,
   freePlanExpiry,
+  companyKind,
+  tiersFor,
+  POSTING_ALLOWANCE,
+  PLAN_LABELS,
 } from './billing.js';
 
 const NOW = '2026-10-27T12:00:00.000Z';
@@ -236,5 +240,51 @@ describe('the single Driver plan from before the split', () => {
 
   it('entitles to nothing when the stored tier is not one we know', () => {
     expect(effectivePlan(legacy({ tier: 'platinum', status: 'active' }), NOW)).toBe('free');
+  });
+});
+
+describe('a company that both ships and carries', () => {
+  it('with the switch on, is offered only the Dual Operator Unlimited plan; one-sided companies keep their own', () => {
+    expect(tiersFor(['shipper', 'carrier'], true)).toEqual(['dual_operator']);
+    expect(tiersFor(['shipper'], true)).toEqual(['starter', 'growth', 'fleet']);
+    expect(tiersFor(['carrier'], true)).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
+    expect(tiersFor([], true)).toEqual([]);
+    expect(companyKind(['carrier', 'shipper'])).toBe('both');
+  });
+
+  it('with the switch off, is offered every shipper and Driver plan as before, and never the combined one', () => {
+    expect(tiersFor(['shipper', 'carrier'], false)).toEqual([
+      'starter',
+      'growth',
+      'fleet',
+      'driver_new',
+      'driver_fleet',
+      'driver_pro',
+    ]);
+    expect(tiersFor(['shipper'], false)).toEqual(['starter', 'growth', 'fleet']);
+    expect(tiersFor(['carrier'], false)).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
+  });
+
+  it('the combined plan is unlimited both ways, and Stripe’s price key maps to it', () => {
+    expect(POSTING_ALLOWANCE.dual_operator).toBeNull();
+    expect(PICKUP_ALLOWANCE.dual_operator).toBeNull();
+    expect(PLAN_LABELS.dual_operator).toBe('Dual Operator Unlimited');
+    expect(tierFromLookupKey('mbh_dual_operator_monthly')).toBe('dual_operator');
+    expect(normalizeTier('dual_operator')).toBe('dual_operator');
+    expect(checkLoadAllowance('dual_operator', 10_000, ['shipper', 'carrier'])).toEqual({ ok: true });
+    expect(checkAcceptAllowed('dual_operator', 10_000, ['shipper', 'carrier'])).toEqual({ ok: true });
+  });
+
+  it('without a plan, is pointed at the combined plan rather than a one-sided one', () => {
+    const both = ['shipper', 'carrier'];
+    const post = checkLoadAllowance('free', 1, both);
+    expect(post).toMatchObject({ ok: false, message: expect.stringMatching(/Dual Operator Unlimited/) });
+    expect(post.ok === false && post.message).not.toMatch(/shipper plan/);
+    const pick = checkAcceptAllowed('free', 1, both);
+    expect(pick).toMatchObject({ ok: false, message: expect.stringMatching(/Dual Operator Unlimited/) });
+    expect(pick.ok === false && pick.message).not.toMatch(/Driver plan/);
+    // One-sided companies are told what they were before.
+    expect(checkAcceptAllowed('free', 1)).toMatchObject({ message: expect.stringMatching(/Driver plan/) });
+    expect(checkLoadAllowance('free', 1)).toMatchObject({ message: expect.stringMatching(/shipper plan/) });
   });
 });

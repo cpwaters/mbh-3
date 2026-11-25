@@ -78,7 +78,7 @@ function AppLayout({ distributor, loading }: { distributor: boolean; loading: bo
   return (
     <div className="pb-16 lg:pb-0">
       {distributor ? <DistributorNavigation /> : <Navigation />}
-      <RoleBanner shipper={distributor} />
+      <RoleBanner />
       {loading ? <LoadingCard /> : <Outlet />}
     </div>
   );

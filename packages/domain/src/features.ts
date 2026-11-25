@@ -5,11 +5,15 @@
 export interface FeatureFlags {
   // Star ratings on driver and shipper profiles.
   ratings: boolean;
+  // A Dual Operator, a company signed up as both shipper and carrier, gets
+  // its own "Dual Operator" banner and one plan, Dual Operator Unlimited. Off: it is shown as a
+  // carrier and offered the shipper and Driver plans, as before.
+  dualOperator: boolean;
 }
 
 export type FeatureKey = keyof FeatureFlags;
 
-export const DEFAULT_FEATURE_FLAGS: FeatureFlags = { ratings: false };
+export const DEFAULT_FEATURE_FLAGS: FeatureFlags = { ratings: false, dualOperator: false };
 
 export interface FeatureInfo {
   key: FeatureKey;
@@ -24,6 +28,12 @@ export const FEATURES: readonly FeatureInfo[] = [
     key: 'ratings',
     label: 'Ratings',
     description: 'Star ratings on driver and shipper profiles. Off: no rating is shown on any profile.',
+  },
+  {
+    key: 'dualOperator',
+    label: 'Dual Operator accounts',
+    description:
+      'A Dual Operator is a company signed up as both shipper and carrier. On: it gets its own Dual Operator banner and one plan only, Dual Operator Unlimited (unlimited posting and pick-ups). Off: it is shown as a carrier and offered the shipper and Driver plans.',
   },
 ];
 

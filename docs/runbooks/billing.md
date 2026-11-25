@@ -46,7 +46,7 @@ provisioning which plan each one is, and it **tags your prices** instead of
 making new ones. It also reuses a link that already sells the right price:
 
     STRIPE_SECRET_KEY=sk_live_... \
-    ADOPT_PRICES=starter=price_AAA,growth=price_BBB,fleet=price_CCC,driver_new=price_DDD,driver_fleet=price_EEE,driver_pro=price_FFF \
+    ADOPT_PRICES=starter=price_AAA,growth=price_BBB,fleet=price_CCC,driver_new=price_DDD,driver_fleet=price_EEE,driver_pro=price_FFF,dual_operator=price_GGG \
     pnpm stripe:provision
 
 Any plan left out of `ADOPT_PRICES` gets a fresh price at the amount in step 1.
@@ -57,12 +57,14 @@ then run `pnpm stripe:check` again until it reports no problems.
 ## 1. Set the prices (optional)
 
 The provisioning script creates these monthly GBP prices unless told
-otherwise: Starter £49, Growth £129 and Fleet £299 for shippers, and Driver
-New £7.99, Driver Fleet £14.99 and Driver Pro £24.99 for drivers. **They are
+otherwise: Starter £49, Growth £129 and Fleet £299 for shippers, Driver
+New £7.99, Driver Fleet £14.99 and Driver Pro £24.99 for drivers, and
+Dual Operator Unlimited £319 for a company that does both. **They are
 placeholders.** To use your own, set them in pence when you run step 2:
 
     STARTER_PENCE=3900 GROWTH_PENCE=9900 FLEET_PENCE=24900 \
-    DRIVER_NEW_PENCE=699 DRIVER_FLEET_PENCE=1299 DRIVER_PRO_PENCE=1999
+    DRIVER_NEW_PENCE=699 DRIVER_FLEET_PENCE=1299 DRIVER_PRO_PENCE=1999 \
+    DUAL_OPERATOR_PENCE=29900
 
 A Stripe price's amount cannot change once created. To change a price later,
 create a new one in the dashboard and move its lookup key
@@ -102,9 +104,9 @@ Webhooks → the endpoint → Roll secret) and update the GitHub secret.
 
 ## 4. Paste the links into the back office
 
-In /app/admin → Billing, paste the six payment links (three shipper plans
-and the three Driver plans) and the portal link the script printed, along with
-the monthly prices to display. Save, leaving "Enforce plans" off.
+In /app/admin → Billing, paste the seven payment links (three shipper plans,
+the three Driver plans and Dual Operator Unlimited) and the portal link
+the script printed, along with the monthly prices to display. Save, leaving "Enforce plans" off.
 
 ## 5. Prove it end to end (test mode)
 
@@ -130,6 +132,11 @@ Tick "Enforce plans" in the back office and save. From then on:
   unlimited).
 - A Driver plan lifts pick-ups: Driver New to 20 a month, Driver Fleet to
   60 a month, Driver Pro to unlimited.
+- A Dual Operator (a company that both ships and carries): while **Dual Operator
+  accounts** is off under Admin → Features (the default), it is offered the
+  shipper and Driver plans like anyone else. Switch it on and it is offered
+  one plan only, Dual Operator Unlimited, which lifts both; the same
+  rule applies when you give it a plan free. Paste that plan's link first.
 - Jobs already accepted carry on regardless.
 
 To give a pilot customer a plan without payment, open their company page →

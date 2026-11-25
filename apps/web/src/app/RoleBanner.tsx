@@ -1,25 +1,57 @@
-import { Package, Truck } from 'lucide-react';
+import { Package, Repeat, Truck } from 'lucide-react';
+import { companyKind } from '@mbh/domain';
 import { useApp } from './context';
+import { useFeatureFlags } from '../components/useFeatureFlags';
+
+const STYLES = {
+  // The back office's indigo.
+  shipper: {
+    title: 'Shipper',
+    label: 'Signed in as a shipper',
+    Icon: Package,
+    bar: 'bg-indigo-950 text-white',
+    icon: 'text-indigo-300',
+    muted: 'text-indigo-200',
+  },
+  // The app's blue.
+  carrier: {
+    title: 'Carrier',
+    label: 'Signed in as a carrier',
+    Icon: Truck,
+    bar: 'bg-blue-600 text-white',
+    icon: 'text-blue-100',
+    muted: 'text-blue-100',
+  },
+  // Both sides: the two colours joined.
+  both: {
+    title: 'Dual Operator',
+    label: 'Signed in as a dual operator',
+    Icon: Repeat,
+    bar: 'bg-gradient-to-r from-indigo-950 to-blue-600 text-white',
+    icon: 'text-indigo-200',
+    muted: 'text-indigo-100',
+  },
+} as const;
 
 // A strip under the header saying which side of the marketplace the signed-in
-// user is working as, and for which company: shippers in the back office's
-// indigo, carriers in the app's blue. It follows the app being shown, so a
-// company that both ships and carries (which gets the carrier app) reads as
-// a carrier. Nothing shows until a company is selected.
-export function RoleBanner({ shipper }: { shipper: boolean }) {
+// user's company is on, and which company: a shipper in the back office's
+// indigo, a carrier in the app's blue, and a company that does both on the two
+// joined. That last is behind the founder's "Dual Operator accounts"
+// switch: off, a company that does both reads as a carrier, the app it gets.
+// Nothing shows until a company is selected.
+export function RoleBanner() {
   const app = useApp();
+  const dualOperatorOn = useFeatureFlags().flags.dualOperator;
   if (app.selected === null) return null;
-  const Icon = shipper ? Package : Truck;
+  const kind = companyKind(app.selected.capabilities);
+  const style = STYLES[kind === 'shipper' ? 'shipper' : kind === 'both' && dualOperatorOn ? 'both' : 'carrier'];
+  const { Icon } = style;
   return (
-    <div
-      role="note"
-      aria-label={shipper ? 'Signed in as a shipper' : 'Signed in as a carrier'}
-      className={shipper ? 'bg-indigo-950 text-white' : 'bg-blue-600 text-white'}
-    >
+    <div role="note" aria-label={style.label} className={style.bar}>
       <div className="max-w-7xl mx-auto px-4 lg:px-6 py-2 flex items-center gap-2 text-sm">
-        <Icon className={`w-4 h-4 shrink-0 ${shipper ? 'text-indigo-300' : 'text-blue-100'}`} aria-hidden="true" />
-        <span className="font-semibold">{shipper ? 'Shipper' : 'Carrier'}</span>
-        <span className={`truncate ${shipper ? 'text-indigo-200' : 'text-blue-100'}`}>· {app.selected.name}</span>
+        <Icon className={`w-4 h-4 shrink-0 ${style.icon}`} aria-hidden="true" />
+        <span className="font-semibold">{style.title}</span>
+        <span className={`truncate ${style.muted}`}>· {app.selected.name}</span>
       </div>
     </div>
   );

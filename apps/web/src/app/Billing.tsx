@@ -2,18 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check, CreditCard, ExternalLink, Info } from 'lucide-react';
 import {
-  DRIVER_TIERS,
   PICKUP_ALLOWANCE,
   PLAN_LABELS,
   POSTING_ALLOWANCE,
-  SHIPPER_TIERS,
   TRIAL_DAYS,
   activeOverride,
   describeAllowance,
   effectivePlan,
   formatGbp,
+  isCombinedTier,
   isShipperTier,
   monthStartUtc,
+  tiersFor,
   ukDayStart,
   type Allowance,
   paymentLinkFor,
@@ -24,12 +24,15 @@ import {
   type PlanTier,
 } from '@mbh/domain';
 import { useApp } from './context';
+import { useFeatureFlags } from '../components/useFeatureFlags';
 import { getReader } from '../lib/reader';
 
 // A company's plan: its free trial, what it is on, how much of its posting
 // and pick-up allowances is used, and the way to change it. One page for both
 // sides of the marketplace — a shipper sees the shipper plans, a driver sees
-// the Driver plans, a company that does both sees both.
+// the Driver plans. A company that does both sees only the combined Dual
+// Operator Unlimited plan while the founder's "Dual Operator accounts"
+// switch is on, and every shipper and Driver plan while it is off (tiersFor).
 //
 // Paying happens on Stripe's own pages (a payment link, the customer portal):
 // this page never touches a card and never calls Stripe. The plan shown is
@@ -42,9 +45,11 @@ const PLAN_BLURBS: Record<PlanTier, string> = {
   driver_new: 'For a driver new to backhauls, picking up the odd one each week.',
   driver_fleet: 'For a driver running backhauls most days.',
   driver_pro: 'Unlimited pick-ups, for a driver who backhauls every run.',
+  dual_operator: 'For a company that ships and carries: post and pick up as many loads as you like.',
 };
 
 function whatItBuys(tier: PlanTier): string {
+  if (isCombinedTier(tier)) return 'Unlimited loads posted and picked up';
   if (!isShipperTier(tier)) return describeAllowance(PICKUP_ALLOWANCE[tier], 'pick-up');
   return describeAllowance(POSTING_ALLOWANCE[tier], 'load');
 }
@@ -100,6 +105,9 @@ export default function Billing() {
   const ships = app.selected?.capabilities.includes('shipper') ?? false;
   const carries = app.selected?.capabilities.includes('carrier') ?? false;
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const { flags, loading: flagsLoading } = useFeatureFlags();
+  // A company that does both, with the combined plan switched on.
+  const combined = ships && carries && flags.dualOperator;
 
   useEffect(() => {
     if (tenantId === undefined) return;
@@ -145,7 +153,7 @@ export default function Billing() {
   const gift = activeOverride(billing, now);
   const posting = POSTING_ALLOWANCE[tier];
   const pickup = PICKUP_ALLOWANCE[tier];
-  const tiers: PlanTier[] = [...(ships ? SHIPPER_TIERS : []), ...(carries ? DRIVER_TIERS : [])];
+  const tiers = tiersFor(app.selected?.capabilities ?? [], flags.dualOperator);
 
   const portalHref = useMemo(() => {
     if (state.kind !== 'ready' || state.config.portalUrl === '') return null;
@@ -161,9 +169,14 @@ export default function Billing() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
         <p className="text-gray-600">
           Every account starts with a {TRIAL_DAYS}-day free trial. After it, without a plan you can{' '}
-          {ships && carries ? 'post one load and pick up one load a day' : ships ? 'post one load a day' : 'pick up one load a day'}
-          {ships ? ' — a shipper plan lets you post more' : ''}
-          {carries ? `${ships ? ', and' : ' —'} a Driver plan lets you pick up more` : ''}.
+          {combined
+            ? `post one load and pick up one load a day — the ${PLAN_LABELS.dual_operator} plan lifts both`
+            : ships && carries
+              ? 'post one load and pick up one load a day — a shipper plan lets you post more, and a Driver plan lets you pick up more'
+              : ships
+                ? 'post one load a day — a shipper plan lets you post more'
+                : 'pick up one load a day — a Driver plan lets you pick up more'}
+          .
         </p>
       </div>
 
@@ -181,7 +194,7 @@ export default function Billing() {
         </div>
       )}
 
-      {state.kind === 'ready' && (
+      {state.kind === 'ready' && !flagsLoading && (
         <>
           <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -314,8 +327,11 @@ export default function Billing() {
               })}
             </div>
             <p className="text-sm text-gray-500 mt-3">
-              {ships && `Without a shipper plan you can post ${describeAllowance(POSTING_ALLOWANCE.free, 'load')}. `}
-              {carries && `Without a Driver plan you can pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `}
+              {combined
+                ? `Without a plan you can post ${describeAllowance(POSTING_ALLOWANCE.free, 'load')} and pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `
+                : null}
+              {ships && !combined && `Without a shipper plan you can post ${describeAllowance(POSTING_ALLOWANCE.free, 'load')}. `}
+              {carries && !combined && `Without a Driver plan you can pick up ${describeAllowance(PICKUP_ALLOWANCE.free, 'load')}. `}
               Payment is taken by Stripe; we never see your card.
             </p>
           </section>

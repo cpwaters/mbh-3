@@ -5,7 +5,10 @@ import {
   SUBSCRIPTION_STATUSES,
   isStripePaymentLink,
   isStripePortalUrl,
-  isShipperTier,
+  companyKind,
+  resolveFeatureFlags,
+  PLAN_LABELS,
+  tiersFor,
   freePlanExpiry,
   type BillingEvent,
   type PlanTier,
@@ -13,7 +16,7 @@ import {
   type Tenant,
   type TenantBilling,
 } from '@mbh/domain';
-import { billingConfigDoc, billingCustomerDoc, tenantDoc } from '@mbh/paths';
+import { billingConfigDoc, billingCustomerDoc, featureFlagsDoc, tenantDoc } from '@mbh/paths';
 import type { DocData, TransactionContext } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireFounder } from '../require-founder.js';
@@ -171,6 +174,7 @@ const setBillingConfigSchema = z.object({
     driver_new: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_pro: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
+    dual_operator: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
   }),
   portalUrl: httpsUrlOrEmpty(
     isStripePortalUrl,
@@ -183,6 +187,7 @@ const setBillingConfigSchema = z.object({
     driver_new: z.number().int().positive().max(1_000_000).optional(),
     driver_fleet: z.number().int().positive().max(1_000_000).optional(),
     driver_pro: z.number().int().positive().max(1_000_000).optional(),
+    dual_operator: z.number().int().positive().max(1_000_000).optional(),
   }),
 });
 
@@ -268,20 +273,24 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
     requireFounder(ctx);
     const tenant = await readTenant(tx, payload.tenantId);
     // A plan has to be one the company can use: shipper plans for a company
-    // that posts, the Driver plan for one that carries.
-    if (payload.tier !== null) {
-      const fits = isShipperTier(payload.tier)
-        ? tenant.capabilities.includes('shipper')
-        : tenant.capabilities.includes('carrier');
-      if (!fits) {
-        throw new AppError(
-          'conflict',
-          isShipperTier(payload.tier)
-            ? 'That company does not post loads, so a shipper plan would do nothing for it.'
-            : 'That company does not carry loads, so a Driver plan would do nothing for it.',
-          { recoverable: false }
-        );
-      }
+    // that only posts, Driver plans for one that only carries, and for a
+    // company that does both only the combined unlimited plan.
+    const dualOperatorOn = resolveFeatureFlags(await tx.get(featureFlagsDoc())).dualOperator;
+    if (payload.tier !== null && !tiersFor(tenant.capabilities, dualOperatorOn).includes(payload.tier)) {
+      const kind = companyKind(tenant.capabilities);
+      throw new AppError(
+        'conflict',
+        payload.tier === 'dual_operator' && !dualOperatorOn
+          ? 'Dual Operator Unlimited is switched off. Turn on Dual Operator accounts under Features first.'
+          : kind === 'both'
+          ? `That company both ships and carries, so its plan is ${PLAN_LABELS.dual_operator}.`
+          : kind === 'shipper'
+            ? 'That company only posts loads, so it takes a shipper plan.'
+            : kind === 'carrier'
+              ? 'That company only carries loads, so it takes a Driver plan.'
+              : 'That company neither posts nor carries loads yet.',
+        { recoverable: false }
+      );
     }
     const note = payload.note ?? '';
     const expiresAt = freePlanExpiry(ctx.now, payload.days ?? null);
