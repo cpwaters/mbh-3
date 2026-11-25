@@ -190,3 +190,22 @@ describe('Billing — drivers', () => {
     );
   });
 });
+
+describe('Billing — a company that both ships and carries', () => {
+  it('offers only the Shipper & Carrier Unlimited plan', async () => {
+    config = {
+      ...LIVE,
+      paymentLinks: { ...LIVE.paymentLinks, fleet: 'https://buy.stripe.com/test_f', shipper_carrier: 'https://buy.stripe.com/test_sc' },
+      monthlyPricePence: { ...LIVE.monthlyPricePence, shipper_carrier: 31900 },
+    };
+    renderBilling('owner', '/billing', ['shipper', 'carrier']);
+    const choose = await screen.findByRole('link', { name: 'Choose Shipper & Carrier Unlimited' });
+    expect(choose).toHaveAttribute('href', expect.stringContaining('https://buy.stripe.com/test_sc?client_reference_id=acme'));
+    expect(screen.getByText('Unlimited loads posted and picked up')).toBeInTheDocument();
+    expect(screen.getByText('£319.00')).toBeInTheDocument();
+    // Nothing one-sided on offer.
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Shipper & Carrier Unlimited']);
+    expect(screen.getByText(/the Shipper & Carrier Unlimited plan lifts both/)).toBeInTheDocument();
+  });
+});

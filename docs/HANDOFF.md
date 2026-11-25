@@ -752,6 +752,23 @@ the Rating row. `UserProfile.rating` is untouched and still system-assigned.
 To add a switch, add it to `FeatureFlags`, `DEFAULT_FEATURE_FLAGS` and
 `FEATURES`, then gate the UI on `useFeatureFlags().flags.<key>`.
 
+## Shipper/carrier banner and the two-sided company (built)
+
+A strip under the header (`RoleBanner`, under both nav bars) names the
+company and its side: **Shipper** in the back office's indigo, **Carrier**
+in the app's blue, and **Shipper & Carrier** on an indigo-to-blue gradient
+for a company with both capabilities (`companyKind` in billing.ts).
+
+A two-sided company has one plan only: **Shipper & Carrier Unlimited**
+(`shipper_carrier`, `mbh_shipper_carrier_monthly`, placeholder £319,
+unlimited posting and pick-ups). `tiersFor(capabilities)` is the single rule
+for what is offered (Billing page, `setCompanyPlan`, the back office's
+company Plan picker). Its payment link and price go in Admin → Billing like
+the rest; until the founder re-runs `pnpm stripe:provision` (which adds just
+the new price and link) and pastes the link, the plan shows as "Opening
+soon". Stripe's portal lists every plan for switching and cannot be narrowed
+per company (ADR-0004 addendum).
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

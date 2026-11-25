@@ -16,6 +16,10 @@ import {
   tierFromLookupKey,
   activeOverride,
   freePlanExpiry,
+  companyKind,
+  tiersFor,
+  POSTING_ALLOWANCE,
+  PLAN_LABELS,
 } from './billing.js';
 
 const NOW = '2026-10-27T12:00:00.000Z';
@@ -236,5 +240,38 @@ describe('the single Driver plan from before the split', () => {
 
   it('entitles to nothing when the stored tier is not one we know', () => {
     expect(effectivePlan(legacy({ tier: 'platinum', status: 'active' }), NOW)).toBe('free');
+  });
+});
+
+describe('a company that both ships and carries', () => {
+  it('is offered only the Shipper & Carrier Unlimited plan; one-sided companies keep their own', () => {
+    expect(tiersFor(['shipper', 'carrier'])).toEqual(['shipper_carrier']);
+    expect(tiersFor(['shipper'])).toEqual(['starter', 'growth', 'fleet']);
+    expect(tiersFor(['carrier'])).toEqual(['driver_new', 'driver_fleet', 'driver_pro']);
+    expect(tiersFor([])).toEqual([]);
+    expect(companyKind(['carrier', 'shipper'])).toBe('both');
+  });
+
+  it('the combined plan is unlimited both ways, and Stripe’s price key maps to it', () => {
+    expect(POSTING_ALLOWANCE.shipper_carrier).toBeNull();
+    expect(PICKUP_ALLOWANCE.shipper_carrier).toBeNull();
+    expect(PLAN_LABELS.shipper_carrier).toBe('Shipper & Carrier Unlimited');
+    expect(tierFromLookupKey('mbh_shipper_carrier_monthly')).toBe('shipper_carrier');
+    expect(normalizeTier('shipper_carrier')).toBe('shipper_carrier');
+    expect(checkLoadAllowance('shipper_carrier', 10_000, ['shipper', 'carrier'])).toEqual({ ok: true });
+    expect(checkAcceptAllowed('shipper_carrier', 10_000, ['shipper', 'carrier'])).toEqual({ ok: true });
+  });
+
+  it('without a plan, is pointed at the combined plan rather than a one-sided one', () => {
+    const both = ['shipper', 'carrier'];
+    const post = checkLoadAllowance('free', 1, both);
+    expect(post).toMatchObject({ ok: false, message: expect.stringMatching(/Shipper & Carrier Unlimited/) });
+    expect(post.ok === false && post.message).not.toMatch(/shipper plan/);
+    const pick = checkAcceptAllowed('free', 1, both);
+    expect(pick).toMatchObject({ ok: false, message: expect.stringMatching(/Shipper & Carrier Unlimited/) });
+    expect(pick.ok === false && pick.message).not.toMatch(/Driver plan/);
+    // One-sided companies are told what they were before.
+    expect(checkAcceptAllowed('free', 1)).toMatchObject({ message: expect.stringMatching(/Driver plan/) });
+    expect(checkLoadAllowance('free', 1)).toMatchObject({ message: expect.stringMatching(/shipper plan/) });
   });
 });

@@ -62,6 +62,9 @@ export const DEFAULT_MONTHLY_PENCE: Record<PlanTier, number> = {
   driver_new: 799,
   driver_fleet: 1_499,
   driver_pro: 2_499,
+  // A company that both ships and carries: Fleet's unlimited posting with
+  // Driver Pro's unlimited pick-ups, for a little under the two together.
+  shipper_carrier: 31_900,
 };
 
 const WEBHOOK_EVENTS = [
@@ -284,6 +287,7 @@ async function main(): Promise<void> {
     driver_new: penceFromEnv('DRIVER_NEW_PENCE', DEFAULT_MONTHLY_PENCE.driver_new),
     driver_fleet: penceFromEnv('DRIVER_FLEET_PENCE', DEFAULT_MONTHLY_PENCE.driver_fleet),
     driver_pro: penceFromEnv('DRIVER_PRO_PENCE', DEFAULT_MONTHLY_PENCE.driver_pro),
+    shipper_carrier: penceFromEnv('SHIPPER_CARRIER_PENCE', DEFAULT_MONTHLY_PENCE.shipper_carrier),
   };
 
   console.log(`Provisioning Stripe (${key.startsWith('sk_live_') || key.startsWith('rk_live_') ? 'LIVE' : 'test'} mode) for ${siteUrl}`);

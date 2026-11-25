@@ -9,6 +9,7 @@ import {
   activeOverride,
   effectivePlan,
   formatGbp,
+  isCombinedTier,
   isShipperTier,
   trialDaysLeft,
   isStripePaymentLink,
@@ -92,7 +93,9 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
               {PLAN_LABELS[tier]}{' '}
               <span className="text-xs text-gray-500">
                 (
-                {!isShipperTier(tier)
+                {isCombinedTier(tier)
+                  ? 'unlimited both ways'
+                  : !isShipperTier(tier)
                   ? PICKUP_ALLOWANCE[tier] === null
                     ? 'unlimited pick-ups'
                     : `${PICKUP_ALLOWANCE[tier]?.count} pick-ups/mo`
@@ -252,7 +255,7 @@ function Companies({ data }: { data: AdminData }) {
                   <PlanSource company={company} />
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {ships && company.capabilities.includes('carrier') ? 'Shipper and carrier' : ships ? 'Shipper' : 'Driver'}
+                  {ships && carries ? 'Shipper & Carrier' : ships ? 'Shipper' : 'Driver'}
                   {tier === 'trial' && ` · trial ends in ${trialDaysLeft(company, now)} days`}
                   {company.billing?.currentPeriodEnd !== undefined &&
                     activeOverride(company.billing, now) === null &&

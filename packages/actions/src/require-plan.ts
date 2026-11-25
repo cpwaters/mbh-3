@@ -50,7 +50,7 @@ export async function requireLoadAllowance(tx: TransactionContext, tenant: Tenan
   });
   const posted = rows.filter((row) => ((row.data as unknown as Load).createdAt ?? '') >= since).length;
 
-  refuseUnless(checkLoadAllowance(tier, posted));
+  refuseUnless(checkLoadAllowance(tier, posted, tenant.capabilities));
 }
 
 // Whether the carrier may pick up one more load: unlimited in its trial or on
@@ -70,5 +70,5 @@ export async function requireAcceptPlan(tx: TransactionContext, carrier: Tenant,
   });
   const accepted = rows.filter((row) => ((row.data as unknown as Job).createdAt ?? '') >= since).length;
 
-  refuseUnless(checkAcceptAllowed(tier, accepted));
+  refuseUnless(checkAcceptAllowed(tier, accepted, carrier.capabilities));
 }

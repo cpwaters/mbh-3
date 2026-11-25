@@ -21,7 +21,10 @@ export interface PlanSubject {
 
 export type ShipperTier = 'starter' | 'growth' | 'fleet';
 export type DriverTier = 'driver_new' | 'driver_fleet' | 'driver_pro';
-export type PlanTier = ShipperTier | DriverTier;
+// For a company that both ships and carries: one plan, unlimited both ways.
+// It is the only plan such a company can choose.
+export type CombinedTier = 'shipper_carrier';
+export type PlanTier = ShipperTier | DriverTier | CombinedTier;
 
 // What a company is entitled to right now: a paid (or founder-given) tier,
 // the free trial, or — after the trial, with no plan — free.
@@ -29,10 +32,47 @@ export type EffectiveTier = PlanTier | 'trial' | 'free';
 
 export const SHIPPER_TIERS: readonly ShipperTier[] = ['starter', 'growth', 'fleet'];
 export const DRIVER_TIERS: readonly DriverTier[] = ['driver_new', 'driver_fleet', 'driver_pro'];
-export const PLAN_TIERS: readonly PlanTier[] = [...SHIPPER_TIERS, ...DRIVER_TIERS];
+export const COMBINED_TIERS: readonly CombinedTier[] = ['shipper_carrier'];
+export const PLAN_TIERS: readonly PlanTier[] = [...SHIPPER_TIERS, ...DRIVER_TIERS, ...COMBINED_TIERS];
 
 export function isShipperTier(tier: PlanTier): tier is ShipperTier {
   return (SHIPPER_TIERS as readonly string[]).includes(tier);
+}
+
+export function isDriverTier(tier: PlanTier): tier is DriverTier {
+  return (DRIVER_TIERS as readonly string[]).includes(tier);
+}
+
+export function isCombinedTier(tier: PlanTier): tier is CombinedTier {
+  return (COMBINED_TIERS as readonly string[]).includes(tier);
+}
+
+// Which side(s) of the marketplace a company is on, from its capabilities.
+export type CompanyKind = 'shipper' | 'carrier' | 'both' | 'none';
+
+export function companyKind(capabilities: readonly string[]): CompanyKind {
+  const ships = capabilities.includes('shipper');
+  const carries = capabilities.includes('carrier');
+  if (ships && carries) return 'both';
+  if (ships) return 'shipper';
+  if (carries) return 'carrier';
+  return 'none';
+}
+
+// The plans a company may choose: shipper plans for a shipper, Driver plans
+// for a carrier, and for a company that does both only the combined
+// unlimited plan.
+export function tiersFor(capabilities: readonly string[]): readonly PlanTier[] {
+  switch (companyKind(capabilities)) {
+    case 'both':
+      return COMBINED_TIERS;
+    case 'shipper':
+      return SHIPPER_TIERS;
+    case 'carrier':
+      return DRIVER_TIERS;
+    default:
+      return [];
+  }
 }
 
 export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
@@ -44,6 +84,7 @@ export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
   driver_new: 'Driver New',
   driver_fleet: 'Driver Fleet',
   driver_pro: 'Driver Pro',
+  shipper_carrier: 'Shipper & Carrier Unlimited',
 };
 
 export const TRIAL_DAYS = 30;
@@ -66,6 +107,7 @@ export const POSTING_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>
   driver_new: { count: 1, per: 'day' },
   driver_fleet: { count: 1, per: 'day' },
   driver_pro: { count: 1, per: 'day' },
+  shipper_carrier: null,
 };
 
 // Picking up (accepting) loads. Driver New and Driver Fleet buy a monthly
@@ -80,6 +122,7 @@ export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>>
   driver_new: { count: 20, per: 'month' },
   driver_fleet: { count: 60, per: 'month' },
   driver_pro: null,
+  shipper_carrier: null,
 };
 
 export function describeAllowance(allowance: Allowance | null, noun: string): string {
@@ -95,6 +138,7 @@ export const PLAN_LOOKUP_KEYS: Readonly<Record<PlanTier, string>> = {
   driver_new: 'mbh_driver_new_monthly',
   driver_fleet: 'mbh_driver_fleet_monthly',
   driver_pro: 'mbh_driver_pro_monthly',
+  shipper_carrier: 'mbh_shipper_carrier_monthly',
 };
 
 // Before the Driver plan was split in two it was one tier, 'driver', on the
@@ -272,10 +316,23 @@ const PERIOD_WORDS: Record<Allowance['per'], string> = { day: 'today', month: 't
 // Whether one more load may be posted, given how many have been posted in the
 // current period. Said in the shipper's terms: how many, on which plan, and
 // what to do about it.
-export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number): AllowanceCheck {
+// A company that both ships and carries has one plan to point at.
+const COMBINED_NUDGE = 'Choose the Shipper & Carrier Unlimited plan under Billing';
+
+export function checkLoadAllowance(
+  tier: EffectiveTier,
+  postedInPeriod: number,
+  capabilities: readonly string[] = ['shipper']
+): AllowanceCheck {
   const allowance = POSTING_ALLOWANCE[tier];
   if (allowance === null || postedInPeriod < allowance.count) return { ok: true };
   const when = PERIOD_WORDS[allowance.per];
+  if (companyKind(capabilities) === 'both' && (tier === 'free' || isDriverTier(tier as PlanTier))) {
+    return {
+      ok: false,
+      message: `Without a plan you can post ${describeAllowance(allowance, 'load')}, and you have posted ${when}'s. ${COMBINED_NUDGE} for unlimited posting and pick-ups.`,
+    };
+  }
   if (tier === 'free' || tier === 'driver_new' || tier === 'driver_fleet' || tier === 'driver_pro') {
     return {
       ok: false,
@@ -291,9 +348,20 @@ export function checkLoadAllowance(tier: EffectiveTier, postedInPeriod: number):
 // Whether one more load may be picked up, given how many the company has
 // accepted in the current period. Says what to do next: choose a plan, move
 // up a plan. Driver Pro is unlimited, so never reaches here.
-export function checkAcceptAllowed(tier: EffectiveTier, acceptedInPeriod: number): AllowanceCheck {
+export function checkAcceptAllowed(
+  tier: EffectiveTier,
+  acceptedInPeriod: number,
+  capabilities: readonly string[] = ['carrier']
+): AllowanceCheck {
   const allowance = PICKUP_ALLOWANCE[tier];
   if (allowance === null || acceptedInPeriod < allowance.count) return { ok: true };
+  if (companyKind(capabilities) === 'both') {
+    const used =
+      tier === 'free'
+        ? `Without a plan you can pick up ${describeAllowance(allowance, 'load')}, and you have picked up ${PERIOD_WORDS[allowance.per]}'s.`
+        : `You've picked up all ${allowance.count} loads in your ${PLAN_LABELS[tier]} plan ${PERIOD_WORDS[allowance.per]}.`;
+    return { ok: false, message: `${used} ${COMBINED_NUDGE} for unlimited posting and pick-ups.` };
+  }
   if (tier === 'driver_new') {
     return {
       ok: false,

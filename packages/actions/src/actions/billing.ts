@@ -5,7 +5,9 @@ import {
   SUBSCRIPTION_STATUSES,
   isStripePaymentLink,
   isStripePortalUrl,
-  isShipperTier,
+  companyKind,
+  PLAN_LABELS,
+  tiersFor,
   freePlanExpiry,
   type BillingEvent,
   type PlanTier,
@@ -171,6 +173,7 @@ const setBillingConfigSchema = z.object({
     driver_new: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_pro: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
+    shipper_carrier: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
   }),
   portalUrl: httpsUrlOrEmpty(
     isStripePortalUrl,
@@ -183,6 +186,7 @@ const setBillingConfigSchema = z.object({
     driver_new: z.number().int().positive().max(1_000_000).optional(),
     driver_fleet: z.number().int().positive().max(1_000_000).optional(),
     driver_pro: z.number().int().positive().max(1_000_000).optional(),
+    shipper_carrier: z.number().int().positive().max(1_000_000).optional(),
   }),
 });
 
@@ -268,20 +272,21 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
     requireFounder(ctx);
     const tenant = await readTenant(tx, payload.tenantId);
     // A plan has to be one the company can use: shipper plans for a company
-    // that posts, the Driver plan for one that carries.
-    if (payload.tier !== null) {
-      const fits = isShipperTier(payload.tier)
-        ? tenant.capabilities.includes('shipper')
-        : tenant.capabilities.includes('carrier');
-      if (!fits) {
-        throw new AppError(
-          'conflict',
-          isShipperTier(payload.tier)
-            ? 'That company does not post loads, so a shipper plan would do nothing for it.'
-            : 'That company does not carry loads, so a Driver plan would do nothing for it.',
-          { recoverable: false }
-        );
-      }
+    // that only posts, Driver plans for one that only carries, and for a
+    // company that does both only the combined unlimited plan.
+    if (payload.tier !== null && !tiersFor(tenant.capabilities).includes(payload.tier)) {
+      const kind = companyKind(tenant.capabilities);
+      throw new AppError(
+        'conflict',
+        kind === 'both'
+          ? `That company both ships and carries, so its plan is ${PLAN_LABELS.shipper_carrier}.`
+          : kind === 'shipper'
+            ? 'That company only posts loads, so it takes a shipper plan.'
+            : kind === 'carrier'
+              ? 'That company only carries loads, so it takes a Driver plan.'
+              : 'That company neither posts nor carries loads yet.',
+        { recoverable: false }
+      );
     }
     const note = payload.note ?? '';
     const expiresAt = freePlanExpiry(ctx.now, payload.days ?? null);

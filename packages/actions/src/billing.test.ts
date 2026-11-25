@@ -522,3 +522,92 @@ describe('the Driver plans meter pick-ups by the month', () => {
     await expectAppError((await carrierWithPickups('driver_fleet', 60)).accept(), 'forbidden');
   });
 });
+
+describe('a company that both ships and carries', () => {
+  async function dual(h: Harness, data: Record<string, unknown> = {}): Promise<void> {
+    await h.store.runBatch([
+      { kind: 'update', path: 'tenants/carrier-1', data: { capabilities: ['shipper', 'carrier'], ...data } },
+    ]);
+  }
+
+  it('can only be given the Shipper & Carrier Unlimited plan', async () => {
+    const h = await makeHarness();
+    await dual(h);
+    for (const [i, tier] of (['fleet', 'driver_pro', 'starter'] as const).entries()) {
+      const err = await expectAppError(
+        h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier }, requestId: `r-no-${i}` }),
+        'conflict'
+      );
+      expect(err.message).toMatch(/both ships and carries, so its plan is Shipper & Carrier Unlimited/);
+    }
+    await h.run(founder, {
+      type: 'setCompanyPlan',
+      payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+      requestId: 'r-yes',
+    });
+    expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({
+      billing: { override: { tier: 'shipper_carrier' } },
+    });
+  });
+
+  it('is not a plan for a company on one side only', async () => {
+    const h = await makeHarness();
+    await expectAppError(
+      h.run(founder, {
+        type: 'setCompanyPlan',
+        payload: { tenantId: 'shipper-1', tier: 'shipper_carrier' },
+        requestId: 'r-ship',
+      }),
+      'conflict'
+    );
+    await expectAppError(
+      h.run(founder, {
+        type: 'setCompanyPlan',
+        payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+        requestId: 'r-carry',
+      }),
+      'conflict'
+    );
+  });
+
+  it('without a plan after the trial, is pointed at the combined plan', async () => {
+    const h = await makeHarness();
+    const first = ((await post(h, 'r-p1')) as { loadId: string }).loadId;
+    const second = ((await post(h, 'r-p2')) as { loadId: string }).loadId;
+    await enforce(h);
+    await dual(h, { trialEndsAt: '2026-07-31T00:00:00.000Z' });
+    await h.run('driver-1', {
+      type: 'acceptLoad',
+      payload: { carrierTenantId: 'carrier-1', loadId: first },
+      requestId: 'r-a1',
+    });
+    const err = await expectAppError(
+      h.run('driver-2', {
+        type: 'acceptLoad',
+        payload: { carrierTenantId: 'carrier-1', loadId: second },
+        requestId: 'r-a2',
+      }),
+      'forbidden'
+    );
+    expect(err.message).toMatch(/1 load a day.*Shipper & Carrier Unlimited plan/);
+  });
+
+  it('on the combined plan, picks up without limit', async () => {
+    const h = await makeHarness();
+    const loads: string[] = [];
+    for (let i = 0; i < 3; i += 1) loads.push(((await post(h, `r-p${i}`)) as { loadId: string }).loadId);
+    await enforce(h);
+    await dual(h, {
+      trialEndsAt: '2026-07-31T00:00:00.000Z',
+      billing: { tier: 'shipper_carrier', status: 'active', override: null },
+    });
+    // Three drivers' worth in a day — well past the free allowance.
+    for (const [i, loadId] of loads.entries()) {
+      await h.run(i === 0 ? 'driver-1' : i === 1 ? 'driver-2' : 'car-owner', {
+        type: 'acceptLoad',
+        payload: { carrierTenantId: 'carrier-1', loadId },
+        requestId: `r-acc-${i}`,
+      });
+    }
+  });
+});
