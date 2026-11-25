@@ -815,7 +815,10 @@ Create Load's Vehicle Size and Vehicle Type ride onto the listing
 show in load details everywhere, and carriers filter Available Loads and
 Loads near you by size and type (`VehicleFilter`, `matchesVehicleFilter`).
 A load must suit both, and a load that takes any size or any type always
-passes that row. The choice is remembered on the device. Admin → Tools
+passes that row. The choice is remembered on the device. The filters sit
+folded inside one "Filters" dropdown (a count of what is on, Clear, and a
+one-line summary while any is on); open, every button is one width, the
+widest's, in a grid that keeps two columns on a 320px phone. Admin → Tools
 → "Place loads" also gives older listings their vehicle details.
 
 ## Next step

@@ -239,6 +239,7 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
       renderBoard();
       expect(screen.getAllByText(/^(Preston|Leeds|Bolton), /)).toHaveLength(3);
 
+      await user.click(screen.getByRole('button', { name: /Filters/ }));
       await user.click(screen.getByRole('button', { name: 'Refrigerated' }));
       expect(screen.getByRole('button', { name: 'Refrigerated' })).toHaveAttribute('aria-pressed', 'true');
       const towns = screen.getAllByText(/^(Preston|Leeds|Bolton), /).map((el) => el.textContent?.split(',')[0]);
@@ -248,6 +249,25 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
 
       await user.click(screen.getByRole('button', { name: 'Clear' }));
       expect(screen.getAllByText(/^(Preston|Leeds|Bolton), /)).toHaveLength(3);
+    });
+
+    it('keeps the filters folded away until asked for, and counts what is on', async () => {
+      const user = userEvent.setup();
+      renderBoard();
+      const toggle = screen.getByRole('button', { name: /Filters/ });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('button', { name: 'Refrigerated' })).not.toBeInTheDocument();
+
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      await user.click(screen.getByRole('button', { name: 'Refrigerated' }));
+      await user.click(screen.getByRole('button', { name: 'Artic' }));
+
+      // Folded away again, it still says what it is doing.
+      await user.click(toggle);
+      expect(screen.queryByRole('button', { name: 'Refrigerated' })).not.toBeInTheDocument();
+      expect(screen.getByLabelText('2 on')).toHaveTextContent('2');
+      expect(screen.getByText(/for an artic with a refrigerated body/)).toBeInTheDocument();
     });
 
     it('filters by size too, and a load must suit both the size and the type picked', async () => {
@@ -268,6 +288,7 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
       );
       const towns = () => screen.getAllByText(/^(Preston|Leeds|Bolton), /).map((el) => el.textContent?.split(',')[0]).sort();
 
+      await user.click(screen.getByRole('button', { name: /Filters/ }));
       await user.click(screen.getByRole('button', { name: 'Rigid' }));
       expect(towns()).toEqual(['Bolton', 'Leeds']);
       expect(window.localStorage.getItem('mbh.vehicleSizeFilter')).toBe('["rigid"]');
@@ -291,6 +312,7 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
           hasActiveJob={false}
         />
       );
+      await user.click(screen.getByRole('button', { name: /Filters/ }));
       await user.click(screen.getByRole('button', { name: 'Box' }));
       expect(screen.getByText('No loads for that vehicle')).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Show all loads' }));

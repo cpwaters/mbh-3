@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { Truck, X } from 'lucide-react';
+import { useCallback, useId, useState } from 'react';
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import {
   LOAD_VEHICLE_SIZE_LABELS,
   LOAD_VEHICLE_SIZES,
@@ -62,10 +62,12 @@ export function describeChoice(filter: Filter): string {
   return `${article(types)} ${types} body`;
 }
 
-// Chips for the vehicle sizes and types a carrier runs. A load shows when it
-// suits both: one of the sizes picked (or any size) and one of the types
-// picked (or any type) — matchesVehicleFilter. Nothing picked shows
-// everything.
+// The carrier's load filters, folded into one "Filters" dropdown so they stay
+// out of the way: closed, a button saying how many are on (and, while any
+// are, what is being shown); open, the vehicle sizes and types as buttons of
+// one width, the widest's. A load shows when it suits both: one of the sizes
+// picked (or any size) and one of the types picked (or any type), per
+// matchesVehicleFilter. Nothing picked shows everything.
 export function VehicleFilter({
   filter,
   onChange,
@@ -79,54 +81,76 @@ export function VehicleFilter({
   shown?: number;
   total?: number;
 }) {
-  const active = filter.sizes.length > 0 || filter.types.length > 0;
-  const choice = describeChoice(filter);
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const count = filter.sizes.length + filter.types.length;
+  const active = count > 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-800">
-          <Truck className="w-4 h-4 text-gray-500" aria-hidden="true" />
-          Vehicle
-        </span>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="flex flex-wrap items-center gap-2 p-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((o) => !o)}
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-gray-500" aria-hidden="true" />
+          Filters
+          {active && (
+            <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white" aria-label={`${count} on`}>
+              {count}
+            </span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+        </button>
         {active && (
           <button
             type="button"
             onClick={() => onChange({ sizes: [], types: [] })}
-            className="inline-flex items-center gap-1 px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-900"
+            className="inline-flex items-center gap-1 px-2 py-2 text-sm font-medium text-gray-600 hover:text-gray-900"
           >
             <X className="w-4 h-4" aria-hidden="true" />
             Clear
           </button>
         )}
+        {active && (
+          <p className="basis-full text-sm text-gray-600">
+            {shown !== undefined && total !== undefined
+              ? `Showing ${shown} of ${total} load${total === 1 ? '' : 's'}: `
+              : 'Showing loads '}
+            for {describeChoice(filter)}, and any that take any vehicle.
+          </p>
+        )}
       </div>
-      <ChipRow
-        label="Size"
-        values={LOAD_VEHICLE_SIZES}
-        labels={LOAD_VEHICLE_SIZE_LABELS}
-        picked={filter.sizes}
-        onToggle={(v) => onChange({ ...filter, sizes: toggled(LOAD_VEHICLE_SIZES, filter.sizes, v) })}
-      />
-      <ChipRow
-        label="Type"
-        values={LOAD_VEHICLE_TYPES}
-        labels={LOAD_VEHICLE_TYPE_LABELS}
-        picked={filter.types}
-        onToggle={(v) => onChange({ ...filter, types: toggled(LOAD_VEHICLE_TYPES, filter.types, v) })}
-      />
-      {active && (
-        <p className="text-sm text-gray-600">
-          {shown !== undefined && total !== undefined
-            ? `Showing ${shown} of ${total} load${total === 1 ? '' : 's'}: `
-            : 'Showing loads '}
-          for {choice}, and any that take any vehicle.
-        </p>
+
+      {open && (
+        <div id={panelId} className="border-t border-gray-100 p-3 space-y-4">
+          <ChipGroup
+            label="Vehicle size"
+            values={LOAD_VEHICLE_SIZES}
+            labels={LOAD_VEHICLE_SIZE_LABELS}
+            picked={filter.sizes}
+            onToggle={(v) => onChange({ ...filter, sizes: toggled(LOAD_VEHICLE_SIZES, filter.sizes, v) })}
+          />
+          <ChipGroup
+            label="Vehicle type"
+            values={LOAD_VEHICLE_TYPES}
+            labels={LOAD_VEHICLE_TYPE_LABELS}
+            picked={filter.types}
+            onToggle={(v) => onChange({ ...filter, types: toggled(LOAD_VEHICLE_TYPES, filter.types, v) })}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-function ChipRow({
+// One width for every button, the widest's ("Refrigerated"): the grid's
+// columns are all at least that wide (7rem holds "Refrigerated") and share
+// what room is left, so two sit side by side even on a 320px phone.
+function ChipGroup({
   label,
   values,
   labels,
@@ -140,24 +164,26 @@ function ChipRow({
   onToggle: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={`Filter by vehicle ${label.toLowerCase()}`}>
-      <span className="w-10 text-sm text-gray-500">{label}</span>
-      {values.map((value) => {
-        const on = picked.includes(value);
-        return (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={on}
-            onClick={() => onToggle(value)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-              on ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {labels[value] ?? value}
-          </button>
-        );
-      })}
+    <div role="group" aria-label={`Filter by ${label.toLowerCase()}`}>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
+        {values.map((value) => {
+          const on = picked.includes(value);
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(value)}
+              className={`w-full px-2 py-2 rounded-full text-sm font-medium border transition-colors whitespace-nowrap ${
+                on ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {labels[value] ?? value}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
