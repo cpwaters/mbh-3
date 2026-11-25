@@ -33,6 +33,9 @@ export interface ShipperLoad {
   palletCount: number;
   // Dangerous goods (ADR).
   adrRequired: boolean;
+  // Vehicle requirements as ticked on Create Load; empty means any.
+  vehicleSizes: string[];
+  vehicleTypes: string[];
   priceGbpPence: number;
   pickupBy: string;
   pickupTime: string;

@@ -343,6 +343,8 @@ export class FirestoreReader
         weightKg: load.consignment.weightKg,
         palletCount: load.consignment.palletCount,
         adrRequired: load.consignment.adrRequired === true,
+        vehicleSizes: load.postingDetails?.vehicleSizes ?? [],
+        vehicleTypes: load.postingDetails?.vehicleTypes ?? [],
         priceGbpPence: load.priceGbpPence,
         pickupBy: load.pickupBy,
         pickupTime: load.postingDetails?.pickupTime ?? '',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { listingFromLoad } from './listing.js';
+import { describeLoadVehicles, listingFromLoad, LOAD_VEHICLE_SIZE_LABELS, LOAD_VEHICLE_TYPE_LABELS } from './listing.js';
 import type { Load } from './entities.js';
 
 const load: Load = {
@@ -26,6 +26,9 @@ describe('listingFromLoad', () => {
       weightKg: 14200,
       palletCount: 16,
       adrRequired: false,
+      // No Create Load details on this load: any vehicle.
+      vehicleSizes: [],
+      vehicleTypes: [],
       priceGbpPence: 68000,
       pickupBy: '2026-08-02',
       deliverBy: '2026-08-03',
@@ -62,3 +65,47 @@ describe('listingFromLoad', () => {
     expect(JSON.stringify(listingFromLoad(enriched))).not.toContain('55.9758');
   });
 });
+
+describe('vehicle requirements', () => {
+  it('carries the size and type the shipper ticked onto the listing', () => {
+    const listing = listingFromLoad({
+      loadId: 'load-v',
+      tenantId: 'shipper-1',
+      status: 'available',
+      origin: { line1: '1 Dock Rd', town: 'Trafford', postcode: 'M17 1WS' },
+      destination: { line1: '2 Quay St', town: 'Leith', postcode: 'EH6 6JJ' },
+      consignment: { description: 'Chilled', weightKg: 9000, palletCount: 12 },
+      priceGbpPence: 68000,
+      pickupBy: '2026-08-04',
+      deliverBy: '2026-08-05',
+      createdAt: '2026-08-01T09:00:00.000Z',
+      postingDetails: {
+        sourceCompanyName: '',
+        destinationCompanyName: '',
+        sourceContact: { name: '', email: '', phone: '' },
+        destinationContact: { name: '', email: '', phone: '' },
+        pickupTime: '',
+        deliveryTime: '',
+        distanceMiles: 0,
+        volumeM3: 0,
+        specialInstructions: '',
+        vehicleSizes: ['artic', 'rigid'],
+        vehicleTypes: ['refrigerated'],
+        paymentType: { invoiced: true, instantPayment: false },
+      },
+    });
+    expect(listing).toMatchObject({ vehicleSizes: ['artic', 'rigid'], vehicleTypes: ['refrigerated'] });
+    // Nothing else from the posting details goes across.
+    expect(listing).not.toHaveProperty('paymentType');
+    expect(listing).not.toHaveProperty('sourceContact');
+  });
+
+  it('says them as the trade does: a list, "Any" when none was ticked, nothing when never said', () => {
+    expect(describeLoadVehicles(['artic', 'rigid'], LOAD_VEHICLE_SIZE_LABELS)).toBe('Artic, Rigid');
+    expect(describeLoadVehicles(['flat_bed', 'low_loader'], LOAD_VEHICLE_TYPE_LABELS)).toBe('Flat Bed, Low Loader');
+    expect(describeLoadVehicles([], LOAD_VEHICLE_TYPE_LABELS)).toBe('Any');
+    expect(describeLoadVehicles(undefined, LOAD_VEHICLE_TYPE_LABELS)).toBeNull();
+    expect(describeLoadVehicles(['hovercraft'], LOAD_VEHICLE_TYPE_LABELS)).toBe('hovercraft');
+  });
+});
+

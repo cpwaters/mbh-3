@@ -14,6 +14,7 @@ import {
   JobCardActions,
   JobCardStatusBadge,
   AdrAcceptNote,
+  LoadVehicleDetails,
 } from '../app/JobCard';
 
 // The carrier browse ("Available Loads"), ported from the mbh-2 prototype
@@ -214,6 +215,7 @@ export function AvailableLoads({
                       <div className="text-xs text-gray-500">Deliver by</div>
                       <div className="font-medium text-gray-900">{load.deliverBy}</div>
                     </div>
+                    <LoadVehicleDetails sizes={load.vehicleSizes} types={load.vehicleTypes} />
                   </div>
                   {load.description && <div className="mt-3 text-sm text-gray-600">{load.description}</div>}
                 </JobCardSection>

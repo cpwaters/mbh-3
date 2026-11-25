@@ -19,7 +19,15 @@ import {
 } from '../lib/nearby';
 import { useNearbyListings } from '../components/useNearbyListings';
 import { useAdrStatus } from '../components/useAdrStatus';
-import { AdrAcceptNote, JobCard, JobCardActions, JobCardPayment, JobCardRoute, JobCardStatusBadge } from './JobCard';
+import {
+  AdrAcceptNote,
+  JobCard,
+  JobCardActions,
+  JobCardPayment,
+  JobCardRoute,
+  JobCardStatusBadge,
+  loadVehicleSummary,
+} from './JobCard';
 
 // "Loads near you": the Map page. An area — around where the phone is, or
 // around a postcode the driver types (where they will drop off, say, or when
@@ -306,6 +314,12 @@ export default function NearbyLoads() {
                     {listing.palletCount} pallets · {listing.weightKg.toLocaleString('en-GB')} kg · collect by{' '}
                     {listing.pickupBy}
                   </p>
+                  {loadVehicleSummary(listing.vehicleSizes, listing.vehicleTypes) !== null && (
+                    <p className="mt-1 text-sm text-gray-600">
+                      <span className="text-gray-500">Vehicle:</span>{' '}
+                      {loadVehicleSummary(listing.vehicleSizes, listing.vehicleTypes)}
+                    </p>
+                  )}
                   {adrBlockFor(listing) !== null && (
                     <AdrAcceptNote
                       message={adrBlockFor(listing) ?? ''}

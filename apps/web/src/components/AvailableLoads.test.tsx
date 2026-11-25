@@ -184,4 +184,30 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
       for (const b of screen.getAllByRole('button', { name: 'Accept Load' })) expect(b).toBeEnabled();
     });
   });
+
+  it('shows the vehicle size and type in a load’s details, and leaves them out for an older listing that never said', async () => {
+    const user = userEvent.setup();
+    render(
+      <AvailableLoads
+        carrierTenantId="carrier-1"
+        listings={[{ ...listing, vehicleSizes: ['rigid', 'artic'], vehicleTypes: ['tanker'] }]}
+        getIdToken={async () => 'token'}
+        onAccepted={() => {}}
+        onChanged={() => {}}
+        hasActiveJob={false}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'View Details' }));
+    expect(screen.getByText('Vehicle size')).toBeInTheDocument();
+    expect(screen.getByText('Rigid, Artic')).toBeInTheDocument();
+    expect(screen.getByText('Tanker')).toBeInTheDocument();
+  });
+
+  it('shows no vehicle rows for a listing made before they were carried', async () => {
+    const user = userEvent.setup();
+    renderLoads();
+    await user.click(screen.getByRole('button', { name: 'View Details' }));
+    expect(screen.queryByText('Vehicle size')).not.toBeInTheDocument();
+  });
 });
+

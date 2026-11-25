@@ -20,6 +20,7 @@ import {
   JobCardSection,
   JobCardActions,
   JobCardStatusBadge,
+  LoadVehicleDetails,
 } from '../JobCard';
 
 const TRACKABLE_STATUSES = ['matched', 'accepted', 'collected', 'in_transit'];
@@ -299,6 +300,7 @@ export default function LoadsList() {
                     {load.deliveryTime}
                   </div>
                 </div>
+                <LoadVehicleDetails sizes={load.vehicleSizes} types={load.vehicleTypes} />
               </div>
             </JobCardSection>
 
