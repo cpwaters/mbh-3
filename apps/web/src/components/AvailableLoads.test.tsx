@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Listing } from '@mbh/domain';
@@ -199,8 +199,10 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
     );
     await user.click(screen.getByRole('button', { name: 'View Details' }));
     expect(screen.getByText('Vehicle size')).toBeInTheDocument();
-    expect(screen.getByText('Rigid, Artic')).toBeInTheDocument();
-    expect(screen.getByText('Tanker')).toBeInTheDocument();
+    // In the load's details grid, beside the size.
+    const details = screen.getByText('Rigid, Artic').closest('.grid');
+    expect(details).toHaveTextContent('Vehicle type');
+    expect(details).toHaveTextContent('Tanker');
   });
 
   it('shows no vehicle rows for a listing made before they were carried', async () => {
@@ -208,6 +210,63 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
     renderLoads();
     await user.click(screen.getByRole('button', { name: 'View Details' }));
     expect(screen.queryByText('Vehicle size')).not.toBeInTheDocument();
+  });
+
+  describe('filtering by vehicle type', () => {
+    const fridge: Listing = { ...listing, loadId: 'fridge', origin: { town: 'Preston', postcode: 'PR1 2AB' }, vehicleTypes: ['refrigerated'] };
+    const tanker: Listing = { ...listing, loadId: 'tanker', origin: { town: 'Leeds', postcode: 'LS1 4AP' }, vehicleTypes: ['tanker'] };
+    const anyVehicle: Listing = { ...listing, loadId: 'any', origin: { town: 'Bolton', postcode: 'BL1 1AA' }, vehicleTypes: [] };
+
+    function renderBoard() {
+      render(
+        <AvailableLoads
+          carrierTenantId="carrier-1"
+          listings={[fridge, tanker, anyVehicle]}
+          getIdToken={async () => 'token'}
+          onAccepted={() => {}}
+          onChanged={() => {}}
+          hasActiveJob={false}
+        />
+      );
+    }
+
+    afterEach(() => {
+      window.localStorage.clear();
+    });
+
+    it('shows the loads that take the types picked, plus any that take any vehicle, and remembers the choice', async () => {
+      const user = userEvent.setup();
+      renderBoard();
+      expect(screen.getAllByText(/^(Preston|Leeds|Bolton), /)).toHaveLength(3);
+
+      await user.click(screen.getByRole('button', { name: 'Refrigerated' }));
+      expect(screen.getByRole('button', { name: 'Refrigerated' })).toHaveAttribute('aria-pressed', 'true');
+      const towns = screen.getAllByText(/^(Preston|Leeds|Bolton), /).map((el) => el.textContent?.split(',')[0]);
+      expect(towns.sort()).toEqual(['Bolton', 'Preston']);
+      expect(screen.getByText(/Showing 2 of 3 loads/)).toBeInTheDocument();
+      expect(window.localStorage.getItem('mbh.vehicleTypeFilter')).toBe('["refrigerated"]');
+
+      await user.click(screen.getByRole('button', { name: 'Clear' }));
+      expect(screen.getAllByText(/^(Preston|Leeds|Bolton), /)).toHaveLength(3);
+    });
+
+    it('says when nothing on the board takes the types picked, and offers everything back', async () => {
+      const user = userEvent.setup();
+      render(
+        <AvailableLoads
+          carrierTenantId="carrier-1"
+          listings={[tanker]}
+          getIdToken={async () => 'token'}
+          onAccepted={() => {}}
+          onChanged={() => {}}
+          hasActiveJob={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: 'Box' }));
+      expect(screen.getByText('No loads for those vehicle types')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Show all loads' }));
+      expect(screen.getByText(/^Leeds, /)).toBeInTheDocument();
+    });
   });
 });
 

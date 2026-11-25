@@ -17,6 +17,18 @@ export const LOAD_VEHICLE_TYPE_LABELS: Readonly<Record<string, string>> = {
   tanker: 'Tanker',
 };
 
+export const LOAD_VEHICLE_TYPES: readonly string[] = Object.keys(LOAD_VEHICLE_TYPE_LABELS);
+
+// The carrier's vehicle-type filter. A load stays in view when it accepts one
+// of the types picked; a load that asks for no particular type (none ticked,
+// or a listing from before the field) takes any vehicle, so it always stays.
+// Nothing picked means no filter.
+export function matchesVehicleTypes(loadTypes: readonly string[] | undefined, picked: readonly string[]): boolean {
+  if (picked.length === 0) return true;
+  if (loadTypes === undefined || loadTypes.length === 0) return true;
+  return loadTypes.some((t) => picked.includes(t));
+}
+
 // "Artic, Rigid" — or "Any" when the shipper ticked none, which is what
 // leaving them all blank means. Null when the load never said (a listing made
 // before the field existed), so a screen can leave the line out.

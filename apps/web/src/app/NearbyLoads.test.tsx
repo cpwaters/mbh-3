@@ -119,6 +119,21 @@ describe('Loads near you', () => {
     expect(screen.getByText('Any vehicle')).toBeInTheDocument();
   });
 
+  it('narrows the map and the list to the vehicle types picked', async () => {
+    const user = userEvent.setup();
+    renderNearby({
+      listings: [
+        { ...load('trafford', 'Trafford', 'M17 1WS'), vehicleTypes: ['tanker'] },
+        { ...load('bolton', 'Bolton', 'BL1 1AA'), vehicleTypes: ['box'] },
+      ],
+    });
+    await screen.findByRole('heading', { name: '2 loads within 25 miles' });
+    await user.click(screen.getByRole('button', { name: 'Box' }));
+    expect(screen.getByRole('heading', { name: '1 load within 25 miles' })).toBeInTheDocument();
+    expect(screen.getByTestId('map')).toHaveTextContent('1 pin');
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+  });
+
   it('widens to the radius chosen, and remembers it', async () => {
     const user = userEvent.setup();
     renderNearby();

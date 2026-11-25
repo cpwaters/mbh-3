@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, LocateFixed, MapPin, Navigation, Search } from 'lucide-react';
-import { adrRefusal, formatGbp, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, matchesVehicleTypes, type Listing } from '@mbh/domain';
 import { useNavigate } from 'react-router-dom';
 import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
@@ -19,6 +19,7 @@ import {
 } from '../lib/nearby';
 import { useNearbyListings } from '../components/useNearbyListings';
 import { useAdrStatus } from '../components/useAdrStatus';
+import { VehicleTypeFilter, useVehicleTypeFilter } from '../components/VehicleTypeFilter';
 import {
   AdrAcceptNote,
   JobCard,
@@ -84,7 +85,11 @@ export default function NearbyLoads() {
   }
 
   const centre: GeoPoint | null = around === 'me' ? app.location : (postcodePoint?.point ?? null);
-  const ranked = useNearbyListings(app.listings, centre);
+  // The carrier's vehicle-type filter (shared with Available Loads) narrows
+  // the board before the radius does, so the map and the list agree.
+  const { picked, setPicked } = useVehicleTypeFilter();
+  const filtered = useMemo(() => app.listings.filter((l) => matchesVehicleTypes(l.vehicleTypes, picked)), [app.listings, picked]);
+  const ranked = useNearbyListings(filtered, centre);
   const split = useMemo(() => withinRadius(ranked, radius), [ranked, radius]);
   const hasActiveJob = app.job !== null;
   // Why this driver can't take an ADR load yet; null when they can (or when
@@ -146,6 +151,8 @@ export default function NearbyLoads() {
           </button>
         ))}
       </div>
+
+      <VehicleTypeFilter picked={picked} onChange={setPicked} />
 
       <div className="space-y-3">
         <div role="group" aria-label="Search around" className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { describeLoadVehicles, listingFromLoad, LOAD_VEHICLE_SIZE_LABELS, LOAD_VEHICLE_TYPE_LABELS } from './listing.js';
+import {
+  describeLoadVehicles,
+  listingFromLoad,
+  LOAD_VEHICLE_SIZE_LABELS,
+  LOAD_VEHICLE_TYPE_LABELS,
+  LOAD_VEHICLE_TYPES,
+  matchesVehicleTypes,
+} from './listing.js';
 import type { Load } from './entities.js';
 
 const load: Load = {
@@ -106,6 +113,23 @@ describe('vehicle requirements', () => {
     expect(describeLoadVehicles([], LOAD_VEHICLE_TYPE_LABELS)).toBe('Any');
     expect(describeLoadVehicles(undefined, LOAD_VEHICLE_TYPE_LABELS)).toBeNull();
     expect(describeLoadVehicles(['hovercraft'], LOAD_VEHICLE_TYPE_LABELS)).toBe('hovercraft');
+  });
+});
+
+describe('the carrier’s vehicle-type filter', () => {
+  it('keeps a load that takes one of the types picked, and drops one that takes none of them', () => {
+    expect(matchesVehicleTypes(['refrigerated', 'box'], ['box'])).toBe(true);
+    expect(matchesVehicleTypes(['tanker'], ['box', 'flat_bed'])).toBe(false);
+  });
+
+  it('always keeps a load that takes any vehicle, and filters nothing when nothing is picked', () => {
+    expect(matchesVehicleTypes([], ['tanker'])).toBe(true);
+    expect(matchesVehicleTypes(undefined, ['tanker'])).toBe(true);
+    expect(matchesVehicleTypes(['tanker'], [])).toBe(true);
+  });
+
+  it('offers every type Create Load does', () => {
+    expect(LOAD_VEHICLE_TYPES).toEqual(['refrigerated', 'box', 'flat_bed', 'low_loader', 'skeleton', 'tanker']);
   });
 });
 
