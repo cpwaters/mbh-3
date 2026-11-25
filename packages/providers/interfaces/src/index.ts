@@ -22,3 +22,4 @@ export * from './invite-reader.js';
 export * from './admin-reader.js';
 export * from './billing-webhook.js';
 export * from './billing-reader.js';
+export * from './feature-reader.js';

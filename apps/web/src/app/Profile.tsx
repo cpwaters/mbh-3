@@ -7,6 +7,7 @@ import { useApp } from './context';
 import CompanyLogo from './CompanyLogo';
 import AdrCertificateCard from './AdrCertificateCard';
 import { useProfile } from '../components/useProfile';
+import { useFeatureFlags } from '../components/useFeatureFlags';
 import { useVehicles } from '../components/useVehicles';
 import { dispatchAction } from '../lib/dispatch';
 
@@ -58,6 +59,8 @@ export default function Profile() {
     }
   }
   const { loading, profile, reload: reloadProfile } = useProfile(actorId);
+  // Ratings show only while the founder has them switched on (Admin → Features).
+  const ratingsOn = useFeatureFlags().flags.ratings;
   // Sent here by an ADR load's "Add ADR certificate": open that form.
   const addAdr = (useLocation().state as { addAdr?: boolean } | null)?.addAdr === true;
   const { vehicles, reload: reloadVehicles } = useVehicles(carrierTenantId);
@@ -111,15 +114,19 @@ export default function Profile() {
               <h2 className="text-2xl font-bold text-gray-900 mb-1">{fullName}</h2>
               <p className="text-gray-600 mb-4">{profile?.companyName || 'Professional Driver'}</p>
 
-              <div className="flex items-center gap-1 mb-6">
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-5 h-5 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-                  />
-                ))}
-                <span className="ml-2 font-semibold text-gray-900">{rating.toFixed(1)}</span>
-              </div>
+              {ratingsOn ? (
+                <div className="flex items-center gap-1 mb-6" aria-label={`Rating ${rating.toFixed(1)} out of 5`}>
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                    />
+                  ))}
+                  <span className="ml-2 font-semibold text-gray-900">{rating.toFixed(1)}</span>
+                </div>
+              ) : (
+                <div className="mb-6" />
+              )}
 
               <div className="w-full space-y-3">
                 <div className="flex justify-between items-start gap-3 py-2 border-b">
@@ -248,20 +255,22 @@ export default function Profile() {
 
           <Section icon={<FileText className="w-5 h-5 text-blue-600" />} title="Driver Information">
             <Field label="Driving License Number" value={profile?.drivingLicenseNumber} />
-            <div>
-              <label className="text-sm text-gray-600">Rating</label>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-4 h-4 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-                    />
-                  ))}
+            {ratingsOn && (
+              <div>
+                <label className="text-sm text-gray-600">Rating</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <Star
+                        key={i}
+                        className={`w-4 h-4 ${i < Math.floor(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="font-medium text-gray-900">{rating.toFixed(1)}</span>
                 </div>
-                <span className="font-medium text-gray-900">{rating.toFixed(1)}</span>
               </div>
-            </div>
+            )}
             <AdrCertificateCard
               key={`${profile?.adrCertificate?.number ?? ''}|${profile?.adrCertificate?.expiresOn ?? ''}`}
               certificate={profile?.adrCertificate}

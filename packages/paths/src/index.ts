@@ -164,6 +164,12 @@ export function billingConfigDoc(): string {
   return `${PLATFORM_CONFIG_COLLECTION}/billing`;
 }
 
+// The founder's feature switches (Admin → Features). Every profile page reads
+// it to decide what to show.
+export function featureFlagsDoc(): string {
+  return `${PLATFORM_CONFIG_COLLECTION}/features`;
+}
+
 // One per Stripe customer: what the webhooks have told us about it, kept even
 // before we know which company it belongs to, because Stripe does not promise
 // to deliver checkout.session.completed before the subscription events.

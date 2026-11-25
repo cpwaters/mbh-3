@@ -45,6 +45,7 @@ import { AdminLoads } from '../app/admin/AdminLoads';
 import { AdminJobs } from '../app/admin/AdminJobs';
 import { AdminActivity } from '../app/admin/AdminActivity';
 import { AdminBilling } from '../app/admin/AdminBilling';
+import { AdminFeatures } from '../app/admin/AdminFeatures';
 import Billing from '../app/Billing';
 
 function LoadingCard() {
@@ -230,6 +231,7 @@ export default function DriverApp() {
                   <Route path="jobs" element={<AdminJobs />} />
                   <Route path="activity" element={<AdminActivity />} />
                   <Route path="billing" element={<AdminBilling />} />
+                  <Route path="features" element={<AdminFeatures />} />
                   <Route path="invites" element={<Invites />} />
                   <Route path="tools" element={<AdminTools />} />
                 </Route>

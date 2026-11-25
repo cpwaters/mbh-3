@@ -147,10 +147,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Platform settings the founder controls from the back office — today
-    // the billing switchboard (public Stripe payment links, the portal link,
-    // whether plan allowances are enforced). Nothing secret lives here, and
-    // every shipper's Billing page reads it, so any signed-in user may.
+    // Platform settings the founder controls from the back office: the
+    // billing switchboard (public Stripe payment links, the portal link,
+    // whether plan allowances are enforced) and the feature switches
+    // (Admin → Features). Nothing secret lives here, and every Billing and
+    // Profile page reads them, so any signed-in user may.
     match /platformConfig/{configId} {
       allow read: if isSignedIn();
       allow write: if false;

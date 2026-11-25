@@ -70,6 +70,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'listings/load-1'), { loadId: 'load-1', shipperTenantId: 'shipper-1', origin: { town: 'Trafford', postcode: 'M17 1WS' }, destination: { town: 'Leith', postcode: 'EH6 6JJ' }, priceGbpPence: 68000 });
     await setDoc(doc(db, `userProfiles/${CAR_DRIVER}`), { actorId: CAR_DRIVER, displayName: 'Chris Waters', phone: '07700 900123' });
     await setDoc(doc(db, 'platformConfig/billing'), { enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} });
+    await setDoc(doc(db, 'platformConfig/features'), { ratings: false });
     await setDoc(doc(db, 'billingCustomers/cus_1'), { customerId: 'cus_1', tenantId: 'shipper-1', tier: 'growth', status: 'active' });
     await setDoc(doc(db, 'invites/inv-1'), { inviteId: 'inv-1', status: 'pending', note: 'Waters Haulage', createdAt: '2026-08-19T09:00:00.000Z', createdBy: 'founder-1', expiresAt: '2026-08-26T09:00:00.000Z' });
   });
@@ -429,6 +430,17 @@ describe('the founder’s back office reads', () => {
     await assertFails(getDocs(collection(db(SHIP_OWNER), 'userProfiles')));
     await assertFails(getDocs(collectionGroup(db(SHIP_OWNER), 'members')));
     await assertFails(getDocs(query(collection(db(SHIP_OWNER), 'audit'), orderBy('at', 'desc'), limit(10))));
+  });
+});
+
+describe('feature switches', () => {
+  it('lets any signed-in user read them (profiles decide what to show), and nobody write them directly', async () => {
+    await assertSucceeds(getDoc(doc(db(CAR_DRIVER), 'platformConfig/features')));
+    await assertSucceeds(getDoc(doc(db(SHIP_OWNER), 'platformConfig/features')));
+    await assertFails(getDoc(doc(db(null), 'platformConfig/features')));
+    await assertFails(setDoc(doc(db(SHIP_OWNER), 'platformConfig/features'), { ratings: true }));
+    // Even the founder goes through dispatch, so every flip is audited.
+    await assertFails(setDoc(doc(founderDb(), 'platformConfig/features'), { ratings: true }));
   });
 });
 

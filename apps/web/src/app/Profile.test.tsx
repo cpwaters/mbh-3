@@ -8,10 +8,12 @@ import { makeMockApp } from './stories/mock';
 
 const profileForActor = vi.fn().mockResolvedValue(null);
 const vehiclesForTenant = vi.fn().mockResolvedValue([]);
+const featureFlags = vi.fn().mockResolvedValue({ ratings: false });
 vi.mock('../lib/reader', () => ({
   getReader: () => ({
     profileForActor: (...args: unknown[]) => profileForActor(...args),
     vehiclesForTenant: (...args: unknown[]) => vehiclesForTenant(...args),
+    featureFlags: () => featureFlags(),
   }),
 }));
 
@@ -155,3 +157,23 @@ describe('Profile — ADR certificate', () => {
   });
 });
 
+describe('Profile — ratings follow the founder’s switch', () => {
+  const base = { actorId: 'actor-1', firstName: 'Chris', lastName: 'Waters', email: 'c@example.com', rating: 4.2 };
+
+  it('shows no rating while Ratings is switched off', async () => {
+    profileForActor.mockResolvedValueOnce({ ...base });
+    renderProfile();
+    await waitFor(() => expect(screen.getByText('Chris Waters')).toBeInTheDocument());
+    await waitFor(() => expect(featureFlags).toHaveBeenCalled());
+    expect(screen.queryByText('Rating')).not.toBeInTheDocument();
+    expect(screen.queryByText('4.2')).not.toBeInTheDocument();
+  });
+
+  it('shows the stars once Ratings is switched on', async () => {
+    featureFlags.mockResolvedValueOnce({ ratings: true });
+    profileForActor.mockResolvedValueOnce({ ...base });
+    renderProfile();
+    expect(await screen.findByLabelText('Rating 4.2 out of 5')).toBeInTheDocument();
+    expect(screen.getByText('Rating')).toBeInTheDocument();
+  });
+});
