@@ -111,11 +111,11 @@ export default function Profile() {
                   <User className="w-12 h-12 text-blue-600" />
                 </div>
               )}
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">{fullName}</h2>
-              <p className="text-gray-600 mb-4">{profile?.companyName || 'Professional Driver'}</p>
+              <h2 className="text-2xl font-bold text-gray-900 text-center">{fullName}</h2>
+              <p className="text-gray-600 mt-1 text-center">{profile?.companyName || 'Professional Driver'}</p>
 
-              {ratingsOn ? (
-                <div className="flex items-center gap-1 mb-6" aria-label={`Rating ${rating.toFixed(1)} out of 5`}>
+              {ratingsOn && (
+                <div className="flex items-center gap-1 mt-3" aria-label={`Rating ${rating.toFixed(1)} out of 5`}>
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
@@ -124,28 +124,31 @@ export default function Profile() {
                   ))}
                   <span className="ml-2 font-semibold text-gray-900">{rating.toFixed(1)}</span>
                 </div>
-              ) : (
-                <div className="mb-6" />
               )}
 
-              <div className="w-full space-y-3">
-                <div className="flex justify-between items-start gap-3 py-2 border-b">
-                  <span className="text-gray-600 flex-shrink-0">Email</span>
-                  <span className="font-semibold text-gray-900 text-sm text-right break-all">{email || 'N/A'}</span>
+              {/* Tailwind 4 draws a bare border in the text colour, so the
+                  dividers name their grey. Label and value share a baseline
+                  and a size so a long email wraps without lifting off its label. */}
+              <dl className="w-full mt-6 divide-y divide-gray-200 border-y border-gray-200 text-sm">
+                <div className="flex justify-between items-baseline gap-3 py-3">
+                  <dt className="text-gray-600 flex-shrink-0">Email</dt>
+                  <dd className="font-semibold text-gray-900 text-right break-all">{email || 'N/A'}</dd>
                 </div>
-                <div className="flex justify-between items-start gap-3 py-2 border-b">
-                  <span className="text-gray-600 flex-shrink-0">Username</span>
-                  <span className="font-semibold text-gray-900 text-right break-all">@{profile?.username || 'N/A'}</span>
+                <div className="flex justify-between items-baseline gap-3 py-3">
+                  <dt className="text-gray-600 flex-shrink-0">Username</dt>
+                  <dd className="font-semibold text-gray-900 text-right break-all">
+                    {profile?.username ? `@${profile.username}` : 'Not set'}
+                  </dd>
                 </div>
-                <div className="flex justify-between items-start gap-3 py-2 border-b">
-                  <span className="text-gray-600 flex-shrink-0">Vehicles</span>
-                  <span className="font-semibold text-gray-900">{vehicles.length}</span>
+                <div className="flex justify-between items-baseline gap-3 py-3">
+                  <dt className="text-gray-600 flex-shrink-0">Vehicles</dt>
+                  <dd className="font-semibold text-gray-900">{vehicles.length}</dd>
                 </div>
-                <div className="flex justify-between items-start gap-3 py-2">
-                  <span className="text-gray-600 flex-shrink-0">Member Since</span>
-                  <span className="font-semibold text-gray-900">{new Date().getFullYear()}</span>
+                <div className="flex justify-between items-baseline gap-3 py-3">
+                  <dt className="text-gray-600 flex-shrink-0">Member Since</dt>
+                  <dd className="font-semibold text-gray-900">{new Date().getFullYear()}</dd>
                 </div>
-              </div>
+              </dl>
 
               <div className="w-full mt-6 space-y-2">
                 <button
@@ -242,9 +245,9 @@ export default function Profile() {
             <div className="md:col-span-2">
               <FieldInner label="Street" value={profile?.companyAddress?.street} />
             </div>
-            <FieldInner label="Town" value={profile?.companyAddress?.town} />
-            <FieldInner label="City" value={profile?.companyAddress?.city} />
-            <FieldInner label="Postcode" value={profile?.companyAddress?.postcode} />
+            <Field label="Town" value={profile?.companyAddress?.town} />
+            <Field label="City" value={profile?.companyAddress?.city} />
+            <Field label="Postcode" value={profile?.companyAddress?.postcode} />
           </Section>
 
           <Section icon={<Phone className="w-5 h-5 text-blue-600" />} title="Company Contact">

@@ -102,10 +102,11 @@ export default function CompanyLogo({ tenantId }: { tenantId: string }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6">
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+      {/* Same card and heading as the profile's other sections, which it sits among. */}
       <div className="flex items-center gap-2 mb-1">
         <ImageIcon className="w-5 h-5 text-blue-600" />
-        <h2 className="text-lg font-bold text-gray-900">Company Logo</h2>
+        <h2 className="font-semibold text-gray-900">Company Logo</h2>
       </div>
       <p className="text-sm text-gray-600 mb-4">
         Goes on the invoices you send. Without one, they carry the MyBackHaul logo.
