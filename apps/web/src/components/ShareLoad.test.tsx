@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ShareLoad } from './ShareLoad';
+import { ShareLoad, forgetMadeLinks } from './ShareLoad';
 
 const summary = {
   origin: { town: 'Preston', postcode: 'PR1 2AB' },
@@ -12,8 +12,13 @@ const summary = {
   vehicleTypes: [],
 };
 
+const originalShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+
 afterEach(() => {
   vi.unstubAllGlobals();
+  forgetMadeLinks();
+  if (originalShare) Object.defineProperty(navigator, 'share', originalShare);
+  else delete (navigator as { share?: unknown }).share;
 });
 
 function stubDispatch(response: unknown) {
@@ -22,37 +27,73 @@ function stubDispatch(response: unknown) {
   return fetchMock;
 }
 
+function withShareSheet(impl: (data: ShareData) => Promise<void>) {
+  const share = vi.fn(impl);
+  Object.defineProperty(navigator, 'share', { value: share, configurable: true, writable: true });
+  return share;
+}
+
+const renderShare = () =>
+  render(<ShareLoad tenantId="carrier-1" loadId="load-1" summary={summary} getIdToken={async () => 't'} />);
+
 describe('ShareLoad', () => {
-  it('makes the load’s short link and offers it to copy and to post on each network', async () => {
+  it('makes the load’s short link and opens the phone’s share sheet with it', async () => {
     const fetchMock = stubDispatch({ ok: true, result: { code: 'AbC12345' } });
+    const share = withShareSheet(async () => {});
     const user = userEvent.setup();
-    render(<ShareLoad tenantId="carrier-1" loadId="load-1" summary={summary} getIdToken={async () => 't'} />);
+    renderShare();
 
     await user.click(screen.getByRole('button', { name: 'Share' }));
 
     const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as { type: string; payload: unknown };
     expect(body).toMatchObject({ type: 'shareLoad', payload: { tenantId: 'carrier-1', loadId: 'load-1' } });
-    const url = `${window.location.origin}/l/AbC12345`;
-    expect(await screen.findByTestId('share-url')).toHaveTextContent(url);
-    expect(screen.getByRole('link', { name: 'Facebook' })).toHaveAttribute(
-      'href',
-      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
-    );
-    expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute(
-      'href',
-      expect.stringContaining(encodeURIComponent('Backhaul: Preston PR1 2AB → Blackpool FY1 1AA'))
-    );
-    for (const network of ['Reddit', 'WhatsApp', 'LinkedIn', 'Email']) {
-      expect(screen.getByRole('link', { name: network })).toBeInTheDocument();
-    }
-    // No share sheet in this browser, so Instagram is explained instead.
-    expect(screen.getByText(/Instagram takes no links from websites/)).toBeInTheDocument();
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share.mock.calls[0]?.[0]).toMatchObject({
+      url: `${window.location.origin}/l/AbC12345`,
+      text: expect.stringContaining('Backhaul: Preston PR1 2AB → Blackpool FY1 1AA'),
+    });
+    // No panel of network buttons any more.
+    expect(screen.queryByRole('link', { name: 'Facebook' })).not.toBeInTheDocument();
+
+    // A second share reuses the link without asking the server again.
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers one more tap when the phone will not open its sheet after the wait', async () => {
+    stubDispatch({ ok: true, result: { code: 'AbC12345' } });
+    const share = withShareSheet(async () => {
+      if (share.mock.calls.length === 1) throw Object.assign(new Error('no activation'), { name: 'NotAllowedError' });
+    });
+    const user = userEvent.setup();
+    renderShare();
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    const again = await screen.findByRole('button', { name: 'Share link' });
+    await user.click(again);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole('button', { name: 'Share' })).toBeInTheDocument();
+  });
+
+  it('copies the link where there is no share sheet', async () => {
+    stubDispatch({ ok: true, result: { code: 'AbC12345' } });
+    delete (navigator as { share?: unknown }).share;
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    renderShare();
+
+    await user.click(screen.getByRole('button', { name: 'Share' }));
+    expect(await screen.findByText('Link copied:')).toBeInTheDocument();
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/l/AbC12345`);
+    expect(screen.getByTestId('share-url')).toHaveTextContent('/l/AbC12345');
   });
 
   it('says why when the link cannot be made', async () => {
     stubDispatch({ ok: false, error: { code: 'conflict', message: 'That load is no longer on offer, so there is nothing to share.' } });
     const user = userEvent.setup();
-    render(<ShareLoad tenantId="carrier-1" loadId="load-1" summary={summary} getIdToken={async () => 't'} />);
+    renderShare();
     await user.click(screen.getByRole('button', { name: 'Share' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('no longer on offer');
   });
