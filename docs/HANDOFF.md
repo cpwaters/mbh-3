@@ -788,9 +788,14 @@ createdAt, createdBy}). There is one code per load, so a second share returns
 the same link (looked up by loadId alone, no index). Only a load still on
 offer can be shared, by its shipper or by any carrier.
 
-The panel offers Copy, Facebook, X, Reddit, WhatsApp, LinkedIn and Email
-(`socialShareLinks`), plus the phone's share sheet (`navigator.share`), which
-is the way into Instagram since it takes no links from the web.
+Share opens the phone's own share sheet (`navigator.share`) with the link
+and `shareMessage`: that reaches Instagram, WhatsApp, Facebook, X and the
+rest. Where there is no share sheet (most computers) the link is copied and
+shown, trimmed to fit. A phone only opens the sheet straight after a tap, so
+each load's link is kept for the visit once made; if the first try is
+refused after the network wait, a "Share link" button opens it on the next
+tap. (The earlier panel of per-network buttons was too wide on a phone and
+has gone.)
 
 The link opens `/l/` (pages/l.astro + `SharedLoadPage`), rewritten from
 `/l/**` in firebase.json. It reads `shares/{code}` and then the listing,

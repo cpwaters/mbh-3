@@ -1,6 +1,6 @@
 // Sharing a load beyond the app: a short link (/l/<code>) that opens a public
-// page with the load's carrier-facing details, and the words and social links
-// to post it with. The page shows only what any carrier already sees (the
+// page with the load's carrier-facing details, and the words to post it
+// with. The page shows only what any carrier already sees (the
 // listing), never the shipper's addresses or contacts.
 
 import { describeLoadVehicles, LOAD_VEHICLE_SIZE_LABELS, LOAD_VEHICLE_TYPE_LABELS, type Listing } from './listing.js';
@@ -72,21 +72,4 @@ export function shareMessage(listing: ShareSummary): string {
   if (type !== null && type !== 'Any') parts.push(type);
   if (listing.adrRequired === true) parts.push('ADR');
   return parts.join(' · ');
-}
-
-export type SocialNetwork = 'facebook' | 'x' | 'reddit' | 'whatsapp' | 'linkedin' | 'email';
-
-// Each network's own "share this" address. Instagram has none: it takes no
-// links from the web, so it is reached through the phone's share sheet.
-export function socialShareLinks(url: string, message: string): Record<SocialNetwork, string> {
-  const u = encodeURIComponent(url);
-  const m = encodeURIComponent(message);
-  return {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
-    x: `https://twitter.com/intent/tweet?text=${m}&url=${u}`,
-    reddit: `https://www.reddit.com/submit?url=${u}&title=${m}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${message} ${url}`)}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
-    email: `mailto:?subject=${m}&body=${encodeURIComponent(`${message}\n\n${url}`)}`,
-  };
 }

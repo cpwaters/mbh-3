@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Listing } from './listing.js';
-import { isShareCode, shareCodeFrom, shareMessage, sharePath, socialShareLinks } from './share.js';
+import { isShareCode, shareCodeFrom, shareMessage, sharePath } from './share.js';
 
 const listing: Listing = {
   loadId: 'load-1',
@@ -38,13 +38,5 @@ describe('the words that go with the link', () => {
     expect(
       shareMessage({ ...listing, vehicleSizes: ['artic'], vehicleTypes: ['refrigerated'], adrRequired: true })
     ).toBe('Backhaul: Preston PR1 2AB → Blackpool FY1 1AA · collect 2026-08-06 · £550.00 · Artic · Refrigerated · ADR');
-  });
-
-  it('build each network’s share address with the link and words encoded', () => {
-    const links = socialShareLinks('https://mybackhaul.test/l/AbC12345', 'Backhaul: A → B');
-    expect(links.facebook).toBe('https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fmybackhaul.test%2Fl%2FAbC12345');
-    expect(links.x).toContain('text=Backhaul%3A%20A%20%E2%86%92%20B');
-    expect(links.reddit).toContain('url=https%3A%2F%2Fmybackhaul.test%2Fl%2FAbC12345');
-    expect(links.whatsapp).toContain('https%3A%2F%2Fmybackhaul.test%2Fl%2FAbC12345');
   });
 });
