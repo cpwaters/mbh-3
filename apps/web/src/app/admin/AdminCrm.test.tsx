@@ -11,6 +11,7 @@ import { AdminPeople } from './AdminPeople';
 import { AdminLoads } from './AdminLoads';
 import { AdminActivity as ActivityPage } from './AdminActivity';
 import { AdminBilling } from './AdminBilling';
+import { AdminFeatures } from './AdminFeatures';
 import { marketplaceStats } from './AdminHome';
 import { AppProvider } from '../context';
 import { makeMockApp } from '../stories/mock';
@@ -92,6 +93,7 @@ vi.mock('../../lib/reader', () => ({
     adminJobs: async () => jobs,
     adminActivity: async () => activity,
     billingConfig: async () => ({ enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} }),
+    featureFlags: async () => ({ ratings: false }),
   }),
 }));
 
@@ -124,6 +126,7 @@ function renderAt(path: string) {
             <Route path="loads" element={<AdminLoads />} />
             <Route path="activity" element={<ActivityPage />} />
             <Route path="billing" element={<AdminBilling />} />
+            <Route path="features" element={<AdminFeatures />} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -361,3 +364,24 @@ describe('Tracking switches', () => {
     expect(screen.queryByRole('switch', { name: 'Location tracking for Ann Acme' })).not.toBeInTheDocument();
   });
 });
+
+describe('Features', () => {
+  it('lists Ratings as off and switches it on through dispatch', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/features');
+    const ratings = await screen.findByRole('switch', { name: 'Ratings' });
+    await waitFor(() => expect(ratings).toBeEnabled());
+    expect(ratings).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/Star ratings on driver and shipper profiles/)).toBeInTheDocument();
+
+    await user.click(ratings);
+    await waitFor(() => expect(dispatched()).toHaveLength(1));
+    expect(dispatched()[0]).toMatchObject({ type: 'setFeatureFlag', payload: { feature: 'ratings', enabled: true } });
+  });
+
+  it('is in the back office navigation', async () => {
+    renderAt('/admin/features');
+    expect(await screen.findByRole('link', { name: /Features/ })).toHaveAttribute('href', '/admin/features');
+  });
+});
+

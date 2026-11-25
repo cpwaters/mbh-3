@@ -9,6 +9,7 @@ import {
   Package,
   Route as RouteIcon,
   ShieldCheck,
+  ToggleRight,
   Ticket,
   Users,
   Wrench,
@@ -32,6 +33,7 @@ const tabs = [
   { to: '/admin/jobs', label: 'Jobs', icon: RouteIcon, end: false },
   { to: '/admin/activity', label: 'Activity', icon: Activity, end: false },
   { to: '/admin/billing', label: 'Billing', icon: CreditCard, end: false },
+  { to: '/admin/features', label: 'Features', icon: ToggleRight, end: false },
   { to: '/admin/invites', label: 'Invitations', icon: Ticket, end: false },
   { to: '/admin/tools', label: 'Tools', icon: Wrench, end: false },
 ];

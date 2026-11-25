@@ -734,6 +734,24 @@ and disable Accept, with a button to the profile form. The back office's
 People list shows each declared certificate. Like the licence number, it is
 self-declared: nobody checks it against the issuing body's register.
 
+## Feature switches (built)
+
+Admin → Features lists platform-wide switches; each is off until the founder
+turns it on. They are stored in `platformConfig/features` (readable by any
+signed-in user, written only via the founder-only `setFeatureFlag` action,
+one switch per call, audited). The domain is `features.ts`: `FeatureFlags`,
+`DEFAULT_FEATURE_FLAGS`, `FEATURES` (what the page lists) and
+`resolveFeatureFlags`, where a missing doc or unknown key reads as off. The
+web reads the switches with `useFeatureFlags()`, which treats every feature
+as off until they load, so nothing switched off flashes up.
+
+The first switch is **Ratings**: off by default, so the star rating is gone
+from the Profile page for drivers and shippers alike (both share
+Profile.tsx). Switching it on brings back the stars on the profile card and
+the Rating row. `UserProfile.rating` is untouched and still system-assigned.
+To add a switch, add it to `FeatureFlags`, `DEFAULT_FEATURE_FLAGS` and
+`FEATURES`, then gate the UI on `useFeatureFlags().flags.<key>`.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FEATURES } from '@mbh/domain';
 import type { AdminActivity as Activity } from '@mbh/provider-interfaces';
 import { getReader } from '../../lib/reader';
 import { companyName, formatWhen, personName, useAdminData, type AdminData } from './adminData';
@@ -19,6 +20,7 @@ export const ACTION_LABELS: Record<string, string> = {
   retireVehicle: 'Retired a vehicle',
   updateProfile: 'Updated their profile',
   setAdrCertificate: 'Updated their ADR certificate',
+  setFeatureFlag: 'Switched a feature',
   createTenant: 'Set up a company',
   createInvite: 'Created an invitation',
   revokeInvite: 'Withdrew an invitation',
@@ -56,6 +58,10 @@ function summary(entry: Activity, data: AdminData): string {
   else if (typeof d.to === 'string') parts.push(d.to);
   if (typeof d.reason === 'string') parts.push(`“${d.reason}”`);
   if (typeof d.note === 'string' && d.note !== '') parts.push(`“${d.note}”`);
+  if (typeof d.feature === 'string' && typeof d.enabled === 'boolean') {
+    const label = FEATURES.find((f) => f.key === d.feature)?.label ?? d.feature;
+    parts.push(`${label} ${d.enabled ? 'on' : 'off'}`);
+  }
   return parts.join(' · ');
 }
 

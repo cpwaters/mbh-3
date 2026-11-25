@@ -35,6 +35,8 @@ import {
   type BillingConfig,
   type PlanSubject,
   DEFAULT_BILLING_CONFIG,
+  resolveFeatureFlags,
+  type FeatureFlags,
 } from '@mbh/domain';
 import {
   jobEventsCollection,
@@ -53,6 +55,7 @@ import {
   tenantsCollection,
   userProfilesCollection,
   billingConfigDoc,
+  featureFlagsDoc,
 } from '@mbh/paths';
 import {
   ADMIN_LIST_LIMIT,
@@ -60,6 +63,7 @@ import {
   type AdminPerson,
   type AdminReader,
   type BillingReader,
+  type FeatureReader,
 } from '@mbh/provider-interfaces';
 import type {
   AddressBookReader,
@@ -137,7 +141,8 @@ export class FirestoreReader
     AddressBookReader,
     InviteReader,
     AdminReader,
-    BillingReader
+    BillingReader,
+    FeatureReader
 {
   private readonly db: Firestore;
 
@@ -458,6 +463,11 @@ export class FirestoreReader
   }
 
   // ── Billing ───────────────────────────────────────────────────────────────
+
+  async featureFlags(): Promise<FeatureFlags> {
+    const snap = await getDoc(doc(this.db, featureFlagsDoc()));
+    return resolveFeatureFlags(snap.exists() ? snap.data() : null);
+  }
 
   async billingConfig(): Promise<BillingConfig> {
     const snap = await getDoc(doc(this.db, billingConfigDoc()));
