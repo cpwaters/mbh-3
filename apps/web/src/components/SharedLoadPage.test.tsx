@@ -5,6 +5,8 @@ import SharedLoadPage, { codeFromPath } from './SharedLoadPage';
 
 const sharedLoad = vi.fn();
 vi.mock('../lib/reader', () => ({ getReader: () => ({ sharedLoad: (code: string) => sharedLoad(code) }) }));
+let session: { actorId: string } | null = null;
+vi.mock('./useAuth', () => ({ useAuth: () => ({ ready: true, session }) }));
 
 const listing: Listing = {
   loadId: 'load-1',
@@ -29,6 +31,7 @@ function at(path: string) {
 }
 
 afterEach(() => {
+  session = null;
   sharedLoad.mockReset();
   window.history.pushState({}, '', '/');
 });
@@ -42,7 +45,7 @@ describe('the shared load page', () => {
     expect(codeFromPath('/app/')).toBeNull();
   });
 
-  it('shows the load as carriers see it, and the way in to accept it', async () => {
+  it('shows the load as carriers see it, and sends someone new to the sign-up pages', async () => {
     sharedLoad.mockResolvedValue({ status: 'available', listing });
     at('/l/AbC12345');
     expect(await screen.findByText('Backhaul available')).toBeInTheDocument();
@@ -52,14 +55,27 @@ describe('the shared load page', () => {
     expect(screen.getByText('£550.00')).toBeInTheDocument();
     expect(screen.getByText('Artic · Refrigerated')).toBeInTheDocument();
     expect(screen.getByText('ADR')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Join as a haulier/ })).toHaveAttribute('href', '/app/signup/carrier');
+    expect(screen.getByRole('link', { name: /Join as a shipper/ })).toHaveAttribute('href', '/app/signup/shipper');
+    expect(screen.getByText(/30-day free trial/)).toBeInTheDocument();
+    // An account holder on a new device can still sign in from here.
     expect(screen.getByRole('link', { name: 'Sign in to accept' })).toHaveAttribute('href', '/app/');
-    expect(screen.getByRole('link', { name: 'New here? Join as a haulier' })).toHaveAttribute('href', '/app/signup/carrier');
+  });
+
+  it('just opens the app for someone already signed in', async () => {
+    session = { actorId: 'driver-1' };
+    sharedLoad.mockResolvedValue({ status: 'available', listing });
+    at('/l/AbC12345');
+    expect(await screen.findByRole('link', { name: 'Open in MyBackHaul' })).toHaveAttribute('href', '/app/');
+    expect(screen.queryByRole('link', { name: /Join as/ })).not.toBeInTheDocument();
   });
 
   it('says when the load has gone, and when the link is wrong, without asking the store about a bad code', async () => {
     sharedLoad.mockResolvedValue({ status: 'gone' });
     const { unmount } = at('/l/AbC12345');
     expect(await screen.findByText('This load has already gone')).toBeInTheDocument();
+    // Still a way in for someone new: there are more loads on the board.
+    expect(screen.getByRole('link', { name: /Join as a haulier/ })).toBeInTheDocument();
     unmount();
 
     at('/l/not-a-code');

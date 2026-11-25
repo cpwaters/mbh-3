@@ -798,6 +798,9 @@ without signing in: the rules now allow a **get** of one share or one
 listing to anyone, while **listing** the board still needs an account. It
 shows the listing only (towns and postcodes, dates, price, pallets, weight,
 vehicle, ADR), never addresses or contacts, and says when the load has gone.
+A visitor not signed in is taken as new: the haulier and shipper sign-up
+pages come first, with "Sign in to accept" underneath. One already signed
+in on that device gets "Open in MyBackHaul".
 
 Link previews on Facebook and X show MyBackHaul's generic card (Base.astro
 Open Graph tags, site set in astro.config): the page is static, and a

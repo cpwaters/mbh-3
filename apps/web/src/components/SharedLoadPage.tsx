@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowRight, Box, Calendar, MapPin, Truck, Weight } from 'lucide-react';
-import { formatGbp, isShareCode, type Listing } from '@mbh/domain';
+import { TRIAL_DAYS, formatGbp, isShareCode, type Listing } from '@mbh/domain';
 import { getReader } from '../lib/reader';
 import { AdrPill, loadVehicleSummary } from '../app/JobCard';
+import { useAuth } from './useAuth';
 
 type State = { kind: 'loading' } | { kind: 'missing' } | { kind: 'gone' } | { kind: 'error' } | { kind: 'ready'; listing: Listing };
 
@@ -17,8 +18,15 @@ export function codeFromPath(pathname: string): string | null {
 // carrier sees it on the board (route by town and postcode, dates, price,
 // what it is and the vehicle it needs), and the way in to take it. Never the
 // shipper's addresses or contacts: the listing does not hold them.
+//
+// Someone not signed in is taken as new to MyBackHaul: the sign-up pages come
+// first (as a haulier, who can take the load, or as a shipper), with signing
+// in offered underneath. Someone already signed in on this device just opens
+// the app.
 export default function SharedLoadPage() {
   const [state, setState] = useState<State>({ kind: 'loading' });
+  const auth = useAuth();
+  const signedIn = auth.ready && auth.session !== null;
 
   useEffect(() => {
     const code = codeFromPath(window.location.pathname);
@@ -69,17 +77,17 @@ export default function SharedLoadPage() {
                   ? 'The link may be mistyped. There are more backhauls on the board.'
                   : 'Check your signal and try again.'}
             </p>
-            <JoinButtons />
+            <JoinButtons signedIn={signedIn} />
           </div>
         )}
 
-        {state.kind === 'ready' && <LoadCard listing={state.listing} />}
+        {state.kind === 'ready' && <LoadCard listing={state.listing} signedIn={signedIn} />}
       </div>
     </main>
   );
 }
 
-function LoadCard({ listing }: { listing: Listing }) {
+function LoadCard({ listing, signedIn }: { listing: Listing; signedIn: boolean }) {
   const vehicle = loadVehicleSummary(listing.vehicleSizes, listing.vehicleTypes);
   return (
     <article className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 sm:p-8">
@@ -111,8 +119,12 @@ function LoadCard({ listing }: { listing: Listing }) {
       {listing.description !== '' && <p className="mt-4 text-gray-700">{listing.description}</p>}
 
       <div className="mt-8 border-t border-gray-100 pt-6">
-        <p className="text-gray-700 mb-4">Hauliers on MyBackHaul can accept this load in the app.</p>
-        <JoinButtons />
+        <p className="text-gray-700 mb-4">
+          {signedIn
+            ? 'Open MyBackHaul to accept it: it is on your Available Loads.'
+            : `Join MyBackHaul to accept this load and see every backhaul on the board. Every account starts with a ${TRIAL_DAYS}-day free trial.`}
+        </p>
+        <JoinButtons signedIn={signedIn} />
       </div>
     </article>
   );
@@ -132,21 +144,41 @@ function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; va
   );
 }
 
-function JoinButtons() {
-  return (
-    <div className="flex flex-col sm:flex-row gap-3">
+function JoinButtons({ signedIn }: { signedIn: boolean }) {
+  if (signedIn) {
+    return (
       <a
         href="/app/"
-        className="flex-1 inline-flex items-center justify-center bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold hover:bg-blue-700"
+        className="w-full inline-flex items-center justify-center bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold hover:bg-blue-700"
       >
-        Sign in to accept
+        Open in MyBackHaul
       </a>
-      <a
-        href="/app/signup/carrier"
-        className="flex-1 inline-flex items-center justify-center border border-gray-300 bg-white text-gray-800 px-5 py-3 rounded-lg font-semibold hover:bg-gray-50"
-      >
-        New here? Join as a haulier
-      </a>
+    );
+  }
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <a
+          href="/app/signup/carrier"
+          className="flex-1 inline-flex flex-col items-center justify-center gap-0.5 bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold hover:bg-blue-700"
+        >
+          <span>Join as a haulier</span>
+          <span className="text-xs font-normal text-blue-100">Take backhauls like this one</span>
+        </a>
+        <a
+          href="/app/signup/shipper"
+          className="flex-1 inline-flex flex-col items-center justify-center gap-0.5 border border-gray-300 bg-white text-gray-800 px-5 py-3 rounded-lg font-semibold hover:bg-gray-50"
+        >
+          <span>Join as a shipper</span>
+          <span className="text-xs font-normal text-gray-500">Post your own loads</span>
+        </a>
+      </div>
+      <p className="mt-4 text-center text-sm text-gray-600">
+        Already on MyBackHaul?{' '}
+        <a href="/app/" className="font-medium text-blue-700 hover:underline">
+          Sign in to accept
+        </a>
+      </p>
     </div>
   );
 }

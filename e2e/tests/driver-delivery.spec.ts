@@ -303,7 +303,11 @@ test('a carrier shares a load, and the link opens it for someone who is not sign
   await expect(visitor.getByText('Backhaul available')).toBeVisible();
   await expect(visitor.getByRole('heading', { level: 1 })).toContainText('Avonmouth');
   await expect(visitor.getByRole('heading', { level: 1 })).toContainText('Cardiff');
-  await expect(visitor.getByRole('link', { name: 'Sign in to accept' })).toBeVisible();
+  // Not signed in, so taken as new: the sign-up pages first.
+  await expect(visitor.getByRole('link', { name: /Join as a haulier/ })).toHaveAttribute('href', '/app/signup/carrier');
+  await expect(visitor.getByRole('link', { name: /Join as a shipper/ })).toHaveAttribute('href', '/app/signup/shipper');
+  await visitor.getByRole('link', { name: /Join as a haulier/ }).click();
+  await expect(visitor).toHaveURL(/\/app\/signup\/carrier$/);
   await stranger.close();
 });
 
