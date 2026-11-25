@@ -813,8 +813,9 @@ rules out. The load's details travel in the words posted with the link
 Create Load's Vehicle Size and Vehicle Type ride onto the listing
 (`vehicleSizes`, `vehicleTypes`; nothing else from postingDetails). They
 show in load details everywhere, and carriers filter Available Loads and
-Loads near you by type (`matchesVehicleTypes`: a load that takes any
-vehicle always shows). The choice is remembered on the device. Admin → Tools
+Loads near you by size and type (`VehicleFilter`, `matchesVehicleFilter`).
+A load must suit both, and a load that takes any size or any type always
+passes that row. The choice is remembered on the device. Admin → Tools
 → "Place loads" also gives older listings their vehicle details.
 
 ## Next step

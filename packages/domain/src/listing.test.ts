@@ -4,7 +4,9 @@ import {
   listingFromLoad,
   LOAD_VEHICLE_SIZE_LABELS,
   LOAD_VEHICLE_TYPE_LABELS,
+  LOAD_VEHICLE_SIZES,
   LOAD_VEHICLE_TYPES,
+  matchesVehicleFilter,
   matchesVehicleTypes,
 } from './listing.js';
 import type { Load } from './entities.js';
@@ -130,6 +132,25 @@ describe('the carrier’s vehicle-type filter', () => {
 
   it('offers every type Create Load does', () => {
     expect(LOAD_VEHICLE_TYPES).toEqual(['refrigerated', 'box', 'flat_bed', 'low_loader', 'skeleton', 'tanker']);
+  });
+});
+
+describe('the carrier’s vehicle filter, size and type together', () => {
+  const artic = { vehicleSizes: ['artic'], vehicleTypes: ['refrigerated'] };
+  it('keeps a load only when it suits both the sizes and the types picked', () => {
+    expect(matchesVehicleFilter(artic, { sizes: ['artic'], types: ['refrigerated'] })).toBe(true);
+    expect(matchesVehicleFilter(artic, { sizes: ['van'], types: [] })).toBe(false);
+    expect(matchesVehicleFilter(artic, { sizes: ['artic', 'rigid'], types: ['box'] })).toBe(false);
+    expect(matchesVehicleFilter(artic, { sizes: [], types: [] })).toBe(true);
+  });
+
+  it('always keeps a load that takes any size, whatever sizes are picked', () => {
+    expect(matchesVehicleFilter({ vehicleSizes: [], vehicleTypes: ['box'] }, { sizes: ['van'], types: [] })).toBe(true);
+    expect(matchesVehicleFilter({}, { sizes: ['van'], types: ['tanker'] })).toBe(true);
+  });
+
+  it('offers every size Create Load does', () => {
+    expect(LOAD_VEHICLE_SIZES).toEqual(['van', 'rigid', 'artic']);
   });
 });
 

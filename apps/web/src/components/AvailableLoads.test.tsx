@@ -250,6 +250,35 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
       expect(screen.getAllByText(/^(Preston|Leeds|Bolton), /)).toHaveLength(3);
     });
 
+    it('filters by size too, and a load must suit both the size and the type picked', async () => {
+      const user = userEvent.setup();
+      render(
+        <AvailableLoads
+          carrierTenantId="carrier-1"
+          listings={[
+            { ...fridge, vehicleSizes: ['artic'] },
+            { ...tanker, vehicleSizes: ['rigid'] },
+            { ...anyVehicle, vehicleSizes: [] },
+          ]}
+          getIdToken={async () => 'token'}
+          onAccepted={() => {}}
+          onChanged={() => {}}
+          hasActiveJob={false}
+        />
+      );
+      const towns = () => screen.getAllByText(/^(Preston|Leeds|Bolton), /).map((el) => el.textContent?.split(',')[0]).sort();
+
+      await user.click(screen.getByRole('button', { name: 'Rigid' }));
+      expect(towns()).toEqual(['Bolton', 'Leeds']);
+      expect(window.localStorage.getItem('mbh.vehicleSizeFilter')).toBe('["rigid"]');
+
+      // Rigid AND refrigerated: the rigid load is a tanker, so only the
+      // any-vehicle load is left.
+      await user.click(screen.getByRole('button', { name: 'Refrigerated' }));
+      expect(towns()).toEqual(['Bolton']);
+      expect(screen.getByText(/for a rigid with a refrigerated body/)).toBeInTheDocument();
+    });
+
     it('says when nothing on the board takes the types picked, and offers everything back', async () => {
       const user = userEvent.setup();
       render(
@@ -263,7 +292,7 @@ describe('AvailableLoads — "Enable location" vs. a watch already open', () => 
         />
       );
       await user.click(screen.getByRole('button', { name: 'Box' }));
-      expect(screen.getByText('No loads for those vehicle types')).toBeInTheDocument();
+      expect(screen.getByText('No loads for that vehicle')).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Show all loads' }));
       expect(screen.getByText(/^Leeds, /)).toBeInTheDocument();
     });

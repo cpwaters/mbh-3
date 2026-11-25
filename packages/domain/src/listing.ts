@@ -18,15 +18,29 @@ export const LOAD_VEHICLE_TYPE_LABELS: Readonly<Record<string, string>> = {
 };
 
 export const LOAD_VEHICLE_TYPES: readonly string[] = Object.keys(LOAD_VEHICLE_TYPE_LABELS);
+export const LOAD_VEHICLE_SIZES: readonly string[] = Object.keys(LOAD_VEHICLE_SIZE_LABELS);
 
-// The carrier's vehicle-type filter. A load stays in view when it accepts one
-// of the types picked; a load that asks for no particular type (none ticked,
-// or a listing from before the field) takes any vehicle, so it always stays.
-// Nothing picked means no filter.
-export function matchesVehicleTypes(loadTypes: readonly string[] | undefined, picked: readonly string[]): boolean {
+// One row of the carrier's vehicle filter (sizes, or types). A load stays in
+// view when it accepts one of the values picked; a load that asks for none in
+// particular (nothing ticked, or a listing from before the field) takes any,
+// so it always stays. Nothing picked means no filter.
+export function matchesVehicleTypes(loadValues: readonly string[] | undefined, picked: readonly string[]): boolean {
   if (picked.length === 0) return true;
-  if (loadTypes === undefined || loadTypes.length === 0) return true;
-  return loadTypes.some((t) => picked.includes(t));
+  if (loadValues === undefined || loadValues.length === 0) return true;
+  return loadValues.some((t) => picked.includes(t));
+}
+
+export interface VehicleFilter {
+  sizes: readonly string[];
+  types: readonly string[];
+}
+
+// The whole filter: a load must suit both the sizes and the types picked.
+export function matchesVehicleFilter(
+  listing: Pick<Listing, 'vehicleSizes' | 'vehicleTypes'>,
+  filter: VehicleFilter
+): boolean {
+  return matchesVehicleTypes(listing.vehicleSizes, filter.sizes) && matchesVehicleTypes(listing.vehicleTypes, filter.types);
 }
 
 // "Artic, Rigid" — or "Any" when the shipper ticked none, which is what
