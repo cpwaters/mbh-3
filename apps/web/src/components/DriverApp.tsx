@@ -26,6 +26,7 @@ import Earnings from '../app/Earnings';
 import DrivingTime from '../app/DrivingTime';
 import Profile from '../app/Profile';
 import EditProfile from '../app/EditProfile';
+import { RoleBanner } from '../app/RoleBanner';
 import AddVehicle from '../app/AddVehicle';
 import DistributorNavigation from '../app/distributor/Navigation';
 import LoadsList from '../app/distributor/LoadsList';
@@ -77,6 +78,7 @@ function AppLayout({ distributor, loading }: { distributor: boolean; loading: bo
   return (
     <div className="pb-16 lg:pb-0">
       {distributor ? <DistributorNavigation /> : <Navigation />}
+      <RoleBanner shipper={distributor} />
       {loading ? <LoadingCard /> : <Outlet />}
     </div>
   );
