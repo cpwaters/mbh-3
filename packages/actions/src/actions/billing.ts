@@ -174,7 +174,7 @@ const setBillingConfigSchema = z.object({
     driver_new: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_fleet: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
     driver_pro: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
-    shipper_carrier: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
+    dual_operator: httpsUrlOrEmpty(isStripePaymentLink, 'That is not a Stripe payment link (https://buy.stripe.com/…).').optional(),
   }),
   portalUrl: httpsUrlOrEmpty(
     isStripePortalUrl,
@@ -187,7 +187,7 @@ const setBillingConfigSchema = z.object({
     driver_new: z.number().int().positive().max(1_000_000).optional(),
     driver_fleet: z.number().int().positive().max(1_000_000).optional(),
     driver_pro: z.number().int().positive().max(1_000_000).optional(),
-    shipper_carrier: z.number().int().positive().max(1_000_000).optional(),
+    dual_operator: z.number().int().positive().max(1_000_000).optional(),
   }),
 });
 
@@ -275,15 +275,15 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
     // A plan has to be one the company can use: shipper plans for a company
     // that only posts, Driver plans for one that only carries, and for a
     // company that does both only the combined unlimited plan.
-    const shipperCarrierOn = resolveFeatureFlags(await tx.get(featureFlagsDoc())).shipperCarrier;
-    if (payload.tier !== null && !tiersFor(tenant.capabilities, shipperCarrierOn).includes(payload.tier)) {
+    const dualOperatorOn = resolveFeatureFlags(await tx.get(featureFlagsDoc())).dualOperator;
+    if (payload.tier !== null && !tiersFor(tenant.capabilities, dualOperatorOn).includes(payload.tier)) {
       const kind = companyKind(tenant.capabilities);
       throw new AppError(
         'conflict',
-        payload.tier === 'shipper_carrier' && !shipperCarrierOn
-          ? 'Shipper & Carrier Unlimited is switched off. Turn on Shipper & Carrier accounts under Features first.'
+        payload.tier === 'dual_operator' && !dualOperatorOn
+          ? 'Dual Operator Unlimited is switched off. Turn on Dual Operator accounts under Features first.'
           : kind === 'both'
-          ? `That company both ships and carries, so its plan is ${PLAN_LABELS.shipper_carrier}.`
+          ? `That company both ships and carries, so its plan is ${PLAN_LABELS.dual_operator}.`
           : kind === 'shipper'
             ? 'That company only posts loads, so it takes a shipper plan.'
             : kind === 'carrier'

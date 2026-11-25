@@ -255,7 +255,7 @@ function Companies({ data }: { data: AdminData }) {
                   <PlanSource company={company} />
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {ships && carries ? 'Shipper & Carrier' : ships ? 'Shipper' : 'Driver'}
+                  {ships && carries ? 'Dual Operator' : ships ? 'Shipper' : 'Driver'}
                   {tier === 'trial' && ` · trial ends in ${trialDaysLeft(company, now)} days`}
                   {company.billing?.currentPeriodEnd !== undefined &&
                     activeOverride(company.billing, now) === null &&

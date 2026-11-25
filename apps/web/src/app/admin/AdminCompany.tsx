@@ -136,15 +136,15 @@ function Standing({ company, data, onChanged }: { company: Tenant; data: AdminDa
 // (a pilot customer) or take that back, leaving whatever Stripe says. Only
 // the plans the company can use are offered (tiersFor): shipper plans to a
 // company that only posts, Driver plans to one that only carries, and the
-// Shipper & Carrier Unlimited plan alone to one that does both (while that is
+// Dual Operator Unlimited plan alone to one that does both (while that is
 // switched on under Features; off, such a company is offered both sets).
 function Plan({ company, onChanged }: { company: Tenant; onChanged: () => void }) {
   const { run, busy, error } = useAdminAction(onChanged);
   const now = new Date().toISOString();
   const override = activeOverride(company.billing, now);
   const lapsed = override === null ? (company.billing?.override ?? null) : null;
-  const shipperCarrierOn = useFeatureFlags().flags.shipperCarrier;
-  const options = tiersFor(company.capabilities, shipperCarrierOn);
+  const dualOperatorOn = useFeatureFlags().flags.dualOperator;
+  const options = tiersFor(company.capabilities, dualOperatorOn);
   const [tier, setTier] = useState<PlanTier>(options[0] ?? 'driver_new');
   const [days, setDays] = useState<number | null>(14);
   const [note, setNote] = useState('');

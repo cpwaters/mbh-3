@@ -4,13 +4,13 @@ import { AppProvider } from './context';
 import { makeMockApp } from './stories/mock';
 import { RoleBanner } from './RoleBanner';
 
-let shipperCarrier = false;
+let dualOperator = false;
 vi.mock('../lib/reader', () => ({
-  getReader: () => ({ featureFlags: async () => ({ ratings: false, shipperCarrier }) }),
+  getReader: () => ({ featureFlags: async () => ({ ratings: false, dualOperator }) }),
 }));
 
 afterEach(() => {
-  shipperCarrier = false;
+  dualOperator = false;
 });
 
 function renderBanner(over: Parameters<typeof makeMockApp>[0] = {}) {
@@ -42,11 +42,11 @@ describe('RoleBanner', () => {
     expect(banner).toHaveClass('bg-indigo-950');
   });
 
-  it('with Shipper & Carrier accounts on, gives a company that does both its own title, on the two colours joined', async () => {
-    shipperCarrier = true;
+  it('with Dual Operator accounts on, gives a company that does both its own title, on the two colours joined', async () => {
+    dualOperator = true;
     renderBanner(company(['shipper', 'carrier']));
-    const banner = await screen.findByRole('note', { name: 'Signed in as a shipper and carrier' });
-    expect(banner).toHaveTextContent('Shipper & Carrier');
+    const banner = await screen.findByRole('note', { name: 'Signed in as a dual operator' });
+    expect(banner).toHaveTextContent('Dual Operator');
     expect(banner).toHaveClass('bg-gradient-to-r', 'from-indigo-950', 'to-blue-600');
   });
 
@@ -56,7 +56,7 @@ describe('RoleBanner', () => {
     expect(banner).toHaveClass('bg-blue-600');
     // And it stays that way once the switches have been read.
     await waitFor(() => expect(screen.getByRole('note')).toHaveTextContent('Carrier'));
-    expect(screen.queryByText('Shipper & Carrier')).not.toBeInTheDocument();
+    expect(screen.queryByText('Dual Operator')).not.toBeInTheDocument();
   });
 
   it('shows nothing before a company is selected', () => {

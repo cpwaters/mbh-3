@@ -12,17 +12,17 @@ describe('setFeatureFlag', () => {
     ).resolves.toEqual({ feature: 'ratings', enabled: true });
     expect(await h.store.getDoc('platformConfig/features')).toEqual({
       ratings: true,
-      shipperCarrier: false,
+      dualOperator: false,
       updatedAt: FIXED_NOW,
     });
 
     // Flipping another switch leaves this one where it was.
     await h.run(founder, {
       type: 'setFeatureFlag',
-      payload: { feature: 'shipperCarrier', enabled: true },
+      payload: { feature: 'dualOperator', enabled: true },
       requestId: 'r-sc',
     });
-    expect(await h.store.getDoc('platformConfig/features')).toMatchObject({ ratings: true, shipperCarrier: true });
+    expect(await h.store.getDoc('platformConfig/features')).toMatchObject({ ratings: true, dualOperator: true });
 
     await h.run(founder, { type: 'setFeatureFlag', payload: { feature: 'ratings', enabled: false }, requestId: 'r-off' });
     expect(await h.store.getDoc('platformConfig/features')).toMatchObject({ ratings: false });

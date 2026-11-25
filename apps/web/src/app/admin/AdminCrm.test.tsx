@@ -93,7 +93,7 @@ vi.mock('../../lib/reader', () => ({
     adminJobs: async () => jobs,
     adminActivity: async () => activity,
     billingConfig: async () => ({ enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} }),
-    featureFlags: async () => ({ ratings: false, shipperCarrier: false }),
+    featureFlags: async () => ({ ratings: false, dualOperator: false }),
   }),
 }));
 

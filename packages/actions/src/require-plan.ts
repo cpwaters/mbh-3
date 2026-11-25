@@ -30,11 +30,11 @@ function refuseUnless(check: AllowanceCheck): void {
   if (!check.ok) throw new AppError('forbidden', check.message, { recoverable: false });
 }
 
-// The capabilities a refusal is worded for. With the founder's "Shipper &
-// Carrier accounts" switch off, a company that does both is spoken to as
+// The capabilities a refusal is worded for. With the founder's "Dual
+// Operator accounts" switch off, a company that does both is spoken to as
 // before (shipper and Driver plans), so its capabilities are left out.
 async function wordingFor(tx: TransactionContext, tenant: Tenant): Promise<readonly string[] | undefined> {
-  const on = resolveFeatureFlags(await tx.get(featureFlagsDoc())).shipperCarrier;
+  const on = resolveFeatureFlags(await tx.get(featureFlagsDoc())).dualOperator;
   return on ? tenant.capabilities : undefined;
 }
 

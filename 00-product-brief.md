@@ -12,8 +12,8 @@ load a day. Subscriptions through Stripe lift those limits: shippers on
 Starter / Growth / Fleet (how many loads they can post), and drivers on
 Driver New (20 pick-ups a month), Driver Fleet (60) or Driver Pro
 (unlimited) — priced well below the shipper plans, because a driver is an
-individual rather than a company. A company that both ships and carries is
-to have one plan only, Shipper & Carrier Unlimited (unlimited both ways),
+individual rather than a company. A company signed up as both shipper and
+carrier, a **Dual Operator**, is to have one plan only, Dual Operator Unlimited (unlimited both ways),
 built behind a back-office switch that is off for now (founder
 decisions, October–November 2026, superseding "drivers ride free"; see
 ADR-0004). Tier is derived from the

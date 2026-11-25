@@ -21,9 +21,10 @@ export interface PlanSubject {
 
 export type ShipperTier = 'starter' | 'growth' | 'fleet';
 export type DriverTier = 'driver_new' | 'driver_fleet' | 'driver_pro';
-// For a company that both ships and carries: one plan, unlimited both ways.
+// For a Dual Operator (a company that both ships and carries): one plan,
+// unlimited both ways.
 // It is the only plan such a company can choose.
-export type CombinedTier = 'shipper_carrier';
+export type CombinedTier = 'dual_operator';
 export type PlanTier = ShipperTier | DriverTier | CombinedTier;
 
 // What a company is entitled to right now: a paid (or founder-given) tier,
@@ -32,7 +33,7 @@ export type EffectiveTier = PlanTier | 'trial' | 'free';
 
 export const SHIPPER_TIERS: readonly ShipperTier[] = ['starter', 'growth', 'fleet'];
 export const DRIVER_TIERS: readonly DriverTier[] = ['driver_new', 'driver_fleet', 'driver_pro'];
-export const COMBINED_TIERS: readonly CombinedTier[] = ['shipper_carrier'];
+export const COMBINED_TIERS: readonly CombinedTier[] = ['dual_operator'];
 export const PLAN_TIERS: readonly PlanTier[] = [...SHIPPER_TIERS, ...DRIVER_TIERS, ...COMBINED_TIERS];
 
 export function isShipperTier(tier: PlanTier): tier is ShipperTier {
@@ -61,12 +62,12 @@ export function companyKind(capabilities: readonly string[]): CompanyKind {
 
 // The plans a company may choose: shipper plans for a shipper, Driver plans
 // for a carrier. For a company that does both it depends on the founder's
-// "Shipper & Carrier accounts" switch (Admin → Features): on, only the
+// "Dual Operator accounts" switch (Admin → Features): on, only the
 // combined unlimited plan; off, every shipper and Driver plan, as before.
-export function tiersFor(capabilities: readonly string[], shipperCarrierOn: boolean): readonly PlanTier[] {
+export function tiersFor(capabilities: readonly string[], dualOperatorOn: boolean): readonly PlanTier[] {
   switch (companyKind(capabilities)) {
     case 'both':
-      return shipperCarrierOn ? COMBINED_TIERS : [...SHIPPER_TIERS, ...DRIVER_TIERS];
+      return dualOperatorOn ? COMBINED_TIERS : [...SHIPPER_TIERS, ...DRIVER_TIERS];
     case 'shipper':
       return SHIPPER_TIERS;
     case 'carrier':
@@ -85,7 +86,7 @@ export const PLAN_LABELS: Readonly<Record<EffectiveTier, string>> = {
   driver_new: 'Driver New',
   driver_fleet: 'Driver Fleet',
   driver_pro: 'Driver Pro',
-  shipper_carrier: 'Shipper & Carrier Unlimited',
+  dual_operator: 'Dual Operator Unlimited',
 };
 
 export const TRIAL_DAYS = 30;
@@ -108,7 +109,7 @@ export const POSTING_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>
   driver_new: { count: 1, per: 'day' },
   driver_fleet: { count: 1, per: 'day' },
   driver_pro: { count: 1, per: 'day' },
-  shipper_carrier: null,
+  dual_operator: null,
 };
 
 // Picking up (accepting) loads. Driver New and Driver Fleet buy a monthly
@@ -123,7 +124,7 @@ export const PICKUP_ALLOWANCE: Readonly<Record<EffectiveTier, Allowance | null>>
   driver_new: { count: 20, per: 'month' },
   driver_fleet: { count: 60, per: 'month' },
   driver_pro: null,
-  shipper_carrier: null,
+  dual_operator: null,
 };
 
 export function describeAllowance(allowance: Allowance | null, noun: string): string {
@@ -139,7 +140,7 @@ export const PLAN_LOOKUP_KEYS: Readonly<Record<PlanTier, string>> = {
   driver_new: 'mbh_driver_new_monthly',
   driver_fleet: 'mbh_driver_fleet_monthly',
   driver_pro: 'mbh_driver_pro_monthly',
-  shipper_carrier: 'mbh_shipper_carrier_monthly',
+  dual_operator: 'mbh_dual_operator_monthly',
 };
 
 // Before the Driver plan was split in two it was one tier, 'driver', on the
@@ -318,7 +319,7 @@ const PERIOD_WORDS: Record<Allowance['per'], string> = { day: 'today', month: 't
 // current period. Said in the shipper's terms: how many, on which plan, and
 // what to do about it.
 // A company that both ships and carries has one plan to point at.
-const COMBINED_NUDGE = 'Choose the Shipper & Carrier Unlimited plan under Billing';
+const COMBINED_NUDGE = 'Choose the Dual Operator Unlimited plan under Billing';
 
 export function checkLoadAllowance(
   tier: EffectiveTier,

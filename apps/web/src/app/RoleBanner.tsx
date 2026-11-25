@@ -24,8 +24,8 @@ const STYLES = {
   },
   // Both sides: the two colours joined.
   both: {
-    title: 'Shipper & Carrier',
-    label: 'Signed in as a shipper and carrier',
+    title: 'Dual Operator',
+    label: 'Signed in as a dual operator',
     Icon: Repeat,
     bar: 'bg-gradient-to-r from-indigo-950 to-blue-600 text-white',
     icon: 'text-indigo-200',
@@ -36,15 +36,15 @@ const STYLES = {
 // A strip under the header saying which side of the marketplace the signed-in
 // user's company is on, and which company: a shipper in the back office's
 // indigo, a carrier in the app's blue, and a company that does both on the two
-// joined. That last is behind the founder's "Shipper & Carrier accounts"
+// joined. That last is behind the founder's "Dual Operator accounts"
 // switch: off, a company that does both reads as a carrier, the app it gets.
 // Nothing shows until a company is selected.
 export function RoleBanner() {
   const app = useApp();
-  const shipperCarrierOn = useFeatureFlags().flags.shipperCarrier;
+  const dualOperatorOn = useFeatureFlags().flags.dualOperator;
   if (app.selected === null) return null;
   const kind = companyKind(app.selected.capabilities);
-  const style = STYLES[kind === 'shipper' ? 'shipper' : kind === 'both' && shipperCarrierOn ? 'both' : 'carrier'];
+  const style = STYLES[kind === 'shipper' ? 'shipper' : kind === 'both' && dualOperatorOn ? 'both' : 'carrier'];
   const { Icon } = style;
   return (
     <div role="note" aria-label={style.label} className={style.bar}>

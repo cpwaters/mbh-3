@@ -529,44 +529,44 @@ async function dual(h: Harness, data: Record<string, unknown> = {}): Promise<voi
   ]);
 }
 
-async function shipperCarrier(h: Harness, enabled: boolean): Promise<void> {
+async function dualOperator(h: Harness, enabled: boolean): Promise<void> {
   await h.run(founder, {
     type: 'setFeatureFlag',
-    payload: { feature: 'shipperCarrier', enabled },
+    payload: { feature: 'dualOperator', enabled },
     requestId: `r-flag-${String(enabled)}`,
   });
 }
 
-describe('a company that both ships and carries, with Shipper & Carrier accounts switched on', () => {
+describe('a company that both ships and carries, with Dual Operator accounts switched on', () => {
 
-  it('can only be given the Shipper & Carrier Unlimited plan', async () => {
+  it('can only be given the Dual Operator Unlimited plan', async () => {
     const h = await makeHarness();
-    await shipperCarrier(h, true);
+    await dualOperator(h, true);
     await dual(h);
     for (const [i, tier] of (['fleet', 'driver_pro', 'starter'] as const).entries()) {
       const err = await expectAppError(
         h.run(founder, { type: 'setCompanyPlan', payload: { tenantId: 'carrier-1', tier }, requestId: `r-no-${i}` }),
         'conflict'
       );
-      expect(err.message).toMatch(/both ships and carries, so its plan is Shipper & Carrier Unlimited/);
+      expect(err.message).toMatch(/both ships and carries, so its plan is Dual Operator Unlimited/);
     }
     await h.run(founder, {
       type: 'setCompanyPlan',
-      payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+      payload: { tenantId: 'carrier-1', tier: 'dual_operator' },
       requestId: 'r-yes',
     });
     expect(await h.store.getDoc('tenants/carrier-1')).toMatchObject({
-      billing: { override: { tier: 'shipper_carrier' } },
+      billing: { override: { tier: 'dual_operator' } },
     });
   });
 
   it('is not a plan for a company on one side only', async () => {
     const h = await makeHarness();
-    await shipperCarrier(h, true);
+    await dualOperator(h, true);
     await expectAppError(
       h.run(founder, {
         type: 'setCompanyPlan',
-        payload: { tenantId: 'shipper-1', tier: 'shipper_carrier' },
+        payload: { tenantId: 'shipper-1', tier: 'dual_operator' },
         requestId: 'r-ship',
       }),
       'conflict'
@@ -574,7 +574,7 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
     await expectAppError(
       h.run(founder, {
         type: 'setCompanyPlan',
-        payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+        payload: { tenantId: 'carrier-1', tier: 'dual_operator' },
         requestId: 'r-carry',
       }),
       'conflict'
@@ -583,7 +583,7 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
 
   it('without a plan after the trial, is pointed at the combined plan', async () => {
     const h = await makeHarness();
-    await shipperCarrier(h, true);
+    await dualOperator(h, true);
     const first = ((await post(h, 'r-p1')) as { loadId: string }).loadId;
     const second = ((await post(h, 'r-p2')) as { loadId: string }).loadId;
     await enforce(h);
@@ -601,18 +601,18 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
       }),
       'forbidden'
     );
-    expect(err.message).toMatch(/1 load a day.*Shipper & Carrier Unlimited plan/);
+    expect(err.message).toMatch(/1 load a day.*Dual Operator Unlimited plan/);
   });
 
   it('on the combined plan, picks up without limit', async () => {
     const h = await makeHarness();
-    await shipperCarrier(h, true);
+    await dualOperator(h, true);
     const loads: string[] = [];
     for (let i = 0; i < 3; i += 1) loads.push(((await post(h, `r-p${i}`)) as { loadId: string }).loadId);
     await enforce(h);
     await dual(h, {
       trialEndsAt: '2026-07-31T00:00:00.000Z',
-      billing: { tier: 'shipper_carrier', status: 'active', override: null },
+      billing: { tier: 'dual_operator', status: 'active', override: null },
     });
     // Three drivers' worth in a day — well past the free allowance.
     for (const [i, loadId] of loads.entries()) {
@@ -625,7 +625,7 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
   });
 });
 
-describe('a company that both ships and carries, with Shipper & Carrier accounts switched off (the default)', () => {
+describe('a company that both ships and carries, with Dual Operator accounts switched off (the default)', () => {
   it('can be given a shipper or Driver plan as before, but not the combined one', async () => {
     const h = await makeHarness();
     await dual(h);
@@ -638,7 +638,7 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
     const err = await expectAppError(
       h.run(founder, {
         type: 'setCompanyPlan',
-        payload: { tenantId: 'carrier-1', tier: 'shipper_carrier' },
+        payload: { tenantId: 'carrier-1', tier: 'dual_operator' },
         requestId: 'r-sc',
       }),
       'conflict'
@@ -666,7 +666,7 @@ describe('a company that both ships and carries, with Shipper & Carrier accounts
       'forbidden'
     );
     expect(err.message).toMatch(/Driver plan/);
-    expect(err.message).not.toMatch(/Shipper & Carrier/);
+    expect(err.message).not.toMatch(/Dual Operator/);
   });
 });
 

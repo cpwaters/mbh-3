@@ -30,8 +30,8 @@ import { getReader } from '../lib/reader';
 // A company's plan: its free trial, what it is on, how much of its posting
 // and pick-up allowances is used, and the way to change it. One page for both
 // sides of the marketplace — a shipper sees the shipper plans, a driver sees
-// the Driver plans. A company that does both sees only the combined Shipper &
-// Carrier Unlimited plan while the founder's "Shipper & Carrier accounts"
+// the Driver plans. A company that does both sees only the combined Dual
+// Operator Unlimited plan while the founder's "Dual Operator accounts"
 // switch is on, and every shipper and Driver plan while it is off (tiersFor).
 //
 // Paying happens on Stripe's own pages (a payment link, the customer portal):
@@ -45,7 +45,7 @@ const PLAN_BLURBS: Record<PlanTier, string> = {
   driver_new: 'For a driver new to backhauls, picking up the odd one each week.',
   driver_fleet: 'For a driver running backhauls most days.',
   driver_pro: 'Unlimited pick-ups, for a driver who backhauls every run.',
-  shipper_carrier: 'For a company that ships and carries: post and pick up as many loads as you like.',
+  dual_operator: 'For a company that ships and carries: post and pick up as many loads as you like.',
 };
 
 function whatItBuys(tier: PlanTier): string {
@@ -107,7 +107,7 @@ export default function Billing() {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const { flags, loading: flagsLoading } = useFeatureFlags();
   // A company that does both, with the combined plan switched on.
-  const combined = ships && carries && flags.shipperCarrier;
+  const combined = ships && carries && flags.dualOperator;
 
   useEffect(() => {
     if (tenantId === undefined) return;
@@ -153,7 +153,7 @@ export default function Billing() {
   const gift = activeOverride(billing, now);
   const posting = POSTING_ALLOWANCE[tier];
   const pickup = PICKUP_ALLOWANCE[tier];
-  const tiers = tiersFor(app.selected?.capabilities ?? [], flags.shipperCarrier);
+  const tiers = tiersFor(app.selected?.capabilities ?? [], flags.dualOperator);
 
   const portalHref = useMemo(() => {
     if (state.kind !== 'ready' || state.config.portalUrl === '') return null;
@@ -170,7 +170,7 @@ export default function Billing() {
         <p className="text-gray-600">
           Every account starts with a {TRIAL_DAYS}-day free trial. After it, without a plan you can{' '}
           {combined
-            ? `post one load and pick up one load a day — the ${PLAN_LABELS.shipper_carrier} plan lifts both`
+            ? `post one load and pick up one load a day — the ${PLAN_LABELS.dual_operator} plan lifts both`
             : ships && carries
               ? 'post one load and pick up one load a day — a shipper plan lets you post more, and a Driver plan lets you pick up more'
               : ships

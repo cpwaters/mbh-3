@@ -99,7 +99,7 @@ describe('provision', () => {
       'mbh_driver_new_monthly',
       'mbh_driver_fleet_monthly',
       'mbh_driver_pro_monthly',
-      'mbh_shipper_carrier_monthly',
+      'mbh_dual_operator_monthly',
     ]);
     expect(Object.values(result.paymentLinks)).toHaveLength(PLAN_TIERS.length);
     expect(result.portalUrl).toBe('https://billing.stripe.com/p/login/test_x');
