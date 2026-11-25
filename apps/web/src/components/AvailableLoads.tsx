@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Package, Weight, Box, AlertCircle, Navigation, MapPin } from 'lucide-react';
-import { adrRefusal, formatGbp, matchesVehicleTypes, type Listing } from '@mbh/domain';
+import { adrRefusal, formatGbp, matchesVehicleFilter, type Listing } from '@mbh/domain';
 import { genRequestId } from '@mbh/client';
 import { dispatchAction } from '../lib/dispatch';
 import type { GeoPoint } from '../lib/geocode';
 import { useNearbyListings } from './useNearbyListings';
 import type { AdrState } from './useAdrStatus';
-import { VehicleTypeFilter, useVehicleTypeFilter } from './VehicleTypeFilter';
+import { VehicleFilter, useVehicleFilter } from './VehicleFilter';
 import { ShareLoad } from './ShareLoad';
 import {
   JobCard,
@@ -68,10 +68,10 @@ export function AvailableLoads({
   const [acceptingLoadId, setAcceptingLoadId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // The carrier's vehicle-type filter, then rank what is left by proximity to
-  // the driver; re-ranks live as they move.
-  const { picked, setPicked } = useVehicleTypeFilter();
-  const filtered = useMemo(() => listings.filter((l) => matchesVehicleTypes(l.vehicleTypes, picked)), [listings, picked]);
+  // The carrier's vehicle filter (size and type), then rank what is left by
+  // proximity to the driver; re-ranks live as they move.
+  const { filter, setFilter } = useVehicleFilter();
+  const filtered = useMemo(() => listings.filter((l) => matchesVehicleFilter(l, filter)), [listings, filter]);
   const ranked = useNearbyListings(filtered, driverLocation);
   const sortedByLocation = driverLocation !== null;
 
@@ -158,7 +158,7 @@ export function AvailableLoads({
 
       {listings.length > 0 && (
         <div className="mb-6">
-          <VehicleTypeFilter picked={picked} onChange={setPicked} shown={filtered.length} total={listings.length} />
+          <VehicleFilter filter={filter} onChange={setFilter} shown={filtered.length} total={listings.length} />
         </div>
       )}
 
@@ -175,11 +175,11 @@ export function AvailableLoads({
           <div className="text-gray-400 mb-4">
             <Package className="w-16 h-16 mx-auto" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No loads for those vehicle types</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No loads for that vehicle</h3>
           <p className="text-gray-600 mb-4">There are {listings.length} loads on the board that need a different vehicle.</p>
           <button
             type="button"
-            onClick={() => setPicked([])}
+            onClick={() => setFilter({ sizes: [], types: [] })}
             className="px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50"
           >
             Show all loads

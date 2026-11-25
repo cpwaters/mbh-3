@@ -128,6 +128,7 @@ describe('Loads near you', () => {
       ],
     });
     await screen.findByRole('heading', { name: '2 loads within 25 miles' });
+    await user.click(screen.getByRole('button', { name: /Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Box' }));
     expect(screen.getByRole('heading', { name: '1 load within 25 miles' })).toBeInTheDocument();
     expect(screen.getByTestId('map')).toHaveTextContent('1 pin');
