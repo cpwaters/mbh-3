@@ -20,6 +20,7 @@ import { useApp } from './context';
 import { STATUS_PROGRESS } from '../lib/progress';
 import { dispatchAction } from '../lib/dispatch';
 import { isFounder } from '../lib/founder';
+import { PAGE } from '../components/page-width';
 
 // The device must be within this much of the journey (percent) before the
 // delivery form is offered — "you've arrived". The device must be BOTH this far
@@ -76,7 +77,7 @@ export function Dashboard() {
 
   if (app.selected === null) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className={PAGE}>
         <CreateCompany
           getIdToken={app.auth.getIdToken}
           onCreated={(tenantId) => {
@@ -92,7 +93,7 @@ export function Dashboard() {
     return (
       <>
         {flash !== null && (
-          <div className="px-6 pt-6 max-w-3xl mx-auto">
+          <div className="max-w-7xl mx-auto px-4 lg:px-6 pt-6">
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 flex-shrink-0" />
               {flash}
@@ -121,14 +122,14 @@ export function Dashboard() {
   if (app.isShipper) {
     // The distributor dashboard arrives in a later increment; keep post-load.
     return (
-      <div className="p-6 max-w-3xl mx-auto">
+      <div className={PAGE}>
         <PostLoad shipperTenantId={app.selected.tenantId} getIdToken={app.auth.getIdToken} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className={PAGE}>
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
         <h2 className="text-xl font-bold text-gray-900 mb-1">No company yet</h2>
         <p className="text-gray-600">Your account isn't linked to a shipper or carrier yet.</p>
@@ -248,7 +249,7 @@ export function ActiveJobsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Active Jobs</h1>
         <p className="text-gray-600">Track your current deliveries</p>

@@ -30,6 +30,7 @@ import {
   JobCardStatusBadge,
   loadVehicleSummary,
 } from './JobCard';
+import { PAGE } from '../components/page-width';
 
 // "Loads near you": the Map page. An area — around where the phone is, or
 // around a postcode the driver types (where they will drop off, say, or when
@@ -130,7 +131,7 @@ export default function NearbyLoads() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className={`${PAGE} space-y-6`}>
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Loads near you</h1>
         <p className="text-gray-600">Backhauls with a collection within your chosen distance — of where you are now, or of a postcode.</p>

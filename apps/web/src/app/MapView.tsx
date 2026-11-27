@@ -9,6 +9,7 @@ import { openNativeNavigation } from '../lib/nativeNav';
 import type { GeoPoint } from '../lib/geocode';
 import { STATUS_PROGRESS } from '../lib/progress';
 import { JobCard, JobCardRoute, JobCardPayment, JobCardStatusBadge } from './JobCard';
+import { PAGE } from '../components/page-width';
 
 // Ported from the mbh-2 prototype (client/src/pages/MapView.tsx): the map + a
 // Route Details panel + an available-loads list + the location-consent modal.
@@ -89,7 +90,7 @@ export default function MapView() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Route Map</h1>
         <p className="text-gray-600">Navigate to your destination</p>

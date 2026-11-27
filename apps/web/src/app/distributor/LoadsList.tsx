@@ -23,6 +23,7 @@ import {
   JobCardStatusBadge,
   LoadVehicleDetails,
 } from '../JobCard';
+import { PAGE } from '../../components/page-width';
 
 const TRACKABLE_STATUSES = ['matched', 'accepted', 'collected', 'in_transit'];
 
@@ -219,7 +220,7 @@ export default function LoadsList() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto p-6">
+      <div className={PAGE}>
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-600">Loading loads...</div>
         </div>
@@ -228,7 +229,7 @@ export default function LoadsList() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">All Loads</h1>
         <p className="text-gray-600">Manage and monitor all created loads</p>

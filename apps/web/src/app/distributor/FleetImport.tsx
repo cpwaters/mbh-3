@@ -6,6 +6,7 @@ import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { dispatchAction } from '../../lib/dispatch';
 import { readSpreadsheet } from '../../lib/spreadsheet';
+import { PAGE } from '../../components/page-width';
 
 interface Progress {
   done: number;
@@ -88,7 +89,7 @@ export default function FleetImport() {
   const readyCount = report?.ready.length ?? 0;
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className={PAGE}>
       <button
         onClick={() => navigate('/vehicles')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"

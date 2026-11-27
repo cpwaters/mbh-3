@@ -1,6 +1,7 @@
 import { Clock, Play, Pause, RotateCcw } from 'lucide-react';
 import { useApp } from './context';
 import type { Timer } from '../components/useDrivingTimers';
+import { PAGE } from '../components/page-width';
 
 // Ported from the mbh-2 prototype (client/src/pages/DrivingTime.tsx):
 // self-contained HGV driving-hours + break countdown timers. No backend.
@@ -33,7 +34,7 @@ export default function DrivingTime() {
   const { timers, dailyRestHours, toggleTimer, resetTimer, updateDailyRestHours } = useApp().drivingTimers;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Driving Time</h1>
         <p className="text-gray-600">Manage your driving hours and breaks</p>

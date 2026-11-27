@@ -48,10 +48,11 @@ import { AdminActivity } from '../app/admin/AdminActivity';
 import { AdminBilling } from '../app/admin/AdminBilling';
 import { AdminFeatures } from '../app/admin/AdminFeatures';
 import Billing from '../app/Billing';
+import { PAGE } from './page-width';
 
 function LoadingCard() {
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 text-gray-500">Loading…</div>
     </div>
   );
