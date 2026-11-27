@@ -4,7 +4,12 @@
 // work as records (not fire-and-forget calls in the request path) is what makes
 // external effects retriable, auditable, and offline-safe.
 
-export type OutboxTaskType = 'enrichLoadRoute' | 'sendInvoiceEmail' | 'sendTestInvoiceEmail' | 'closeJob';
+export type OutboxTaskType =
+  | 'enrichLoadRoute'
+  | 'sendInvoiceEmail'
+  | 'sendTestInvoiceEmail'
+  | 'closeJob'
+  | 'syncPlanPrice';
 
 // pending  -> eligible for the drain to claim
 // claimed  -> a drain run holds it (crash-safe: reclaimed if the claim goes stale)
@@ -21,6 +26,8 @@ export interface OutboxTask {
   jobId?: string; // sendInvoiceEmail / closeJob: the job this task acts on
   recipientEmail?: string; // sendTestInvoiceEmail: where to send the test (the requester's own profile email, captured at enqueue time)
   actorId?: string; // sendTestInvoiceEmail: who requested it — the ONLY outbox task type a client may ever read back (its own), so the founder toolbar can show whether the send actually succeeded instead of a permanent "Queued" with no outcome
+  tier?: string; // syncPlanPrice: the plan whose Stripe price changes
+  pence?: number; // syncPlanPrice: its new monthly price
   attempts: number;
   createdAt: string;
   claimedAt?: string;

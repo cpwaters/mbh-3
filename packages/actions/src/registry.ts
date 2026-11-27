@@ -31,7 +31,12 @@ import {
   setMemberStatusHandler,
   suspendCompanyHandler,
 } from './actions/founder-controls.js';
-import { recordBillingEventHandler, setBillingConfigHandler, setCompanyPlanHandler } from './actions/billing.js';
+import {
+  recordBillingEventHandler,
+  setBillingConfigHandler,
+  setCompanyPlanHandler,
+  setPlanPriceHandler,
+} from './actions/billing.js';
 
 // Every action the dispatch function can run. Adding an action means adding
 // it here — nothing else discovers handlers.
@@ -66,6 +71,7 @@ const HANDLERS: readonly AnyHandler[] = [
   setMemberRoleHandler,
   recordBillingEventHandler,
   setBillingConfigHandler,
+  setPlanPriceHandler,
   setCompanyPlanHandler,
   setCompanyTrackingHandler,
   setMemberTrackingHandler,
@@ -119,6 +125,7 @@ export const IDEMPOTENT_ACTION_TYPES: readonly string[] = [
   'setMemberRole',
   'recordBillingEvent',
   'setBillingConfig',
+  'setPlanPrice',
   'setCompanyPlan',
   'setCompanyTracking',
   'setMemberTracking',

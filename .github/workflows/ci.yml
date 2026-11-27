@@ -125,6 +125,12 @@ jobs:
             echo "STRIPE_WEBHOOK_SECRET=${{ secrets.STRIPE_WEBHOOK_SECRET }}" >> functions/.env
             echo "dispatch -> Stripe webhook configured"
           fi
+          # The Stripe secret key lets the drain change plan prices set in the
+          # back office. Without it a price change fails and says why.
+          if [ -n "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
+            echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> functions/.env
+            echo "drain -> Stripe prices configured"
+          fi
       - run: pnpm exec firebase deploy --only functions,hosting,firestore --project mybackhaul-app --non-interactive
       - run: pnpm smoke:prod
         env:

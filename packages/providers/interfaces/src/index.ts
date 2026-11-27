@@ -24,3 +24,4 @@ export * from './billing-webhook.js';
 export * from './billing-reader.js';
 export * from './feature-reader.js';
 export * from './share-reader.js';
+export * from './plan-catalog.js';

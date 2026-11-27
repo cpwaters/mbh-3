@@ -28,7 +28,7 @@ export const drain = onSchedule(
   },
   async () => {
     const summary = await runDrainOnce(getDrainDeps());
-    if (summary.enriched + summary.failed + summary.retried + summary.reclaimed > 0) {
+    if (summary.enriched + summary.priced + summary.failed + summary.retried + summary.reclaimed > 0) {
       logger.info('drain processed outbound work', summary);
     }
   }

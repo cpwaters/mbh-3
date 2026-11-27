@@ -161,6 +161,17 @@ export function tierFromLookupKey(lookupKey: string | null | undefined): PlanTie
   return match ?? null;
 }
 
+// The plan a Stripe price belongs to. The lookup key travels with the plan's
+// CURRENT price only: when the founder changes a price, the key moves to the
+// new one and the old price keeps billing its existing subscribers untagged
+// by key. Every price we make or adopt is also stamped metadata.mbh_tier,
+// which never moves — so a subscriber on an older price keeps their plan.
+export function tierFromPrice(
+  price: { lookup_key?: string | null | undefined; metadata?: Record<string, string> | null | undefined } | null | undefined
+): PlanTier | null {
+  return tierFromLookupKey(price?.lookup_key) ?? normalizeTier(price?.metadata?.mbh_tier);
+}
+
 // Stripe's subscription statuses, verbatim.
 export type SubscriptionStatus =
   | 'active'
@@ -398,6 +409,28 @@ export interface BillingConfig {
   monthlyPricePence: Partial<Record<PlanTier, number>>;
   updatedAt?: string;
 }
+
+// A price change the founder made in the back office, carried out against
+// Stripe by the drain (never in their request). One entry per plan, keeping
+// the latest change: platformConfig/planPrices.
+export type PlanPriceChangeStatus = 'pending' | 'done' | 'failed';
+
+export interface PlanPriceChange {
+  pence: number;
+  status: PlanPriceChangeStatus;
+  requestedAt: string;
+  finishedAt?: string;
+  lastError?: string;
+  priceId?: string; // the Stripe price now sold for this plan
+  paymentLink?: string; // and the link that sells it
+}
+
+export type PlanPrices = Partial<Record<PlanTier, PlanPriceChange>>;
+
+// Bounds on a price set from the back office: at least £1, at most £10,000 a
+// month — enough room for any real plan, and a guard against a typo in pence.
+export const MIN_PLAN_PRICE_PENCE = 100;
+export const MAX_PLAN_PRICE_PENCE = 1_000_000;
 
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
   enforced: false,

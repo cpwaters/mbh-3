@@ -10,13 +10,18 @@ import {
   PLAN_LABELS,
   tiersFor,
   freePlanExpiry,
+  MAX_PLAN_PRICE_PENCE,
+  MIN_PLAN_PRICE_PENCE,
+  formatGbp,
   type BillingEvent,
+  type OutboxTask,
+  type PlanPrices,
   type PlanTier,
   type SubscriptionStatus,
   type Tenant,
   type TenantBilling,
 } from '@mbh/domain';
-import { billingConfigDoc, billingCustomerDoc, featureFlagsDoc, tenantDoc } from '@mbh/paths';
+import { billingConfigDoc, billingCustomerDoc, featureFlagsDoc, outboxTaskDoc, planPricesDoc, tenantDoc } from '@mbh/paths';
 import type { DocData, TransactionContext } from '@mbh/provider-interfaces';
 import type { ActionHandler } from '../context.js';
 import { requireFounder } from '../require-founder.js';
@@ -180,6 +185,8 @@ const setBillingConfigSchema = z.object({
     isStripePortalUrl,
     'That is not a Stripe customer portal link (https://billing.stripe.com/p/login/…).'
   ),
+  // Omitted by the back office now that prices are set through setPlanPrice
+  // (which changes them at Stripe too): the stored ones are kept as they are.
   monthlyPricePence: z.object({
     starter: z.number().int().positive().max(1_000_000).optional(),
     growth: z.number().int().positive().max(1_000_000).optional(),
@@ -188,7 +195,7 @@ const setBillingConfigSchema = z.object({
     driver_fleet: z.number().int().positive().max(1_000_000).optional(),
     driver_pro: z.number().int().positive().max(1_000_000).optional(),
     dual_operator: z.number().int().positive().max(1_000_000).optional(),
-  }),
+  }).optional(),
 });
 
 export type SetBillingConfigPayload = z.infer<typeof setBillingConfigSchema>;
@@ -218,9 +225,11 @@ export const setBillingConfigHandler: ActionHandler<SetBillingConfigPayload, Set
     const paymentLinks = Object.fromEntries(
       Object.entries(payload.paymentLinks).filter(([, l]) => l !== undefined && l !== '')
     );
-    const monthlyPricePence = Object.fromEntries(
-      Object.entries(payload.monthlyPricePence).filter(([, p]) => p !== undefined)
-    );
+    const stored = (await tx.get(billingConfigDoc())) as { monthlyPricePence?: Record<string, number> } | null;
+    const monthlyPricePence =
+      payload.monthlyPricePence === undefined
+        ? (stored?.monthlyPricePence ?? {})
+        : Object.fromEntries(Object.entries(payload.monthlyPricePence).filter(([, p]) => p !== undefined));
     tx.write({
       kind: 'set',
       path: billingConfigDoc(),
@@ -310,6 +319,75 @@ export const setCompanyPlanHandler: ActionHandler<SetCompanyPlanPayload, SetComp
         to: payload.tier ?? 'none',
         ...(note !== '' ? { note } : {}),
         ...(payload.tier !== null ? { until: expiresAt ?? 'no end date' } : {}),
+      },
+    };
+  },
+};
+
+const setPlanPriceSchema = z.object({
+  tier,
+  pence: z.number().int().min(MIN_PLAN_PRICE_PENCE).max(MAX_PLAN_PRICE_PENCE),
+});
+
+export type SetPlanPricePayload = z.infer<typeof setPlanPriceSchema>;
+
+export interface SetPlanPriceResult extends DocData {
+  taskId: string;
+  tier: PlanTier;
+  pence: number;
+}
+
+// The founder sets a plan's monthly price in the back office. Stripe is not
+// called here (non-negotiable 6): the change is queued for the drain, which
+// makes the new price and payment link at Stripe and then records them on
+// the billing settings (see drain.ts, syncPlanPrice). Until then the plan
+// keeps selling at its old price, and platformConfig/planPrices says the
+// change is pending so the back office can show it.
+//
+// New subscribers pay the new price. Subscribers already paying keep their
+// current price; Stripe never moves an existing subscription by itself.
+export const setPlanPriceHandler: ActionHandler<SetPlanPricePayload, SetPlanPriceResult> = {
+  type: 'setPlanPrice',
+  idempotent: true,
+  parse: zodParse(setPlanPriceSchema),
+  async execute(tx, ctx, payload) {
+    requireFounder(ctx);
+    const prices = ((await tx.get(planPricesDoc())) as PlanPrices | null) ?? {};
+    const previous = prices[payload.tier];
+    if (previous?.status === 'pending') {
+      throw new AppError(
+        'conflict',
+        `${PLAN_LABELS[payload.tier]} is still changing to ${formatGbp(previous.pence)} at Stripe. Wait for that to finish, then try again.`,
+        { recoverable: true }
+      );
+    }
+    const taskId = ctx.newId('task');
+    const task: OutboxTask = {
+      taskId,
+      type: 'syncPlanPrice',
+      status: 'pending',
+      tenantId: 'platform',
+      tier: payload.tier,
+      pence: payload.pence,
+      attempts: 0,
+      createdAt: ctx.now,
+    };
+    tx.write({ kind: 'create', path: outboxTaskDoc(taskId), data: { ...task } });
+    tx.write({
+      kind: 'set',
+      path: planPricesDoc(),
+      data: {
+        ...prices,
+        [payload.tier]: { pence: payload.pence, status: 'pending', requestedAt: ctx.now },
+      } as DocData,
+    });
+    return {
+      result: { taskId, tier: payload.tier, pence: payload.pence },
+      auditDetail: {
+        taskId,
+        tier: payload.tier,
+        pence: payload.pence,
+        ...(previous !== undefined ? { previousPence: previous.pence } : {}),
       },
     };
   },

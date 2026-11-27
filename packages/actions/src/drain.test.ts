@@ -4,7 +4,13 @@ import {
   companyLogoStoragePath,
   type GeoPoint,
 } from '@mbh/domain';
-import { InMemoryGeocoder, InMemoryMailer, InMemoryObjectStorage, InMemoryRouteProvider } from '@mbh/provider-mocks';
+import {
+  InMemoryGeocoder,
+  InMemoryMailer,
+  InMemoryObjectStorage,
+  InMemoryPlanCatalog,
+  InMemoryRouteProvider,
+} from '@mbh/provider-mocks';
 import { runDrainOnce, type DrainDeps } from './drain.js';
 import { makeHarness, validPostLoadPayload, type Harness } from './test-harness.js';
 
@@ -24,7 +30,7 @@ async function seedLoad(harness: Harness): Promise<void> {
 
 function drainDeps(
   harness: Harness,
-  overrides: Partial<Pick<DrainDeps, 'geocoder' | 'routeProvider' | 'mailer' | 'objectStorage'>> = {}
+  overrides: Partial<Pick<DrainDeps, 'geocoder' | 'routeProvider' | 'mailer' | 'objectStorage' | 'planCatalog'>> = {}
 ): DrainDeps {
   let n = 0;
   return {
@@ -35,6 +41,7 @@ function drainDeps(
     routeProvider: overrides.routeProvider ?? new InMemoryRouteProvider(),
     mailer: overrides.mailer ?? new InMemoryMailer(),
     objectStorage: overrides.objectStorage ?? new InMemoryObjectStorage(),
+    planCatalog: overrides.planCatalog === undefined ? new InMemoryPlanCatalog() : overrides.planCatalog,
     now: () => '2026-08-01T10:00:00.000Z',
     // Distinct from the harness's ids so the system audit never collides.
     newId: (prefix: string) => `${prefix}-drain-${++n}`,
@@ -125,7 +132,7 @@ describe('runDrainOnce — enrichLoadRoute', () => {
     await runDrainOnce(drainDeps(harness));
 
     const summary = await runDrainOnce(drainDeps(harness));
-    expect(summary).toEqual({ reclaimed: 0, enriched: 0, invoiced: 0, closed: 0, retried: 0, failed: 0, skipped: 0 });
+    expect(summary).toEqual({ reclaimed: 0, enriched: 0, invoiced: 0, closed: 0, priced: 0, retried: 0, failed: 0, skipped: 0 });
   });
 
   it('fails permanently when a postcode is unknown', async () => {

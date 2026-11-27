@@ -16,11 +16,14 @@ import {
   type Member,
   type OutboxTask,
   type OutboxTaskType,
+  type PlanPrices,
+  type PlanTier,
   type Tenant,
   type UserProfile,
 } from '@mbh/domain';
 import {
   auditDoc,
+  billingConfigDoc,
   jobDoc,
   jobEventDoc,
   jobEvidenceCollection,
@@ -29,10 +32,19 @@ import {
   loadDoc,
   membersCollection,
   outboxCollection,
+  planPricesDoc,
   tenantDoc,
   userProfileDoc,
 } from '@mbh/paths';
-import type { DataStore, Geocoder, Mailer, MailAttachment, ObjectStorageReader, RouteProvider } from '@mbh/provider-interfaces';
+import type {
+  DataStore,
+  Geocoder,
+  Mailer,
+  MailAttachment,
+  ObjectStorageReader,
+  PlanCatalog,
+  RouteProvider,
+} from '@mbh/provider-interfaces';
 import { samplePhotoPng, sampleSignaturePng } from './sample-pod-images.js';
 
 // The scheduled drain's logic, pure of the vendor SDKs and the clock so it
@@ -46,6 +58,9 @@ export interface DrainDeps {
   routeProvider: RouteProvider;
   mailer: Mailer;
   objectStorage: ObjectStorageReader;
+  // Stripe, for plan price changes. null until the server has a Stripe key:
+  // a price change then fails with that reason instead of waiting forever.
+  planCatalog: PlanCatalog | null;
   now(): string; // ISO-8601 UTC
   newId(prefix: string): string;
 }
@@ -55,6 +70,7 @@ export interface DrainSummary {
   enriched: number; // route recorded
   invoiced: number; // invoice email sent
   closed: number; // job closed + its load freed for reuse
+  priced: number; // plan price changed at Stripe
   retried: number; // recoverable failure, left pending for the next run
   failed: number; // permanently gave up
   skipped: number; // lost the claim race / nothing to do
@@ -71,6 +87,7 @@ export async function runDrainOnce(deps: DrainDeps): Promise<DrainSummary> {
     enriched: 0,
     invoiced: 0,
     closed: 0,
+    priced: 0,
     retried: 0,
     failed: 0,
     skipped: 0,
@@ -121,12 +138,13 @@ async function reclaimStale(deps: DrainDeps): Promise<number> {
   return reclaimed;
 }
 
-type ProcessOutcome = 'enriched' | 'invoiced' | 'closed' | 'retried' | 'failed' | 'skipped';
+type ProcessOutcome = 'enriched' | 'invoiced' | 'closed' | 'priced' | 'retried' | 'failed' | 'skipped';
 
 function processTask(deps: DrainDeps, taskPath: string, type: OutboxTaskType): Promise<ProcessOutcome> {
   if (type === 'sendInvoiceEmail') return processSendInvoiceEmail(deps, taskPath);
   if (type === 'sendTestInvoiceEmail') return processSendTestInvoiceEmail(deps, taskPath);
   if (type === 'closeJob') return processCloseJob(deps, taskPath);
+  if (type === 'syncPlanPrice') return processSyncPlanPrice(deps, taskPath);
   return processEnrichLoadRoute(deps, taskPath);
 }
 
@@ -705,6 +723,104 @@ async function recordJobClosed(deps: DrainDeps, taskPath: string, job: Job): Pro
   });
 }
 
+// A plan price change: make the new price and payment link at Stripe
+// (StripePlanCatalog), then record the link and price on the billing settings
+// and mark the change done — in one transaction, as a system action.
+async function processSyncPlanPrice(deps: DrainDeps, taskPath: string): Promise<ProcessOutcome> {
+  const claim = await deps.store.runTransaction(async (tx) => {
+    const task = (await tx.get(taskPath)) as (OutboxTask & Record<string, unknown>) | null;
+    if (task === null || task.status !== 'pending') return null; // lost the race
+    tx.write({
+      kind: 'update',
+      path: taskPath,
+      data: { status: 'claimed', claimedAt: deps.now(), attempts: task.attempts + 1 },
+    });
+    return { task };
+  });
+
+  if (claim === null) return 'skipped';
+  const attempts = claim.task.attempts + 1;
+  const tier = claim.task.tier as PlanTier | undefined;
+  const pence = claim.task.pence;
+
+  if (tier === undefined || pence === undefined) {
+    await settle(deps, taskPath, 'failed', 'no plan or price on the task');
+    return 'failed';
+  }
+  if (deps.planCatalog === null) {
+    await settle(
+      deps,
+      taskPath,
+      'failed',
+      'The server has no Stripe key yet (STRIPE_SECRET_KEY), so prices cannot be changed from here. See docs/runbooks/billing.md.'
+    );
+    return 'failed';
+  }
+
+  try {
+    const { priceId, paymentLink } = await deps.planCatalog.setMonthlyPrice(tier, pence);
+    await recordPlanPriceSynced(deps, taskPath, tier, pence, priceId, paymentLink);
+    return 'priced';
+  } catch (error) {
+    const recoverable = (error as { recoverable?: boolean }).recoverable !== false;
+    const message = error instanceof Error ? error.message : String(error);
+    if (recoverable && attempts < MAX_OUTBOX_ATTEMPTS) {
+      await settle(deps, taskPath, 'pending', message); // retried next run
+      return 'retried';
+    }
+    await settle(deps, taskPath, 'failed', message);
+    return 'failed';
+  }
+}
+
+async function recordPlanPriceSynced(
+  deps: DrainDeps,
+  taskPath: string,
+  tier: PlanTier,
+  pence: number,
+  priceId: string,
+  paymentLink: string
+): Promise<void> {
+  await deps.store.runTransaction(async (tx) => {
+    const task = await tx.get(taskPath);
+    if (task === null || task.status !== 'claimed') return; // already settled elsewhere
+    const config = (await tx.get(billingConfigDoc())) as {
+      paymentLinks?: Record<string, string>;
+      monthlyPricePence?: Record<string, number>;
+    } | null;
+    const prices = ((await tx.get(planPricesDoc())) as PlanPrices | null) ?? {};
+
+    // The billing settings: whatever else is there, plus this plan's new link
+    // and price. A settings doc that does not exist yet starts not enforced.
+    tx.write({
+      kind: 'set',
+      path: billingConfigDoc(),
+      data: {
+        enforced: false,
+        portalUrl: '',
+        ...(config ?? {}),
+        paymentLinks: { ...(config?.paymentLinks ?? {}), [tier]: paymentLink },
+        monthlyPricePence: { ...(config?.monthlyPricePence ?? {}), [tier]: pence },
+        updatedAt: deps.now(),
+      },
+    });
+    const entry = prices[tier];
+    // A newer change asked for meanwhile stays pending; its own task follows.
+    if (entry === undefined || entry.pence === pence) {
+      tx.write({
+        kind: 'set',
+        path: planPricesDoc(),
+        data: {
+          ...prices,
+          [tier]: { pence, status: 'done', requestedAt: entry?.requestedAt ?? deps.now(), finishedAt: deps.now(), priceId, paymentLink },
+        },
+      });
+    }
+    tx.write({ kind: 'update', path: taskPath, data: { status: 'done' } });
+    tx.write(systemAuditOp(deps, 'syncPlanPrice', { tier, pence, priceId, paymentLink }));
+  });
+}
+
 async function settle(
   deps: DrainDeps,
   taskPath: string,
@@ -714,16 +830,33 @@ async function settle(
   await deps.store.runTransaction(async (tx) => {
     const task = await tx.get(taskPath);
     if (task === null || task.status !== 'claimed') return;
+    const type = task.type as OutboxTaskType;
+    // Reads before writes. A failed price change is also marked failed on
+    // platformConfig/planPrices, so the back office says it did not happen.
+    const prices =
+      status === 'failed' && type === 'syncPlanPrice'
+        ? (((await tx.get(planPricesDoc())) as PlanPrices | null) ?? {})
+        : null;
     tx.write({ kind: 'update', path: taskPath, data: { status, lastError } });
     if (status === 'failed') {
-      const type = task.type as OutboxTaskType;
       const detail =
         type === 'sendInvoiceEmail' || type === 'closeJob'
           ? { jobId: task.jobId, lastError }
-          : type === 'sendTestInvoiceEmail'
-            ? { recipientEmail: task.recipientEmail, lastError }
-            : { loadId: task.loadId, lastError };
+          : type === 'syncPlanPrice'
+            ? { tier: task.tier, pence: task.pence, lastError }
+            : type === 'sendTestInvoiceEmail'
+              ? { recipientEmail: task.recipientEmail, lastError }
+              : { loadId: task.loadId, lastError };
       tx.write(systemAuditOp(deps, `${type}.failed`, detail));
+      const tier = task.tier as PlanTier | undefined;
+      const entry = prices !== null && tier !== undefined ? prices[tier] : undefined;
+      if (prices !== null && tier !== undefined && entry?.status === 'pending' && entry.pence === task.pence) {
+        tx.write({
+          kind: 'set',
+          path: planPricesDoc(),
+          data: { ...prices, [tier]: { ...entry, status: 'failed', lastError, finishedAt: deps.now() } },
+        });
+      }
     }
   });
 }
