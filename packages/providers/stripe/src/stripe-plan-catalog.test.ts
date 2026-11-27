@@ -30,6 +30,10 @@ function fakeStripe() {
       },
     },
   };
+  const products: Obj[] = [
+    { id: 'prod_growth', active: true, metadata: { mbh_tier: 'growth' } },
+    { id: 'prod_fleet', active: true, metadata: { mbh_tier: 'fleet' } },
+  ];
   const posts: string[] = [];
   let failOn: string | null = null;
 
@@ -44,7 +48,11 @@ function fakeStripe() {
       const product = /\/v1\/prices\?product=([^&]+)/.exec(path)?.[1];
       if (product !== undefined) return { data: prices.filter((p) => p.product === product && p.active) };
       const items = /^\/v1\/payment_links\/([^/]+)\/line_items/.exec(path);
-      if (items) return { data: [{ price: { id: links.find((l) => l.id === items[1])?.price } }] };
+      if (items) {
+        const sold = links.find((l) => l.id === items[1])?.price;
+        return { data: [{ price: { id: sold, product: prices.find((p) => p.id === sold)?.product } }] };
+      }
+      if (path.startsWith('/v1/products')) return { data: products.filter((p) => p.active) };
       if (path.startsWith('/v1/payment_links')) return { data: links.filter((l) => l.active) };
       if (path.startsWith('/v1/billing_portal/configurations')) return { data: [portal] };
       throw new Error(`unexpected GET ${path}`);
@@ -174,6 +182,32 @@ describe('StripePlanCatalog.setMonthlyPrice', () => {
     expect(fake.links.filter((l) => l.active && (l.metadata as Obj).mbh_tier === 'growth')).toHaveLength(1);
     expect(fake.prices.find((p) => p.id === 'price_growth_1')?.active).toBe(false);
     expect(result.paymentLink).toBe(fake.links.find((l) => l.price === result.priceId)?.url);
+  });
+
+  it('recovers a plan whose price was edited in the Stripe dashboard', async () => {
+    const fake = fakeStripe();
+    // What a dashboard edit leaves: the tagged price archived, and a new
+    // price on the same product with no lookup key or plan, sold by a new link.
+    const tagged = fake.prices.find((p) => p.id === 'price_growth_1') as Obj;
+    tagged.active = false;
+    tagged.lookup_key = null;
+    fake.prices.push({ id: 'price_by_hand', product: 'prod_growth', currency: 'gbp', unit_amount: 11_000, recurring: { interval: 'month' }, lookup_key: null, active: true, metadata: {} });
+    fake.links.push({ id: 'plink_by_hand', url: 'https://buy.stripe.com/test_by_hand', active: true, price: 'price_by_hand', metadata: {} });
+
+    const result = await new StripePlanCatalog(fake.stripe, SITE).setMonthlyPrice('growth', 4_900);
+
+    expect(fake.prices.find((p) => p.id === result.priceId)).toMatchObject({
+      product: 'prod_growth',
+      unit_amount: 4_900,
+      lookup_key: 'mbh_growth_monthly',
+      active: true,
+    });
+    // The hand-made price stops selling but names its plan, for anyone who subscribed to it.
+    expect(fake.prices.find((p) => p.id === 'price_by_hand')).toMatchObject({ active: false, metadata: { mbh_tier: 'growth' } });
+    expect(fake.links.find((l) => l.id === 'plink_by_hand')?.active).toBe(false);
+    expect(fake.links.filter((l) => l.active && l.price !== 'price_fleet_1')).toEqual([
+      expect.objectContaining({ url: result.paymentLink, price: result.priceId }),
+    ]);
   });
 
   it('gives up, without retrying, on a plan Stripe has never been set up for', async () => {
