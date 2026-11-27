@@ -826,6 +826,42 @@ one-line summary while any is on); open, every button is one width, the
 widest's, in a grid that keeps two columns on a 320px phone. Admin → Tools
 → "Place loads" also gives older listings their vehicle details.
 
+## Plan prices set from the back office (built)
+
+The founder changes a plan's monthly price in Admin → Billing
+(`setPlanPrice`, founder only, idempotent, audited). The action never calls
+Stripe: it writes `platformConfig/planPrices[tier] = { pence, status:
+'pending' }` and queues an outbox `syncPlanPrice` task. A second change to the
+same plan is refused while one is pending.
+
+The drain (`processSyncPlanPrice`) calls `PlanCatalog.setMonthlyPrice`
+(interface in provider-interfaces; `StripePlanCatalog` in providers/stripe;
+`InMemoryPlanCatalog` in mocks). The Stripe adapter makes a new monthly GBP
+price on the plan's product with `transfer_lookup_key`, one active payment
+link selling it (older links for the plan switched off), the portal's
+switcher pointed at it, and the product's other monthly prices archived.
+Every step looks before it writes, so a retry finishes a half-done change.
+4xx other than 429 is permanent; 5xx/429/network retry. On success one
+transaction writes the new link and price into `platformConfig/billing`,
+marks the planPrices entry done, closes the task and adds a system audit
+entry. On final failure `settle` marks the entry failed with Stripe's
+message in the same transaction.
+
+Existing subscribers keep their price. Because the lookup key moves to the
+new price, the webhook now reads the plan with `tierFromPrice`: the lookup
+key first, then `metadata.mbh_tier`, which every price we make or adopt
+carries and which never moves.
+
+`setBillingConfig` no longer needs `monthlyPricePence`. When it is omitted
+(as the back office now does), the stored prices are kept. The Billing page
+polls planPrices every 4 seconds while a change is pending, and refills the
+form with the new link once it lands.
+
+Needs the `STRIPE_SECRET_KEY` repo secret (written to functions/.env at
+deploy, same stopgap path as the webhook secret). Without it,
+`planCatalog` is null and a price change fails, saying so. See
+docs/runbooks/billing.md §4a.
+
 ## Next step
 
 - Founder: run docs/runbooks/osrm.md to stand up OSRM, then set the

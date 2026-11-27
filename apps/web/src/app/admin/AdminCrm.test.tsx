@@ -84,6 +84,9 @@ const activity: AdminActivity[] = [
   },
 ];
 
+// What the server says about each plan's last price change; tests set it.
+let planPrices: Record<string, unknown> = {};
+
 vi.mock('../../lib/reader', () => ({
   getReader: () => ({
     adminCompanies: async () => companies,
@@ -92,7 +95,8 @@ vi.mock('../../lib/reader', () => ({
     adminLoads: async () => loads,
     adminJobs: async () => jobs,
     adminActivity: async () => activity,
-    billingConfig: async () => ({ enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: {} }),
+    billingConfig: async () => ({ enforced: false, paymentLinks: {}, portalUrl: '', monthlyPricePence: { growth: 12900 } }),
+    planPrices: async () => planPrices,
     featureFlags: async () => ({ ratings: false, dualOperator: false }),
   }),
 }));
@@ -272,7 +276,6 @@ describe('Billing (founder)', () => {
 
     await user.clear(growth);
     await user.type(growth, 'https://buy.stripe.com/test_g');
-    await user.type(screen.getByRole('textbox', { name: 'Growth monthly price' }), '129');
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: /save billing settings/i }));
 
@@ -282,9 +285,39 @@ describe('Billing (founder)', () => {
       payload: {
         enforced: true,
         paymentLinks: { starter: '', growth: 'https://buy.stripe.com/test_g', fleet: '' },
-        monthlyPricePence: { growth: 12900 },
       },
     });
+    // Prices change through setPlanPrice, not with the settings.
+    expect(dispatched()[0]?.payload).not.toHaveProperty('monthlyPricePence');
+  });
+
+  it('changes a plan price through the server, and says while it is going through to Stripe', async () => {
+    const user = userEvent.setup();
+    planPrices = {};
+    renderAt('/admin/billing');
+    const growth = await screen.findByRole('textbox', { name: 'Growth new monthly price' });
+    expect(growth).toHaveAttribute('placeholder', '129.00');
+
+    await user.type(growth, '0.50');
+    expect(screen.getByText(/between £1 and £10,000/)).toBeInTheDocument();
+    await user.clear(growth);
+    await user.type(growth, '99');
+    planPrices = { growth: { pence: 9900, status: 'pending', requestedAt: '2026-11-27T12:00:00.000Z' } };
+    const growthRow = growth.closest('div.space-y-1') as HTMLElement;
+    await user.click(within(growthRow).getByRole('button', { name: 'Change' }));
+
+    await waitFor(() => expect(dispatched()).toHaveLength(1));
+    expect(dispatched()[0]).toMatchObject({ type: 'setPlanPrice', payload: { tier: 'growth', pence: 9900 } });
+    expect(await screen.findByText('Changing to £99.00 at Stripe…')).toBeInTheDocument();
+  });
+
+  it('shows why Stripe refused a price change', async () => {
+    planPrices = {
+      growth: { pence: 9900, status: 'failed', requestedAt: '2026-11-27T12:00:00.000Z', lastError: 'The server has no Stripe key yet' },
+    };
+    renderAt('/admin/billing');
+    expect(await screen.findByText(/Not changed to £99.00: The server has no Stripe key yet/)).toBeInTheDocument();
+    planPrices = {};
   });
 
   it('lists every company with its plan, drivers included', async () => {

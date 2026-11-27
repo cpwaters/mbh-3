@@ -1,4 +1,4 @@
-import type { BillingConfig, PlanSubject } from '@mbh/domain';
+import type { BillingConfig, PlanPrices, PlanSubject } from '@mbh/domain';
 
 // What a company's Billing page needs: the platform's billing switchboard
 // (any signed-in user), its own company's plan and trial (members of that
@@ -6,6 +6,8 @@ import type { BillingConfig, PlanSubject } from '@mbh/domain';
 // a given instant — the same count the server makes before allowing one more.
 export interface BillingReader {
   billingConfig(): Promise<BillingConfig>;
+  // Where each plan's last price change stands at Stripe (back office).
+  planPrices(): Promise<PlanPrices>;
   tenantPlan(tenantId: string): Promise<PlanSubject | null>;
   loadsPostedSince(tenantId: string, sinceIso: string): Promise<number>;
   // Loads the company has picked up (accepted) since a given instant — the

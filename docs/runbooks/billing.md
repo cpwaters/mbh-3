@@ -66,9 +66,8 @@ placeholders.** To use your own, set them in pence when you run step 2:
     DRIVER_NEW_PENCE=699 DRIVER_FLEET_PENCE=1299 DRIVER_PRO_PENCE=1999 \
     DUAL_OPERATOR_PENCE=29900
 
-A Stripe price's amount cannot change once created. To change a price later,
-create a new one in the dashboard and move its lookup key
-(`mbh_<tier>_monthly`) onto it.
+These are only the starting prices. Change them later from the back office
+(see "Changing a price" below), not in the Stripe dashboard.
 
 ## 2. Provision Stripe
 
@@ -107,6 +106,39 @@ Webhooks → the endpoint → Roll secret) and update the GitHub secret.
 In /app/admin → Billing, paste the seven payment links (three shipper plans,
 the three Driver plans and Dual Operator Unlimited) and the portal link
 the script printed, along with the monthly prices to display. Save, leaving "Enforce plans" off.
+
+## 4a. Let the back office change prices
+
+Give the server a Stripe key so the drain can make new prices for you:
+GitHub → the repo → Settings → Secrets and variables → Actions → New
+repository secret, named `STRIPE_SECRET_KEY`. Then re-run the `ci` workflow.
+
+Best is a **restricted key** (Developers → API keys → Create restricted key)
+with **Write** on Prices, Payment Links and Customer portal, and **Read** on
+Products. The standard secret key also works. Use the test key in test mode
+and replace it with a live one when you go live.
+
+Without it, a price change in the back office fails and says the server has
+no Stripe key. Nothing else needs it.
+
+### Changing a price
+
+In /app/admin → Billing, type the new monthly price beside the plan and press
+**Change**. Within about a minute the row says "Changed to £…" and the plan's
+payment link is filled in with a new one. Behind the scenes the drain:
+
+- makes a new monthly price in Stripe and moves the plan's lookup key to it;
+- makes a payment link for it and switches off the plan's old links;
+- lets the customer portal switch to the new price;
+- archives the old price.
+
+New subscribers pay the new price. **Anyone already subscribed keeps paying
+the price they signed up at**: Stripe never moves an existing subscription by
+itself, and their plan is still recognised from the old price's
+`mbh_tier` tag. Moving existing subscribers to a new price is a separate job
+(they need notice first).
+
+If Stripe refuses, the row says why in red and you can try again.
 
 ## 5. Prove it end to end (test mode)
 

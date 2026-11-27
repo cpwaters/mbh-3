@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PICKUP_ALLOWANCE,
@@ -15,7 +15,11 @@ import {
   isStripePaymentLink,
   isStripePortalUrl,
   monthStartUtc,
+  MAX_PLAN_PRICE_PENCE,
+  MIN_PLAN_PRICE_PENCE,
   type BillingConfig,
+  type PlanPriceChange,
+  type PlanPrices,
   type PlanTier,
   type Tenant,
 } from '@mbh/domain';
@@ -32,19 +36,13 @@ import { Pill, formatDay, useAdminAction, useAdminData, type AdminData } from '.
 interface Form {
   enforced: boolean;
   links: Record<PlanTier, string>;
-  prices: Record<PlanTier, string>; // pounds, as typed
   portalUrl: string;
 }
 
 function toForm(config: BillingConfig): Form {
   const links = Object.fromEntries(PLAN_TIERS.map((t) => [t, ''])) as Record<PlanTier, string>;
-  const prices = Object.fromEntries(PLAN_TIERS.map((t) => [t, ''])) as Record<PlanTier, string>;
-  for (const tier of PLAN_TIERS) {
-    links[tier] = config.paymentLinks[tier] ?? '';
-    const pence = config.monthlyPricePence[tier];
-    prices[tier] = pence !== undefined ? (pence / 100).toFixed(2) : '';
-  }
-  return { enforced: config.enforced, links, prices, portalUrl: config.portalUrl };
+  for (const tier of PLAN_TIERS) links[tier] = config.paymentLinks[tier] ?? '';
+  return { enforced: config.enforced, links, portalUrl: config.portalUrl };
 }
 
 function pence(pounds: string): number | undefined {
@@ -52,7 +50,89 @@ function pence(pounds: string): number | undefined {
   return pounds.trim() === '' || !Number.isFinite(n) || n <= 0 ? undefined : Math.round(n * 100);
 }
 
-function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () => void }) {
+// A plan's monthly price, changed at Stripe by the server (setPlanPrice →
+// the drain). The new price takes a minute or so to go through, so the row
+// says where it stands: going through, done, or refused with Stripe's reason.
+function PlanPrice({
+  tier,
+  current,
+  change,
+  onQueued,
+}: {
+  tier: PlanTier;
+  current: number | undefined;
+  change: PlanPriceChange | undefined;
+  onQueued: () => void;
+}) {
+  const [pounds, setPounds] = useState('');
+  const { run, busy, error } = useAdminAction(onQueued);
+  const wanted = pence(pounds);
+  const outOfRange = wanted !== undefined && (wanted < MIN_PLAN_PRICE_PENCE || wanted > MAX_PLAN_PRICE_PENCE);
+  const pending = change?.status === 'pending';
+
+  async function submit(): Promise<void> {
+    if (wanted === undefined || outOfRange) return;
+    if (await run('setPlanPrice', { tier, pence: wanted })) setPounds('');
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-2">
+        <label className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">£</span>
+          <input
+            aria-label={`${PLAN_LABELS[tier]} new monthly price`}
+            inputMode="decimal"
+            value={pounds}
+            disabled={pending}
+            onChange={(e) => setPounds(e.target.value)}
+            placeholder={current !== undefined ? (current / 100).toFixed(2) : 'per month'}
+            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={busy || pending || wanted === undefined || outOfRange || wanted === current}
+          onClick={() => void submit()}
+          className="px-3 py-2 rounded-lg border border-indigo-600 text-indigo-700 font-medium hover:bg-indigo-50 disabled:opacity-50"
+        >
+          {busy ? 'Sending…' : 'Change'}
+        </button>
+      </div>
+      {outOfRange && <p className="text-xs text-red-700">A plan costs between £1 and £10,000 a month.</p>}
+      {error !== null && (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
+      )}
+      {pending && (
+        <p role="status" className="text-xs text-amber-700">
+          Changing to {formatGbp(change.pence)} at Stripe…
+        </p>
+      )}
+      {change?.status === 'failed' && (
+        <p role="alert" className="text-xs text-red-700">
+          Not changed to {formatGbp(change.pence)}: {change.lastError ?? 'Stripe refused it.'}
+        </p>
+      )}
+      {change?.status === 'done' && change.finishedAt !== undefined && (
+        <p className="text-xs text-gray-500">Changed to {formatGbp(change.pence)} on {formatDay(change.finishedAt)}.</p>
+      )}
+    </div>
+  );
+}
+
+function Switchboard({
+  config,
+  planPrices,
+  onSaved,
+  onPriceQueued,
+}: {
+  config: BillingConfig;
+  planPrices: PlanPrices;
+  onSaved: () => void;
+  onPriceQueued: () => void;
+}) {
   const [form, setForm] = useState<Form>(() => toForm(config));
   const [saved, setSaved] = useState(false);
   const { run, busy, error } = useAdminAction(onSaved);
@@ -62,16 +142,11 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
 
   async function save(): Promise<void> {
     setSaved(false);
-    const monthlyPricePence: Partial<Record<PlanTier, number>> = {};
-    for (const tier of PLAN_TIERS) {
-      const p = pence(form.prices[tier]);
-      if (p !== undefined) monthlyPricePence[tier] = p;
-    }
+    // Prices are not sent: they change through setPlanPrice, at Stripe too.
     const ok = await run('setBillingConfig', {
       enforced: form.enforced,
       paymentLinks: form.links,
       portalUrl: form.portalUrl,
-      monthlyPricePence,
     });
     setSaved(ok);
   }
@@ -79,17 +154,18 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
   return (
     <section className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 space-y-5">
       <div>
-        <h3 className="text-lg font-bold text-gray-900">Stripe links</h3>
+        <h3 className="text-lg font-bold text-gray-900">Plans and prices</h3>
         <p className="text-sm text-gray-600">
-          Paste what <code className="text-xs">pnpm stripe:provision</code> printed (see docs/runbooks/billing.md). Shippers
-          are sent to these; nothing here is secret.
+          Change a plan&apos;s monthly price here and it changes in Stripe too, usually within a minute, with a new
+          payment link filled in for you. New subscribers pay the new price; anyone already subscribed keeps paying
+          what they signed up at. The links are what shippers and drivers are sent to; nothing here is secret.
         </p>
       </div>
 
       <div className="grid gap-4">
         {PLAN_TIERS.map((tier) => (
-          <div key={tier} className="grid sm:grid-cols-[10rem_1fr_9rem] gap-2 sm:items-center">
-            <span className="font-medium text-gray-800">
+          <div key={tier} className="grid sm:grid-cols-[10rem_1fr_15rem] gap-2 sm:items-start">
+            <span className="font-medium text-gray-800 sm:pt-2">
               {PLAN_LABELS[tier]}{' '}
               <span className="text-xs text-gray-500">
                 (
@@ -112,17 +188,12 @@ function Switchboard({ config, onSaved }: { config: BillingConfig; onSaved: () =
               placeholder="https://buy.stripe.com/…"
               className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 min-w-0"
             />
-            <label className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">£</span>
-              <input
-                aria-label={`${PLAN_LABELS[tier]} monthly price`}
-                inputMode="decimal"
-                value={form.prices[tier]}
-                onChange={(e) => setForm({ ...form, prices: { ...form.prices, [tier]: e.target.value } })}
-                placeholder="per month"
-                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </label>
+            <PlanPrice
+              tier={tier}
+              current={config.monthlyPricePence[tier]}
+              change={planPrices[tier]}
+              onQueued={onPriceQueued}
+            />
           </div>
         ))}
         <div className="grid sm:grid-cols-[10rem_1fr] gap-2 sm:items-center">
@@ -287,15 +358,57 @@ function Companies({ data }: { data: AdminData }) {
 export function AdminBilling() {
   const { state } = useAdminData();
   const [config, setConfig] = useState<BillingConfig | null>(null);
+  const [planPrices, setPlanPrices] = useState<PlanPrices>({});
   const [version, setVersion] = useState(0);
+  // Bumped when a price change finishes, to reload the settings and refill
+  // the form with the new link the server wrote.
+  const [settled, setSettled] = useState(0);
+  const [pricesVersion, setPricesVersion] = useState(0);
+  const [formKey, setFormKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const wasPending = useRef<Set<PlanTier>>(new Set());
+
+  const anyPending = PLAN_TIERS.some((t) => planPrices[t]?.status === 'pending');
+
+  useEffect(() => {
+    let cancelled = false;
+    getReader()
+      .planPrices()
+      .then((p) => {
+        if (cancelled) return;
+        const pendingNow = new Set(PLAN_TIERS.filter((t) => p[t]?.status === 'pending'));
+        const finished = [...wasPending.current].some((t) => !pendingNow.has(t));
+        wasPending.current = pendingNow;
+        setPlanPrices(p);
+        if (finished) setSettled((n) => n + 1);
+      })
+      .catch(() => {
+        // The settings above still load; the price rows just show no status.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pricesVersion]);
+
+  // While a change is going through, look again every few seconds.
+  useEffect(() => {
+    if (!anyPending) return;
+    const timer = setInterval(() => setPricesVersion((v) => v + 1), 4000);
+    return () => clearInterval(timer);
+  }, [anyPending]);
+
+  const onPriceQueued = useCallback(() => setPricesVersion((v) => v + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     getReader()
       .billingConfig()
       .then((c) => {
-        if (!cancelled) setConfig(c);
+        if (cancelled) return;
+        setConfig(c);
+        // Refill the form only once the settings a finished price change
+        // wrote have arrived; an ordinary save keeps the form as it is.
+        setFormKey(settled);
       })
       .catch(() => {
         if (!cancelled) setError('Could not read the billing settings.');
@@ -303,7 +416,7 @@ export function AdminBilling() {
     return () => {
       cancelled = true;
     };
-  }, [version]);
+  }, [version, settled]);
 
   const prices = config === null ? [] : PLAN_TIERS.filter((t) => config.monthlyPricePence[t] !== undefined);
 
@@ -333,7 +446,15 @@ export function AdminBilling() {
       {config === null && error === null && <p className="text-gray-600">Loading billing…</p>}
       {/* Not re-keyed on save: the form already shows what was saved, and
           remounting it would throw away the "Saved." confirmation. */}
-      {config !== null && <Switchboard config={config} onSaved={() => setVersion((v) => v + 1)} />}
+      {config !== null && (
+        <Switchboard
+          key={formKey}
+          config={config}
+          planPrices={planPrices}
+          onSaved={() => setVersion((v) => v + 1)}
+          onPriceQueued={onPriceQueued}
+        />
+      )}
       {state.kind === 'ready' && <Companies data={state.data} />}
     </div>
   );
