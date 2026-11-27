@@ -76,6 +76,16 @@ describe('parseStripeEvent', () => {
     expect(outcome).toMatchObject({ ok: true, event: { status: 'incomplete', tier: null } });
   });
 
+  it('keeps a subscriber on their plan after its price has changed and the lookup key moved on', () => {
+    // An older price: no lookup key any more, but still stamped with its plan.
+    const outcome = parseStripeEvent(
+      subscriptionEvent('customer.subscription.updated', {
+        items: { data: [{ price: { id: 'price_old', lookup_key: null, metadata: { mbh_tier: 'fleet' } } }] },
+      })
+    );
+    expect(outcome).toMatchObject({ ok: true, event: { tier: 'fleet' } });
+  });
+
   it('acknowledges events it does not act on', () => {
     expect(parseStripeEvent({ id: 'evt_3', type: 'invoice.paid', created, data: { object: {} } })).toEqual({
       ok: true,

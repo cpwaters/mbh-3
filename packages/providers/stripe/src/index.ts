@@ -4,3 +4,5 @@
 // with their own key).
 export { StripeBillingWebhook } from './stripe-billing-webhook.js';
 export { signStripePayload, verifyStripeSignature, DEFAULT_TOLERANCE_SECONDS } from './webhook-signature.js';
+export { StripePlanCatalog } from './stripe-plan-catalog.js';
+export { stripeFetch, type StripeFetch } from './stripe-rest.js';

@@ -697,11 +697,16 @@ test('the founder sets up billing links from the back office, through dispatch',
   await expect(page.getByText('Plans are not enforced yet.')).toBeVisible();
 
   await page.getByRole('textbox', { name: 'Growth payment link' }).fill('https://buy.stripe.com/test_e2e_growth');
-  await page.getByRole('textbox', { name: 'Growth monthly price' }).fill('129');
   await page.getByRole('button', { name: 'Save billing settings' }).click();
   await expect(page.getByRole('status')).toHaveText('Saved.');
   // Still not enforced — saving links alone must not lock anyone out.
   await expect(page.getByText('Plans are not enforced yet.')).toBeVisible();
+
+  // A price change is queued for the drain, which talks to Stripe; the
+  // emulator does not run the schedule, so it stays on its way.
+  await page.getByRole('textbox', { name: 'Growth new monthly price' }).fill('129');
+  await page.getByRole('button', { name: 'Change', exact: true }).nth(1).click();
+  await expect(page.getByText('Changing to £129.00 at Stripe…')).toBeVisible();
 });
 
 test('the back office turns away anyone who is not the founder', async ({ page }) => {

@@ -55,6 +55,7 @@ function drainDeps(h: Harness): DrainDeps {
     routeProvider: new InMemoryRouteProvider(),
     mailer: new InMemoryMailer(),
     objectStorage: new InMemoryObjectStorage(),
+    planCatalog: null,
     now: () => '2026-08-01T10:00:00.000Z',
     newId: (prefix: string) => `${prefix}-backfill-${++n}`,
   };

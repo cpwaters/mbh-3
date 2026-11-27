@@ -7,7 +7,7 @@ import { PostcodesIoGeocoder } from '@mbh/provider-postcodes-io';
 import { OsrmRouteProvider } from '@mbh/provider-osrm';
 import { NodemailerMailer } from '@mbh/provider-nodemailer';
 import { FirebaseStorageReader } from '@mbh/provider-firebase-storage-admin';
-import { StripeBillingWebhook } from '@mbh/provider-stripe';
+import { StripeBillingWebhook, StripePlanCatalog, stripeFetch } from '@mbh/provider-stripe';
 import { buildRegistry, type DrainDeps, type HttpDispatchDeps } from '@mbh/actions';
 import type { AuthProvider, VerifiedActor } from '@mbh/provider-interfaces';
 
@@ -84,6 +84,15 @@ const smtpFrom = process.env.SMTP_FROM ?? 'invoices@mybackhaul.app';
 const smtpUserEnv = process.env.SMTP_USER ?? '';
 const smtpPasswordEnv = process.env.SMTP_PASSWORD ?? '';
 
+// The Stripe secret key, for changing plan prices from the back office (the
+// drain's syncPlanPrice). Same stopgap path as the webhook secret: a GitHub
+// Actions repository SECRET written to functions/.env at deploy. Best a
+// restricted key with write access to Prices, Payment Links and Customer
+// portal, and read access to Products. Absent means a price change fails
+// with that reason; nothing else needs it.
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY ?? '';
+const siteUrl = (process.env.SITE_URL ?? 'https://mybackhaul-app.web.app').replace(/\/$/, '');
+
 // The drain's providers: the real HTTP adapters. postcodes.io is keyless.
 export function getDrainDeps(): DrainDeps {
   if (cachedDrain !== null) return cachedDrain;
@@ -100,6 +109,7 @@ export function getDrainDeps(): DrainDeps {
       pass: () => smtpPasswordEnv,
     }),
     objectStorage: new FirebaseStorageReader(),
+    planCatalog: stripeSecretKey !== '' ? new StripePlanCatalog(stripeFetch(stripeSecretKey), siteUrl) : null,
     now: isoNow,
     newId: prefixedId,
   };

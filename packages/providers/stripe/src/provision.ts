@@ -1,4 +1,5 @@
 import { PLAN_LABELS, PLAN_LOOKUP_KEYS, PLAN_TIERS, type PlanTier } from '@mbh/domain';
+import { encodeForm, stripeFetch, type StripeFetch } from './stripe-rest.js';
 
 // Sets up Stripe for MyBackHaul through the REST API, not by clicking around
 // the dashboard (architecture.md, Payments): one product + monthly price per
@@ -19,37 +20,7 @@ import { PLAN_LABELS, PLAN_LOOKUP_KEYS, PLAN_TIERS, type PlanTier } from '@mbh/d
 // the endpoint is first created — goes straight into the GitHub Actions
 // secret STRIPE_WEBHOOK_SECRET, and nowhere else (not a chat, not the repo).
 
-export type StripeFetch = (
-  path: string,
-  init: { method: 'GET' | 'POST'; form?: Record<string, string> }
-) => Promise<Record<string, unknown>>;
-
-// Stripe's form encoding flattens nested params as a[b][0]=c — this takes the
-// already-flattened keys, so call sites read like Stripe's own docs.
-export function encodeForm(form: Record<string, string>): string {
-  return Object.entries(form)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-    .join('&');
-}
-
-export function stripeFetch(secretKey: string, base = 'https://api.stripe.com'): StripeFetch {
-  return async (path, init) => {
-    const res = await fetch(`${base}${path}`, {
-      method: init.method,
-      headers: {
-        authorization: `Bearer ${secretKey}`,
-        ...(init.form !== undefined ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
-      },
-      ...(init.form !== undefined ? { body: encodeForm(init.form) } : {}),
-    });
-    const body = (await res.json()) as Record<string, unknown>;
-    if (!res.ok) {
-      const err = body.error as { message?: string } | undefined;
-      throw new Error(`Stripe ${init.method} ${path} failed (${res.status}): ${err?.message ?? 'unknown error'}`);
-    }
-    return body;
-  };
-}
+export { encodeForm, stripeFetch, type StripeFetch };
 
 // Display prices, in pence per month. PLACEHOLDERS — set the real ones with
 // the env vars below before running against the live account. Stripe charges

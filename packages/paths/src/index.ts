@@ -176,6 +176,12 @@ export function billingConfigDoc(): string {
   return `${PLATFORM_CONFIG_COLLECTION}/billing`;
 }
 
+// Where each plan's last price change stands (pending at Stripe, done, or
+// failed with Stripe's reason). Written only by setPlanPrice and the drain.
+export function planPricesDoc(): string {
+  return `${PLATFORM_CONFIG_COLLECTION}/planPrices`;
+}
+
 // The founder's feature switches (Admin → Features). Every profile page reads
 // it to decide what to show.
 export function featureFlagsDoc(): string {

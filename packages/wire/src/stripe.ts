@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SUBSCRIPTION_STATUSES, tierFromLookupKey, type BillingEvent, type SubscriptionStatus } from '@mbh/domain';
+import { SUBSCRIPTION_STATUSES, tierFromPrice, type BillingEvent, type SubscriptionStatus } from '@mbh/domain';
 
 // The wire shape of the Stripe webhook events we act on, and the ONE mapper to
 // a domain BillingEvent. Only fields we use are declared; Stripe adds fields
@@ -43,7 +43,13 @@ const subscription = z.object({
     data: z.array(
       z.object({
         current_period_end: unixSeconds.nullable().optional(),
-        price: z.object({ id, lookup_key: z.string().nullable().optional() }),
+        price: z.object({
+          id,
+          lookup_key: z.string().nullable().optional(),
+          // mbh_tier names the plan even after its lookup key has moved on
+          // to a newer price (see tierFromPrice).
+          metadata: z.record(z.string()).nullable().optional(),
+        }),
       })
     ),
   }),
@@ -117,7 +123,7 @@ export function parseStripeEvent(json: unknown): StripeEventOutcome {
         subscriptionId: s.id,
         // A deleted subscription is over whatever its last status said.
         status: type === 'customer.subscription.deleted' ? 'canceled' : status,
-        tier: tierFromLookupKey(item?.price.lookup_key),
+        tier: tierFromPrice(item?.price),
         currentPeriodEnd: periodEnd === null ? null : toIso(periodEnd),
         cancelAtPeriodEnd: s.cancel_at_period_end,
       },

@@ -72,6 +72,7 @@ async function main(): Promise<void> {
     routeProvider: new InMemoryRouteProvider(),
     mailer,
     objectStorage: new InMemoryObjectStorage(),
+    planCatalog: null,
     now: () => new Date().toISOString(),
     newId: deps.newId, // shared counter -> no audit id collision
   });
@@ -121,6 +122,7 @@ async function main(): Promise<void> {
     routeProvider: new InMemoryRouteProvider(),
     mailer,
     objectStorage: new InMemoryObjectStorage(),
+    planCatalog: null,
     now: () => new Date().toISOString(),
     newId: deps.newId,
   });

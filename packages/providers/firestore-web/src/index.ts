@@ -33,6 +33,7 @@ import {
   type Member,
   type Tenant,
   type BillingConfig,
+  type PlanPrices,
   type PlanSubject,
   DEFAULT_BILLING_CONFIG,
   resolveFeatureFlags,
@@ -56,6 +57,7 @@ import {
   tenantsCollection,
   userProfilesCollection,
   billingConfigDoc,
+  planPricesDoc,
   featureFlagsDoc,
   shareDoc,
   listingDoc,
@@ -491,6 +493,11 @@ export class FirestoreReader
     const snap = await getDoc(doc(this.db, billingConfigDoc()));
     if (!snap.exists()) return DEFAULT_BILLING_CONFIG;
     return { ...DEFAULT_BILLING_CONFIG, ...(snap.data() as Partial<BillingConfig>) };
+  }
+
+  async planPrices(): Promise<PlanPrices> {
+    const snap = await getDoc(doc(this.db, planPricesDoc()));
+    return snap.exists() ? (snap.data() as PlanPrices) : {};
   }
 
   async tenantPlan(tenantId: string): Promise<PlanSubject | null> {
