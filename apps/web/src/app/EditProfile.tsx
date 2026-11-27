@@ -5,6 +5,7 @@ import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import { useProfile } from '../components/useProfile';
 import { dispatchAction } from '../lib/dispatch';
+import { PAGE } from '../components/page-width';
 
 const INPUT = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent';
 
@@ -151,7 +152,7 @@ export default function EditProfile() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className={PAGE}>
         <div className="text-center py-12">
           <div className="text-gray-600">Loading profile...</div>
         </div>
@@ -160,7 +161,7 @@ export default function EditProfile() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-6">
         <button onClick={() => navigate('/profile')} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
           <ArrowLeft className="w-4 h-4" />

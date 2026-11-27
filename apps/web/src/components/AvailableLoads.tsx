@@ -18,6 +18,7 @@ import {
   AdrAcceptNote,
   LoadVehicleDetails,
 } from '../app/JobCard';
+import { PAGE } from './page-width';
 
 // The carrier browse ("Available Loads"), ported from the mbh-2 prototype
 // (client/src/pages/Dashboard.tsx): expandable JobCards with Accept / View
@@ -96,7 +97,7 @@ export function AvailableLoads({
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Available Loads</h1>
         <p className="text-gray-600">

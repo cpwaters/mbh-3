@@ -12,6 +12,7 @@ import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { useVehicles } from '../../components/useVehicles';
 import { dispatchAction } from '../../lib/dispatch';
+import { PAGE } from '../../components/page-width';
 
 // A shipper's own fleet. Plenty of shippers run their own vehicles and
 // trailers alongside the loads they put out to carriers, so a fleet belongs to
@@ -44,14 +45,14 @@ export default function Fleet() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className={PAGE}>
         <div className="flex items-center justify-center h-64 text-gray-600">Loading fleet…</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className={PAGE}>
       <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Fleet</h1>

@@ -9,6 +9,7 @@ import { geocodePostcode, type GeoPoint } from '../../lib/geocode';
 import { getDrivingDistanceMiles, getDrivingRoute } from '../../lib/routing';
 import { useAddressBook } from '../../components/useAddressBook';
 import { AddressBookPicker, entryFromFields, fieldsFromEntry, type AddressSide } from './AddressBookPicker';
+import { PAGE } from '../../components/page-width';
 
 const INPUT = 'block w-full px-3 py-2 border border-gray-300 rounded-lg';
 
@@ -294,7 +295,7 @@ export default function CreateLoad() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Load</h1>
         <p className="text-gray-600">Fill in all required fields to create a new load</p>

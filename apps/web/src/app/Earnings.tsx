@@ -2,6 +2,7 @@ import { PoundSterling, TrendingUp, Calendar } from 'lucide-react';
 import { formatGbp } from '@mbh/domain';
 import { useApp } from './context';
 import { useEarnings } from '../components/useEarnings';
+import { PAGE } from '../components/page-width';
 
 // Ported from the mbh-2 prototype (client/src/pages/Earnings.tsx): earnings
 // cards + Performance Overview + Recent Trips. Wired to mbh-3's real
@@ -40,7 +41,7 @@ export default function Earnings() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className={PAGE}>
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-600">Loading earnings data...</div>
         </div>
@@ -49,7 +50,7 @@ export default function Earnings() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Earnings &amp; Performance</h1>
         <p className="text-gray-600">Track your income and performance metrics</p>

@@ -5,6 +5,7 @@ import { genRequestId } from '@mbh/client';
 import { useApp } from '../context';
 import { useAddressBook } from '../../components/useAddressBook';
 import { dispatchAction } from '../../lib/dispatch';
+import { PAGE } from '../../components/page-width';
 
 const empty = {
   label: '',
@@ -127,14 +128,14 @@ export default function AddressBook() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className={PAGE}>
         <div className="flex items-center justify-center h-64 text-gray-600">Loading address book…</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className={PAGE}>
       <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Address Book</h1>

@@ -10,6 +10,7 @@ import { useProfile } from '../components/useProfile';
 import { useFeatureFlags } from '../components/useFeatureFlags';
 import { useVehicles } from '../components/useVehicles';
 import { dispatchAction } from '../lib/dispatch';
+import { PAGE } from '../components/page-width';
 
 // Ported from the mbh-2 prototype (client/src/pages/Profile.tsx): the profile
 // card + personal/company/address/contact/driver sections + the vehicle list.
@@ -73,7 +74,7 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className={PAGE}>
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-600">Loading profile...</div>
         </div>
@@ -89,7 +90,7 @@ export default function Profile() {
   const rating = profile?.rating ?? 0;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className={PAGE}>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">My Profile</h1>
         <p className="text-gray-600">Manage your personal and company information</p>

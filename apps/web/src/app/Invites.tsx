@@ -5,6 +5,7 @@ import { genRequestId } from '@mbh/client';
 import { useApp } from './context';
 import { getReader } from '../lib/reader';
 import { dispatchAction } from '../lib/dispatch';
+import { PAGE } from '../components/page-width';
 
 // The founder's invitations. Joining MyBackHaul is by invitation, so this is
 // the door: mint a link, send it, and see what has been used. Founder-only —
@@ -89,7 +90,7 @@ export default function Invites() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className={PAGE}>
       <div className="mb-8 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Invitations</h1>

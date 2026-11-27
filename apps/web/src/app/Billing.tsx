@@ -26,6 +26,7 @@ import {
 import { useApp } from './context';
 import { useFeatureFlags } from '../components/useFeatureFlags';
 import { getReader } from '../lib/reader';
+import { PAGE } from '../components/page-width';
 
 // A company's plan: its free trial, what it is on, how much of its posting
 // and pick-up allowances is used, and the way to change it. One page for both
@@ -164,7 +165,7 @@ export default function Billing() {
     billing?.stripeSubscriptionId !== undefined && billing.status !== undefined && billing.status !== 'canceled';
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-6">
+    <div className={`${PAGE} space-y-6`}>
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing</h1>
         <p className="text-gray-600">
