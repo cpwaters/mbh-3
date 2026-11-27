@@ -140,6 +140,12 @@ itself, and their plan is still recognised from the old price's
 
 If Stripe refuses, the row says why in red and you can try again.
 
+Change prices here, not in the Stripe dashboard. Editing a price in the
+dashboard makes a new price without the plan's lookup key. If that happens,
+press **Change** for the plan here: it finds the plan by its product, makes a
+tagged price, and switches off the hand-made price and its link. Anyone who
+subscribed at the hand-made price keeps paying it and keeps their plan.
+
 ## 5. Prove it end to end (test mode)
 
 1. Sign in as a shipper owner, open Billing, choose a plan, and pay with

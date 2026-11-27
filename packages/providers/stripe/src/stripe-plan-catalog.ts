@@ -17,6 +17,10 @@ import type { StripeFetch } from './stripe-rest.js';
 //
 // Every step looks before it writes, so a run that died part-way is finished
 // by the next one rather than repeated.
+//
+// If the plan has no tagged price — someone edited or archived it in the
+// Stripe dashboard, which makes a new untagged price — the plan is found by
+// its product's metadata.mbh_tier instead, and a tagged price is made there.
 type Obj = Record<string, unknown>;
 type List = { data: Obj[] };
 
@@ -47,22 +51,23 @@ export class StripePlanCatalog implements PlanCatalog {
 
     // 1. The plan's current price, and a new one if the amount differs.
     const found = (await stripe(`/v1/prices?lookup_keys[]=${lookupKey}&active=true`, { method: 'GET' })) as List;
-    const current = found.data[0];
-    if (current === undefined) {
+    const current: Obj | undefined = found.data[0];
+    const product = current !== undefined ? idOf(current.product) : await this.productFor(tier);
+    if (product === undefined) {
       throw new PlanCatalogError(
-        `Stripe has no price for ${PLAN_LABELS[tier]} yet. Run pnpm stripe:provision first (docs/runbooks/billing.md).`,
+        `Stripe has no product or price for ${PLAN_LABELS[tier]} yet. Run pnpm stripe:provision first (docs/runbooks/billing.md).`,
         false
       );
     }
-    const product = idOf(current.product);
-    if (product === undefined) throw new PlanCatalogError(`${PLAN_LABELS[tier]}: its price has no product.`, false);
 
-    let price = current;
-    if (current.unit_amount !== pence || current.currency !== 'gbp') {
+    let price: Obj;
+    if (current !== undefined && current.unit_amount === pence && current.currency === 'gbp') {
+      price = current;
+    } else {
       // Stamp the outgoing price with its plan first, in case it was made by
       // hand without one: its subscribers are identified by it from now on.
-      const meta = current.metadata as Record<string, string> | null | undefined;
-      if (meta?.mbh_tier !== tier) {
+      const meta = current?.metadata as Record<string, string> | null | undefined;
+      if (current !== undefined && meta?.mbh_tier !== tier) {
         await stripe(`/v1/prices/${String(current.id)}`, { method: 'POST', form: { 'metadata[mbh_tier]': tier } });
       }
       price = await stripe('/v1/prices', {
@@ -86,10 +91,14 @@ export class StripePlanCatalog implements PlanCatalog {
     const retire: Obj[] = [];
     for (const link of links.data) {
       const items = (await stripe(`/v1/payment_links/${String(link.id)}/line_items?limit=10`, { method: 'GET' })) as List;
-      const sold = idOf(items.data[0]?.price);
+      const soldPrice = items.data[0]?.price;
+      const sold = idOf(soldPrice);
+      const soldProduct = typeof soldPrice === 'object' && soldPrice !== null ? idOf((soldPrice as Obj).product) : undefined;
       const ours = (link.metadata as Record<string, string> | undefined)?.mbh_tier === tier;
       if (sold === priceId && keep === undefined) keep = link;
-      else if (ours || sold === String(current.id)) retire.push(link);
+      // Any other link for the plan: ours, or selling any price of its product
+      // (including one made by hand in the dashboard).
+      else if (ours || soldProduct === product || (current !== undefined && sold === String(current.id))) retire.push(link);
     }
     if (keep === undefined) {
       keep = await stripe('/v1/payment_links', {
@@ -141,5 +150,12 @@ export class StripePlanCatalog implements PlanCatalog {
     }
 
     return { priceId, paymentLink: String(keep.url) };
+  }
+
+  // The plan's product, by the metadata provisioning stamped on it.
+  private async productFor(tier: PlanTier): Promise<string | undefined> {
+    const products = (await this.stripe('/v1/products?active=true&limit=100', { method: 'GET' })) as List;
+    const match = products.data.find((p) => (p.metadata as Record<string, string> | undefined)?.mbh_tier === tier);
+    return match === undefined ? undefined : String(match.id);
   }
 }
